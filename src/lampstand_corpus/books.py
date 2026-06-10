@@ -30,6 +30,42 @@ ORDER: list[str] = [
 
 CANON: frozenset[str] = frozenset(ORDER)
 
+# Disputed New Testament verses omitted by the critical text (NA/UBS) but present
+# in the Textus Receptus / Majority text. These are the well-known "missing verse"
+# references a reader will look up (e.g. Matthew 18:11). Each translation either
+# renders the verse (KJV throughout; WEB for most) or omits/empties it (ASV empties
+# every one; BSB drops the row entirely; WEB empties a handful). We standardize so
+# that EVERY one of these references resolves to a row in EVERY translation — a real
+# verse where the translation includes it, an ``omitted=1`` empty row where it does
+# not. This list is deliberately explicit and curated rather than heuristic: it is
+# the audit spine for the omitted-verse affordance and must match a printed
+# critical apparatus on spot-check.
+#
+# Scope note: these are *textual-variant* omissions only. Versification/numbering
+# differences (BSB folding Hebrew psalm superscriptions into headings; the Romans
+# doxology relocation at 16:25-27 / WEB's 14:24-26) are NOT omissions — the content
+# is present, only renumbered — and are intentionally excluded here.
+OMITTED_VARIANTS: tuple[tuple[str, int, int], ...] = (
+    ("MAT", 17, 21),
+    ("MAT", 18, 11),
+    ("MAT", 23, 14),
+    ("MRK", 7, 16),
+    ("MRK", 9, 44),
+    ("MRK", 9, 46),
+    ("MRK", 11, 26),
+    ("MRK", 15, 28),
+    ("LUK", 17, 36),
+    ("LUK", 23, 17),
+    ("JHN", 5, 4),
+    ("ACT", 8, 37),
+    ("ACT", 15, 34),
+    ("ACT", 24, 7),
+    ("ACT", 28, 29),
+    ("ROM", 16, 24),
+)
+
+OMITTED_VARIANT_SET: frozenset[tuple[str, int, int]] = frozenset(OMITTED_VARIANTS)
+
 ORDER_INDEX: dict[str, int] = {book: i for i, book in enumerate(ORDER)}
 
 # Human-readable names (for reports + the SQLite book metadata).
