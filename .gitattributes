@@ -10,3 +10,4 @@ sources/**/*.usx filter=lfs diff=lfs merge=lfs -text
 # directly in the repo — keep it as normal text, not LFS. (Overrides the broad
 # sources/**/*.json LFS rule above, which targets large source data files.)
 sources/manifest.json text -filter -diff -merge
+sources/confessions/manifest.json text -filter -diff -merge
