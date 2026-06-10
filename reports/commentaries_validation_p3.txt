@@ -1,0 +1,59 @@
+LampStand corpus — P3 commentaries validation report
+Granularity: paragraph-level chunk, each anchored to a VerseRef
+(single verse or verse range / pericope). Every CCEL structural
+ambiguity is a FLAG for human review, not a silent fix. The
+pipeline never marks a corpus ship-ready.
+========================================================================
+
+## SCOPE (architect-locked, spec §4.2)
+  Henry  — Commentary on the Whole Bible (complete)
+  JFB    — Commentary Critical & Explanatory on the Whole Bible (complete)
+  Calvin — Genesis + Psalms + New Testament ONLY (remaining OT deferred)
+  Spurgeon Treasury of David — skipped (image-only CCEL source); Gill — deferred v1.1
+
+## CALVIN
+  chunks=41694  books=26/26  chapters=436  text=24,301,961 chars
+  errors=0  flags=1
+  books covered: GEN, PSA, MAT, MRK, LUK, JHN, ACT, ROM, 1CO, 2CO, GAL, EPH, PHP, COL, 1TH, 2TH, 1TI, 2TI, TIT, PHM, HEB, JAS, 1PE, 2PE, 1JN, JUD
+  PARSER / CCEL AMBIGUITY FLAGS (review) (1):
+    - calvin: 45 verse-anchor key(s) repeat within the commentator (CCEL split one chapter across sibling div blocks, or a single-chapter book's whole-chapter and verse-1 anchors coincide). Both blocks kept; later occurrence(s) given a deterministic '~N' key suffix — verify this is a benign source split, not a merge error — review
+
+## HENRY
+  chunks=31347  books=66/66  chapters=1188  text=38,578,341 chars
+  errors=6  flags=51
+  books covered: GEN, EXO, LEV, NUM, DEU, JOS, JDG, RUT, 1SA, 2SA, 1KI, 2KI, 1CH, 2CH, EZR, NEH, EST, JOB, PSA, PRO, ECC, SNG, ISA, JER, LAM, EZK, DAN, HOS, JOL, AMO, OBA, JON, MIC, NAM, HAB, ZEP, HAG, ZEC, MAL, MAT, MRK, LUK, JHN, ACT, ROM, 1CO, 2CO, GAL, EPH, PHP, COL, 1TH, 2TH, 1TI, 2TI, TIT, PHM, HEB, JAS, 1PE, 2PE, 1JN, 2JN, 3JN, JUD, REV
+  BOOKS WITH PARTIAL CHAPTER COVERAGE (review) (1):
+    - 2CH: 35/36 chapters
+  CHUNKS WITH OFF-CANON VERSE REFS (error) (6):
+    - henry:2CH.27.16-27#p1 -> 2CH 27:16-27 (off-canon book/chapter/start)
+    - henry:2CH.27.16-27#p2 -> 2CH 27:16-27 (off-canon book/chapter/start)
+    - henry:2CH.27.16-27#p3 -> 2CH 27:16-27 (off-canon book/chapter/start)
+    - henry:2CH.27.16-27#p4 -> 2CH 27:16-27 (off-canon book/chapter/start)
+    - henry:2CH.27.16-27#p5 -> 2CH 27:16-27 (off-canon book/chapter/start)
+    - henry:2CH.27.16-27#p6 -> 2CH 27:16-27 (off-canon book/chapter/start)
+  CCEL ANCHOR VERSE-RANGE OVERRUNS — 49 chunk(s) across these distinct ranges (verify vs printed edition; content anchored at start) (5):
+    - henry:2CH.27.6-15 -> 2CH 27:6-15 (CCEL end-verse > chapter length 9)
+    - henry:2CH.28.20-36 -> 2CH 28:20-36 (CCEL end-verse > chapter length 27)
+    - henry:ACT.26.24-44 -> ACT 26:24-44 (CCEL end-verse > chapter length 32)
+    - henry:ISA.7.17-28 -> ISA 7:17-28 (CCEL end-verse > chapter length 25)
+    - henry:PRO.31.10-33 -> PRO 31:10-33 (CCEL end-verse > chapter length 31)
+  PARSER / CCEL AMBIGUITY FLAGS (review) (1):
+    - henry: 1 verse-anchor key(s) repeat within the commentator (CCEL split one chapter across sibling div blocks, or a single-chapter book's whole-chapter and verse-1 anchors coincide). Both blocks kept; later occurrence(s) given a deterministic '~N' key suffix — verify this is a benign source split, not a merge error — review
+
+## JFB
+  chunks=44452  books=66/66  chapters=1189  text=10,732,243 chars
+  errors=0  flags=1
+  books covered: GEN, EXO, LEV, NUM, DEU, JOS, JDG, RUT, 1SA, 2SA, 1KI, 2KI, 1CH, 2CH, EZR, NEH, EST, JOB, PSA, PRO, ECC, SNG, ISA, JER, LAM, EZK, DAN, HOS, JOL, AMO, OBA, JON, MIC, NAM, HAB, ZEP, HAG, ZEC, MAL, MAT, MRK, LUK, JHN, ACT, ROM, 1CO, 2CO, GAL, EPH, PHP, COL, 1TH, 2TH, 1TI, 2TI, TIT, PHM, HEB, JAS, 1PE, 2PE, 1JN, 2JN, 3JN, JUD, REV
+  PARSER / CCEL AMBIGUITY FLAGS (review) (1):
+    - jfb: 1 verse-anchor key(s) repeat within the commentator (CCEL split one chapter across sibling div blocks, or a single-chapter book's whole-chapter and verse-1 anchors coincide). Both blocks kept; later occurrence(s) given a deterministic '~N' key suffix — verify this is a benign source split, not a merge error — review
+
+## SOURCES SKIPPED / DEFERRED IN SCOPE (flagged for human review)
+  - Spurgeon — Treasury of David (Psalms) — SKIPPED, flagged for human sourcing
+      The only CCEL edition (spurgeon/treasury1-6) is a PAGE-IMAGE SCAN: every volume's body is nothing but <img> references to ~2900 PNG page scans, with no machine-readable commentary text (the sole extractable text is the print-page-number index). Ingesting it would require OCR — a guess, not a parse — which CLAUDE.md forbids. ARCHITECT: approve a clean full-text public-domain Treasury of David source before inclusion. (Mirrors the P2 1689/Belgic handling.)
+  - John Gill — Exposition of the Whole Bible — NOT INGESTED (deferred to v1.1)
+      Per the architect-locked scope, Gill is deferred to corpus v1.1 and is deliberately not defined as a source in this phase. Confirmed absent.
+  - John Calvin — remaining OT — DEFERRED (cleanly skipped)
+      v1 Calvin scope is Genesis + Psalms + New Testament only (spec §4.2). The deferred OT volumes (Harmony of the Law/Joshua, Isaiah, Jeremiah & Lamentations, Ezekiel, Daniel, the Minor Prophets) are NOT snapshotted or parsed: calcom03-06=Harmony of the Law (Exodus-Deuteronomy, 4 vols); calcom07=Joshua; calcom13-16=Isaiah (4 vols); calcom17-21=Jeremiah & Lamentations (5 vols); calcom22-23=Ezekiel (2 vols); calcom24-25=Daniel (2 vols); calcom26=Hosea; calcom27=Joel, Amos, Obadiah; calcom28=Jonah, Micah, Nahum; calcom29=Habakkuk, Zephaniah, Haggai; calcom30=Zechariah, Malachi. Calvin also never wrote on Revelation, 2 John, or 3 John — those NT books are legitimately absent, not gaps (he did comment on Jude).
+
+========================================================================
+END. Human spot-check still required before ship (architect's 23-point: 5 commentary passages vs the canonical edition).

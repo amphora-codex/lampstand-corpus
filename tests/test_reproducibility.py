@@ -13,9 +13,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = REPO_ROOT / "sources" / "manifest.json"
-
-pytestmark = pytest.mark.skipif(
-    not MANIFEST.exists(), reason="snapshots not present; run `cli snapshot` first"
+COMMENTARIES_MANIFEST = (
+    REPO_ROOT / "sources" / "commentaries" / "manifest.json"
 )
 
 
@@ -25,6 +24,9 @@ def _sha(path: Path) -> str:
     return h.hexdigest()
 
 
+@pytest.mark.skipif(
+    not MANIFEST.exists(), reason="snapshots not present; run `cli snapshot` first"
+)
 def test_build_is_deterministic(tmp_path):
     from lampstand_corpus.build import write_bibles
     from lampstand_corpus.cli import normalize_all
@@ -34,4 +36,20 @@ def test_build_is_deterministic(tmp_path):
     b = tmp_path / "b.sqlite"
     write_bibles(parsed, provenance, a)
     write_bibles(parsed, provenance, b)
+    assert _sha(a) == _sha(b)
+
+
+@pytest.mark.skipif(
+    not COMMENTARIES_MANIFEST.exists(),
+    reason="commentary snapshots not present; run `cli snapshot-commentaries` first",
+)
+def test_commentaries_build_is_deterministic(tmp_path):
+    from lampstand_corpus.build_commentaries import write_commentaries
+    from lampstand_corpus.cli import normalize_commentaries
+
+    parsed = normalize_commentaries()
+    a = tmp_path / "a.sqlite"
+    b = tmp_path / "b.sqlite"
+    write_commentaries(parsed, a)
+    write_commentaries(parsed, b)
     assert _sha(a) == _sha(b)

@@ -157,5 +157,49 @@ def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
     return manifest
 
 
-# TODO(P3+): commentary (CCEL), lexicon (OpenScriptures), TSK cross-ref snapshot
-# definitions land in later phases.
+def snapshot_commentaries(retrieved: str, *, force: bool = False) -> dict:
+    """Download (if absent) each commentary VOLUME and write its manifest.
+
+    Commentaries are multi-volume on CCEL (Henry mhc1-6, Calvin's many calcomNN
+    files, JFB one file), so the manifest is keyed ``<commentator>/<volume>``.
+    Idempotent like the others; sources are canonical CCEL ThML (public domain),
+    committed under ``sources/commentaries/<id>/`` via git-lfs. Spurgeon is NOT
+    listed (the CCEL Treasury of David is a page-image scan with no machine text —
+    flagged-and-skipped for v1; see commentaries.py), nor is Gill (deferred v1.1).
+    """
+    from .commentaries import COMMENTARIES_DIR, COMMENTARY_SOURCES
+
+    manifest: dict = {"retrieved": retrieved, "sources": {}}
+    for src in COMMENTARY_SOURCES.values():
+        vols: dict = {}
+        for volume in src.volumes:
+            dest = src.dest(volume)
+            if force or not dest.exists():
+                checksum = fetch(src.url(volume), dest, timeout=180)
+            else:
+                checksum = sha256_of(dest)
+            vols[volume] = {
+                "url": src.url(volume),
+                "file": str(dest.relative_to(SOURCES_DIR.parent)),
+                "sha256": checksum,
+            }
+        manifest["sources"][src.id] = {
+            "name": src.name,
+            "shortcode": src.shortcode,
+            "author": src.author,
+            "work": src.work,
+            "version": src.version,
+            "license": src.license,
+            "retrieved": retrieved,
+            "volumes": vols,
+        }
+    manifest_path = COMMENTARIES_DIR / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
+
+
+# TODO(P4+): lexicon (OpenScriptures), TSK cross-ref snapshot definitions land in
+# later phases.
