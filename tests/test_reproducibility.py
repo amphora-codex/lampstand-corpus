@@ -1,0 +1,37 @@
+"""Reproducibility: the same snapshots must produce a bit-for-bit identical DB.
+
+Skipped when snapshots aren't present. Builds twice into temp paths and compares
+SHA-256. No timestamps or unfixed ordering may leak into the output.
+"""
+
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MANIFEST = REPO_ROOT / "sources" / "manifest.json"
+
+pytestmark = pytest.mark.skipif(
+    not MANIFEST.exists(), reason="snapshots not present; run `cli snapshot` first"
+)
+
+
+def _sha(path: Path) -> str:
+    h = hashlib.sha256()
+    h.update(path.read_bytes())
+    return h.hexdigest()
+
+
+def test_build_is_deterministic(tmp_path):
+    from lampstand_corpus.build import write_bibles
+    from lampstand_corpus.cli import normalize_all
+
+    parsed, provenance = normalize_all()
+    a = tmp_path / "a.sqlite"
+    b = tmp_path / "b.sqlite"
+    write_bibles(parsed, provenance, a)
+    write_bibles(parsed, provenance, b)
+    assert _sha(a) == _sha(b)

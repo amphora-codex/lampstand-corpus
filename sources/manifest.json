@@ -1,0 +1,41 @@
+{
+  "retrieved": "2026-06-10",
+  "sources": {
+    "asv": {
+      "file": "sources/asv/eng-asv_usfm.zip",
+      "license": "Public domain",
+      "name": "American Standard Version",
+      "retrieved": "2026-06-10",
+      "sha256": "f88c96287942c74b08015319348402fd91c74cd67eb50acd44db6fcb9eead408",
+      "url": "https://ebible.org/Scriptures/eng-asv_usfm.zip",
+      "version": "eng-asv 1901 (eBible.org USFM)"
+    },
+    "bsb": {
+      "file": "sources/bsb/bsb_usfm.zip",
+      "license": "CC0 / public domain (bereanbible.com)",
+      "name": "Berean Standard Bible",
+      "retrieved": "2026-06-10",
+      "sha256": "8c4a8068afb1e9c1528c34a89ba73dca9e3d529f4317428553c3695bd373d98a",
+      "url": "https://bereanbible.com/bsb_usfm.zip",
+      "version": "bereanbible.com USFM (snapshot 2026-06-10)"
+    },
+    "kjv": {
+      "file": "sources/kjv/eng-kjv2006_usfm.zip",
+      "license": "Public domain (KJV; UK Crown patent printing restriction only)",
+      "name": "King James Version",
+      "retrieved": "2026-06-10",
+      "sha256": "af9d24284b2a222c9f5a3b140da21397c23b8ae0c20a00617ab34ef556bcd0a1",
+      "url": "https://ebible.org/Scriptures/eng-kjv2006_usfm.zip",
+      "version": "eng-kjv2006 (eBible.org USFM)"
+    },
+    "web": {
+      "file": "sources/web/eng-web_usfm.zip",
+      "license": "Public domain",
+      "name": "World English Bible",
+      "retrieved": "2026-06-10",
+      "sha256": "dea78f5453c44e296e1cbc30c36278b30a10bd25f5c90e13d1f870fe421b464a",
+      "url": "https://ebible.org/Scriptures/eng-web_usfm.zip",
+      "version": "eng-web 2020 stable (eBible.org USFM)"
+    }
+  }
+}

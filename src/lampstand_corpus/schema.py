@@ -3,12 +3,12 @@ output is auditable and reproducible (docs/normalized-schema.md)."""
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ResourceType(str, Enum):
+class ResourceType(StrEnum):
     SCRIPTURE = "scripture"
     COMMENTARY = "commentary"
     CONFESSION = "confession"
@@ -35,7 +35,7 @@ class VerseRef(BaseModel):
     verse_start: int
     verse_end: int | None = None
 
-    def normalized(self) -> "VerseRef":
+    def normalized(self) -> VerseRef:
         return self if self.verse_end else VerseRef(
             book=self.book, chapter=self.chapter,
             verse_start=self.verse_start, verse_end=self.verse_start,
