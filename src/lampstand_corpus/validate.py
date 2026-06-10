@@ -138,15 +138,24 @@ def validate_translation(tid: str, parsed: dict[str, ParsedBook]) -> Translation
 
     # Variants this translation dropped entirely (no parsed verse) become injected
     # omitted=1 empty rows in the build. Count them and confirm the full union of
-    # disputed references will resolve to a row in this translation.
+    # disputed references will resolve to a row in this translation. BSB recovers
+    # the omitted verse's wording from the preceding verse's footnote (\fv marker);
+    # where a recovered note exists it counts toward n_omitted_with_note, otherwise
+    # it is flagged for human review (never fabricated).
     for (b, ch, vs) in books.OMITTED_VARIANTS:
         if (b, ch, vs) not in parsed_variants:
             rep.n_omitted += 1
             rep.n_omitted_injected += 1
-            rep.omitted_verses.append(f"{b} {ch}:{vs} (injected)")
-            rep.omitted_notes_missing.append(
-                f"{b} {ch}:{vs} (injected, no source note)"
-            )
+            pb = parsed.get(b)
+            note = pb.omission_notes.get((ch, vs)) if pb else None
+            if note:
+                rep.n_omitted_with_note += 1
+                rep.omitted_verses.append(f"{b} {ch}:{vs} (injected, source_note recovered)")
+            else:
+                rep.omitted_verses.append(f"{b} {ch}:{vs} (injected)")
+                rep.omitted_notes_missing.append(
+                    f"{b} {ch}:{vs} (injected, no source note)"
+                )
     rep.omitted_verses.sort()
 
     return rep
