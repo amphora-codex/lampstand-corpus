@@ -1,0 +1,55 @@
+{
+  "retrieved": "2026-06-10",
+  "sources": {
+    "dort": {
+      "file": "sources/confessions/dort/canonsofdort.xml",
+      "license": "Public domain (CCEL)",
+      "name": "Canons of Dort",
+      "retrieved": "2026-06-10",
+      "sha256": "a96a94d0a33cdfa3094c89312548e227845ab76c09c0cb20eb8594e2416b9c65",
+      "shortcode": "Dort",
+      "url": "https://ccel.org/ccel/anonymous/canonsofdort.xml",
+      "version": "CCEL ThML (English; Synod of Dordrecht 1618-1619)"
+    },
+    "heidelberg": {
+      "file": "sources/confessions/heidelberg/heidelberg.xml",
+      "license": "Public domain (CCEL)",
+      "name": "Heidelberg Catechism",
+      "retrieved": "2026-06-10",
+      "sha256": "933c933049a1d75dbbe043350b9102569940e8b3eb6d7dc18bfdff1f9cf4660e",
+      "shortcode": "HC",
+      "url": "https://ccel.org/ccel/anonymous/heidelberg.xml",
+      "version": "CCEL ThML"
+    },
+    "wcf": {
+      "file": "sources/confessions/wcf/westminster3.xml",
+      "license": "Public domain (CCEL)",
+      "name": "Westminster Confession of Faith",
+      "retrieved": "2026-06-10",
+      "sha256": "f3017e0bac771d64a73586a97af55f843034ade20bdd03265adddb81788a06cc",
+      "shortcode": "WCF",
+      "url": "https://ccel.org/ccel/anonymous/westminster3.xml",
+      "version": "CCEL ThML (PCUS/UPCUSA American edition; original 33 chapters recovered)"
+    },
+    "wlc": {
+      "file": "sources/confessions/wlc/westminster2.xml",
+      "license": "Public domain (CCEL)",
+      "name": "Westminster Larger Catechism",
+      "retrieved": "2026-06-10",
+      "sha256": "1b23146c4302b8f94c527723377c2b6c8e0989cd0259bdf2aa81c3270c0140f2",
+      "shortcode": "WLC",
+      "url": "https://ccel.org/ccel/anonymous/westminster2.xml",
+      "version": "CCEL ThML"
+    },
+    "wsc": {
+      "file": "sources/confessions/wsc/westminster1.xml",
+      "license": "Public domain (CCEL)",
+      "name": "Westminster Shorter Catechism",
+      "retrieved": "2026-06-10",
+      "sha256": "27bab86445b4a7b5f1199d5b1af9f8ad3720a026f77d51653d6f4237efb6ae12",
+      "shortcode": "WSC",
+      "url": "https://ccel.org/ccel/anonymous/westminster1.xml",
+      "version": "CCEL ThML (1674)"
+    }
+  }
+}

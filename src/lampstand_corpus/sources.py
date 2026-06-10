@@ -124,5 +124,38 @@ def snapshot_bibles(retrieved: str, *, force: bool = False) -> dict:
     return manifest
 
 
-# TODO(P2+): CCEL pages, OpenScriptures repos, TSK snapshot definitions land in
-# later phases. P1 covers the four Bibles only.
+def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
+    """Download (if absent) each confession source and write its manifest.
+
+    Idempotent like :func:`snapshot_bibles`. Sources are canonical CCEL ThML
+    (public domain), committed under ``sources/confessions/<id>/`` via git-lfs.
+    Returns the manifest dict and writes ``sources/confessions/manifest.json``.
+    """
+    # Imported here to avoid a circular import (confessions imports SOURCES_DIR).
+    from .confessions import CONFESSION_SOURCES, CONFESSIONS_DIR
+
+    manifest: dict = {"retrieved": retrieved, "sources": {}}
+    for src in CONFESSION_SOURCES.values():
+        if force or not src.dest.exists():
+            checksum = fetch(src.url, src.dest)
+        else:
+            checksum = sha256_of(src.dest)
+        manifest["sources"][src.id] = {
+            "name": src.name,
+            "shortcode": src.shortcode,
+            "url": src.url,
+            "file": str(src.dest.relative_to(SOURCES_DIR.parent)),
+            "version": src.version,
+            "license": src.license,
+            "retrieved": retrieved,
+            "sha256": checksum,
+        }
+    manifest_path = CONFESSIONS_DIR / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
+
+
+# TODO(P3+): commentary (CCEL), lexicon (OpenScriptures), TSK cross-ref snapshot
+# definitions land in later phases.

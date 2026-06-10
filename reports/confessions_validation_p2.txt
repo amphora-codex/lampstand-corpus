@@ -1,0 +1,51 @@
+LampStand corpus — P2 confessions & catechisms validation report
+Granularity: section / Q&A. Counts checked against known totals.
+Every CCEL structural ambiguity is a FLAG for human review, not a
+silent fix. The pipeline never marks a corpus ship-ready.
+========================================================================
+
+## KNOWN TOTALS (target)
+  WCF=33 chapters  WLC=196 Q  WSC=107 Q  Heidelberg=129 Q / 52 Lord's Days
+  Dort=5 heads of doctrine (59 articles + 34 rejection paragraphs; 3rd & 4th heads combined) + Conclusion
+
+## DORT
+  head-sections=4/4 (= 5 canonical heads, 3rd & 4th combined)  articles=59  rejections=34  chunks=94 (incl. Conclusion)
+  count_ok=True  errors=0  flags=0
+
+## HEIDELBERG
+  questions=129/129  Lord's Days=52/52  proof-texts=1645
+  count_ok=True  errors=0  flags=1
+  PARSER / CCEL AMBIGUITY FLAGS (review) (1):
+    - heidelberg: Lord's Day marker reads 2 where 29 is expected in sequence (likely a CCEL source typo) — review; advanced the Lord's Day counter without renumbering the source
+
+## WCF
+  chapters=32/33  sections=164  proof-texts=0
+  count_ok=False  errors=1  flags=7
+  SEQUENCE GAPS (1):
+    - missing original chapter 24
+  PARSER / CCEL AMBIGUITY FLAGS (review) (6):
+    - wcf: CCEL source is the modern American PCUS/UPCUSA edition (renumbered, adds modern chapters Of the Holy Spirit / Of the Gospel and denominational marriage chapters, carries [PCUS…]/[UPCUSA…] variant brackets). Recovered the 33 ORIGINAL chapters via CCEL's own (orig) mapping; brackets preserved verbatim. Architect: confirm whether to re-source the original 1646/1647 WCF (e.g. Schaff Creeds III) before ship.
+    - wcf: skipping modern chapter 'Chapter 9 (34)' (maps to original 34, outside the 33-chapter original) — review
+    - wcf: skipping modern chapter 'Chapter 10 (35)' (maps to original 35, outside the 33-chapter original) — review
+    - wcf: chapter 19 has a repeated section number 6 in the CCEL source (stored as key '19.6#2'); likely a source mislabel of the following section — review
+    - wcf: original chapter(s) [24] not recoverable from this CCEL edition — the modern PCUS/UPCUSA text replaced WCF 24 (Of Marriage and Divorce) with denomination-specific chapters titled 'Chapter 24: UPCUSA' / 'Chapter 26: PCUS', which lack the (orig) mapping. NOT guessed; re-source the original 1646/1647 chapter for ship — review
+    - wcf: recovered 32/33 original chapters — review
+
+## WLC
+  questions=196/196  proof-texts=0
+  count_ok=True  errors=0  flags=0
+
+## WSC
+  questions=107/107  proof-texts=0
+  count_ok=True  errors=0  flags=0
+
+## DOCUMENTS IN SCOPE BUT SKIPPED (flagged for human sourcing)
+  - 1689 London Baptist Confession (32 chapters)
+      CCEL/Schaff (Creeds of Christendom III, 'Baptist Confession of 1688 / Philadelphia Confession') prints only the editorial DIFFERENCES from the Westminster/Savoy text, not the full 32 chapters. No standalone clean full-text 1689 ThML exists on CCEL. Reconstructing it would mean splicing Westminster text with Schaff's noted deltas — guesswork, which CLAUDE.md forbids. ARCHITECT: approve a canonical full-text source before inclusion.
+  - Belgic Confession (37 articles)
+      Present in Schaff Creeds III only as a 2-column French/Latin-English TABLE (54 tables; English in the right cell) whose 37 articles are fragmented mid-sentence across rows/tables with OCR artifacts ('A rt. II.', 'G uy de B rès'). Clean per-article reconstruction needs heuristic stitching + OCR repair — a guess, not a parse. Re-source a clean canonical English Belgic before inclusion.
+  - Apostles' / Nicene / Athanasian creeds
+      Tentative per spec §6.2. CCEL lists them under the Creeds subject but exposes only rendered HTML (no standalone ThML download), and in Schaff they sit among many historical variant creeds with Greek/Latin parallels. Not cleanly available -> skipped per the 'include only if clean' rule.
+
+========================================================================
+END. Human spot-check still required before ship (architect's 23-point: 3 confession sections vs authoritative).
