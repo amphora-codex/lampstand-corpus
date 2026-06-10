@@ -1,0 +1,183 @@
+{
+  "retrieved": "2026-06-10",
+  "sources": {
+    "calvin": {
+      "author": "John Calvin",
+      "license": "Public domain (CCEL)",
+      "name": "John Calvin's Commentaries (NT + Psalms + Genesis)",
+      "retrieved": "2026-06-10",
+      "shortcode": "Calvin Comm.",
+      "version": "CCEL ThML (v1 scope: Genesis + Psalms + New Testament; remaining OT deferred to a later corpus version)",
+      "volumes": {
+        "calcom01": {
+          "file": "sources/commentaries/calvin/calcom01.xml",
+          "sha256": "4b700a5aa4f799f9363cc232cde85409a4f2ff58ebba6c82d9c4830ba83c7b33",
+          "url": "https://ccel.org/ccel/calvin/calcom01.xml"
+        },
+        "calcom02": {
+          "file": "sources/commentaries/calvin/calcom02.xml",
+          "sha256": "fa675fccdbe4d1ad0e555069e0c00c46d732974cc1989b1ca3df87bb073f0663",
+          "url": "https://ccel.org/ccel/calvin/calcom02.xml"
+        },
+        "calcom08": {
+          "file": "sources/commentaries/calvin/calcom08.xml",
+          "sha256": "d536c3aef54fbece4f8411ee9e76279333c97cd321ce1fc99241da17ea917586",
+          "url": "https://ccel.org/ccel/calvin/calcom08.xml"
+        },
+        "calcom09": {
+          "file": "sources/commentaries/calvin/calcom09.xml",
+          "sha256": "ed4df1781f8f4fcc5c192adae0702a198f19176e2ae5e4790b34b5780971a591",
+          "url": "https://ccel.org/ccel/calvin/calcom09.xml"
+        },
+        "calcom10": {
+          "file": "sources/commentaries/calvin/calcom10.xml",
+          "sha256": "7663f8e936be7b2f896a01e146ac30e03884f6edc04f3fc65d2b97bb51f99070",
+          "url": "https://ccel.org/ccel/calvin/calcom10.xml"
+        },
+        "calcom11": {
+          "file": "sources/commentaries/calvin/calcom11.xml",
+          "sha256": "ba8b446e8df7599db0e8088704f5c108fab17a873f34df75f7449eb79b13d6ea",
+          "url": "https://ccel.org/ccel/calvin/calcom11.xml"
+        },
+        "calcom12": {
+          "file": "sources/commentaries/calvin/calcom12.xml",
+          "sha256": "53e9f7cb53092c67c71ed3f6b0bf6f625f0fcdc4b4f4272327c8939fb9e4b3de",
+          "url": "https://ccel.org/ccel/calvin/calcom12.xml"
+        },
+        "calcom31": {
+          "file": "sources/commentaries/calvin/calcom31.xml",
+          "sha256": "4989da59aa4b29fd076d95bae451def22de137db54bd7c52eb070f544913b428",
+          "url": "https://ccel.org/ccel/calvin/calcom31.xml"
+        },
+        "calcom32": {
+          "file": "sources/commentaries/calvin/calcom32.xml",
+          "sha256": "a6a0045ee9a75603a35142bdcfa2fdeac79a9d867ea32b1e16cbc47a8c0d6681",
+          "url": "https://ccel.org/ccel/calvin/calcom32.xml"
+        },
+        "calcom33": {
+          "file": "sources/commentaries/calvin/calcom33.xml",
+          "sha256": "28cecf1fe7cdf9837f6760f8febb9bea5cee08ead5950596fa4dac1dfb4a98af",
+          "url": "https://ccel.org/ccel/calvin/calcom33.xml"
+        },
+        "calcom34": {
+          "file": "sources/commentaries/calvin/calcom34.xml",
+          "sha256": "69f6362ccb18d6e09c8c4aae165179b8dc4838ae19b268b3a3787fb6ed37c39a",
+          "url": "https://ccel.org/ccel/calvin/calcom34.xml"
+        },
+        "calcom35": {
+          "file": "sources/commentaries/calvin/calcom35.xml",
+          "sha256": "d4681c28a63055fa04fcd4883f8f9acf0e2614086bdfe40c0fd303bf26ddd035",
+          "url": "https://ccel.org/ccel/calvin/calcom35.xml"
+        },
+        "calcom36": {
+          "file": "sources/commentaries/calvin/calcom36.xml",
+          "sha256": "b48725d5eb77240b1bc4e5918d7141387811e9e2916e19f210a3cc75e6886af1",
+          "url": "https://ccel.org/ccel/calvin/calcom36.xml"
+        },
+        "calcom37": {
+          "file": "sources/commentaries/calvin/calcom37.xml",
+          "sha256": "a1ca28543d1700c301dfb9e72e9fa8646febd1575e76ae0bc91ddb95a871bf34",
+          "url": "https://ccel.org/ccel/calvin/calcom37.xml"
+        },
+        "calcom38": {
+          "file": "sources/commentaries/calvin/calcom38.xml",
+          "sha256": "83f148d977bb0e02928d209dd4cb2b19ebea440dd9c5e85fe3e73131fb53289c",
+          "url": "https://ccel.org/ccel/calvin/calcom38.xml"
+        },
+        "calcom39": {
+          "file": "sources/commentaries/calvin/calcom39.xml",
+          "sha256": "176ef9aa57b3973664dcf65d4ca12c1b7b319e51e8df7c270d237d6ad1aed012",
+          "url": "https://ccel.org/ccel/calvin/calcom39.xml"
+        },
+        "calcom40": {
+          "file": "sources/commentaries/calvin/calcom40.xml",
+          "sha256": "62b7b8c27c058d259cc4dc63564970ead43d516beeb9225b83a01c6d02fa1db2",
+          "url": "https://ccel.org/ccel/calvin/calcom40.xml"
+        },
+        "calcom41": {
+          "file": "sources/commentaries/calvin/calcom41.xml",
+          "sha256": "fac8c754eb4291391a28e94f9e285c40f9a5dfc43326f63a3438f65f9aa9aefd",
+          "url": "https://ccel.org/ccel/calvin/calcom41.xml"
+        },
+        "calcom42": {
+          "file": "sources/commentaries/calvin/calcom42.xml",
+          "sha256": "51096062bcf518040d5384f2597331b6e96dece4d0aaf2e5dda64c262dd921d2",
+          "url": "https://ccel.org/ccel/calvin/calcom42.xml"
+        },
+        "calcom43": {
+          "file": "sources/commentaries/calvin/calcom43.xml",
+          "sha256": "b5cdb241085c0eea44aa29388d88a53d2940ee0910cd43c39182f4a0c581528b",
+          "url": "https://ccel.org/ccel/calvin/calcom43.xml"
+        },
+        "calcom44": {
+          "file": "sources/commentaries/calvin/calcom44.xml",
+          "sha256": "b3bc9df38e418bc26ec525e01e9a4f59a41ca0b8f9c52ede49d880f0eac59827",
+          "url": "https://ccel.org/ccel/calvin/calcom44.xml"
+        },
+        "calcom45": {
+          "file": "sources/commentaries/calvin/calcom45.xml",
+          "sha256": "61ee8f73bf8a3f274bdf599c20631874a1070d489edf9fd659d572bfb20b1d1f",
+          "url": "https://ccel.org/ccel/calvin/calcom45.xml"
+        }
+      },
+      "work": "Calvin's Commentaries"
+    },
+    "henry": {
+      "author": "Matthew Henry",
+      "license": "Public domain (CCEL)",
+      "name": "Matthew Henry's Commentary on the Whole Bible",
+      "retrieved": "2026-06-10",
+      "shortcode": "MH",
+      "version": "CCEL ThML (complete; 6 volumes mhc1-mhc6)",
+      "volumes": {
+        "mhc1": {
+          "file": "sources/commentaries/henry/mhc1.xml",
+          "sha256": "6eb946647f806f46129001f83013d65c51e40ac59b939ac1c51404aa50375971",
+          "url": "https://ccel.org/ccel/henry/mhc1.xml"
+        },
+        "mhc2": {
+          "file": "sources/commentaries/henry/mhc2.xml",
+          "sha256": "673fcb4168ad946ab1e6923c0e331cc61e4adca4498fc0ee34cf1507285aa2f7",
+          "url": "https://ccel.org/ccel/henry/mhc2.xml"
+        },
+        "mhc3": {
+          "file": "sources/commentaries/henry/mhc3.xml",
+          "sha256": "8ba9779eba5d326acbfc9acaccf2ea1fa2d6b5c48b03ab86fc5e80b0bfa5b17e",
+          "url": "https://ccel.org/ccel/henry/mhc3.xml"
+        },
+        "mhc4": {
+          "file": "sources/commentaries/henry/mhc4.xml",
+          "sha256": "7b6ea0800caa1daab6b0c807f5b95c7567fb5d880290bbe91d848048a80486b2",
+          "url": "https://ccel.org/ccel/henry/mhc4.xml"
+        },
+        "mhc5": {
+          "file": "sources/commentaries/henry/mhc5.xml",
+          "sha256": "8b0853b116e9a68215a594bafe29f45502d4c766e1f128cbf5fb050f45cf2518",
+          "url": "https://ccel.org/ccel/henry/mhc5.xml"
+        },
+        "mhc6": {
+          "file": "sources/commentaries/henry/mhc6.xml",
+          "sha256": "296195d09d4fbb1e7516ea77c100dbc87ce37542c3109f9f570c3cf155b594c1",
+          "url": "https://ccel.org/ccel/henry/mhc6.xml"
+        }
+      },
+      "work": "An Exposition of the Old and New Testaments (Commentary on the Whole Bible)"
+    },
+    "jfb": {
+      "author": "Robert Jamieson, A. R. Fausset, David Brown",
+      "license": "Public domain (CCEL)",
+      "name": "Jamieson-Fausset-Brown Commentary on the Whole Bible",
+      "retrieved": "2026-06-10",
+      "shortcode": "JFB",
+      "version": "CCEL ThML (complete; single file)",
+      "volumes": {
+        "jfb": {
+          "file": "sources/commentaries/jfb/jfb.xml",
+          "sha256": "ce16900c4795d9bd3dc7f7aaec3fccd395c166d4d9593a14b9aae06869aab9af",
+          "url": "https://ccel.org/ccel/jamieson/jfb.xml"
+        }
+      },
+      "work": "Commentary Critical and Explanatory on the Whole Bible"
+    }
+  }
+}
