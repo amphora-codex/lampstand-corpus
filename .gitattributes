@@ -1,0 +1,7 @@
+sources/**/*.zip filter=lfs diff=lfs merge=lfs -text
+sources/**/*.json filter=lfs diff=lfs merge=lfs -text
+sources/**/*.usfm filter=lfs diff=lfs merge=lfs -text
+sources/**/*.sfm filter=lfs diff=lfs merge=lfs -text
+sources/**/*.txt filter=lfs diff=lfs merge=lfs -text
+sources/**/*.xml filter=lfs diff=lfs merge=lfs -text
+sources/**/*.usx filter=lfs diff=lfs merge=lfs -text
