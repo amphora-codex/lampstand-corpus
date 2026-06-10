@@ -29,11 +29,20 @@ class TranslationReport:
     n_verses: int = 0
     n_red_letter_verses: int = 0
     n_bridges: int = 0
+    # Omitted-variant accounting (critical-text omissions, post-standardization).
+    n_omitted: int = 0                 # omitted=1 rows the build will write
+    n_omitted_with_note: int = 0       # of those, with a recovered source_note
+    n_omitted_injected: int = 0        # of those, rows injected (no parsed verse)
     missing_books: list[str] = field(default_factory=list)
     extra_books: list[str] = field(default_factory=list)
     chapter_count_mismatches: list[str] = field(default_factory=list)
     verse_count_deviations: list[str] = field(default_factory=list)
     empty_verses: list[str] = field(default_factory=list)
+    omitted_verses: list[str] = field(default_factory=list)
+    omitted_notes_missing: list[str] = field(default_factory=list)
+    # Disputed variants this translation renders as real text ("B C:V"), so the
+    # union check can confirm every reference resolves to *some* row everywhere.
+    real_variant_refs: set[str] = field(default_factory=set)
     anomalies: list[str] = field(default_factory=list)
     parser_warnings: list[str] = field(default_factory=list)
 
@@ -52,6 +61,11 @@ class TranslationReport:
 
 def validate_translation(tid: str, parsed: dict[str, ParsedBook]) -> TranslationReport:
     rep = TranslationReport(translation=tid)
+
+    # Which disputed critical-text variants this translation actually parsed as
+    # a verse (whether with text or empty). The remainder are injected by the
+    # build as omitted=1 empty rows so every variant resolves in every translation.
+    parsed_variants: dict[tuple[str, int, int], object] = {}
 
     present = set(parsed)
     rep.missing_books = [b for b in books.ORDER if b not in present]
@@ -86,8 +100,26 @@ def validate_translation(tid: str, parsed: dict[str, ParsedBook]) -> Translation
                 rep.n_red_letter_verses += 1
             if v.is_bridge:
                 rep.n_bridges += 1
+            ref = (book_id, v.chapter, v.verse_start)
+            is_variant = ref in books.OMITTED_VARIANT_SET
+            if is_variant:
+                parsed_variants[ref] = v
+                if v.text:
+                    rep.real_variant_refs.add(f"{book_id} {v.chapter}:{v.verse_start}")
             if not v.text:
-                rep.empty_verses.append(f"{book_id} {v.chapter}:{v.verse_start}")
+                # A known textual-variant empty is an *expected* omitted row, not a
+                # generic empty-verse flag. Everything else stays a flag for review.
+                if is_variant:
+                    rep.n_omitted += 1
+                    rep.omitted_verses.append(f"{book_id} {v.chapter}:{v.verse_start}")
+                    if v.source_note:
+                        rep.n_omitted_with_note += 1
+                    else:
+                        rep.omitted_notes_missing.append(
+                            f"{book_id} {v.chapter}:{v.verse_start} (empty, no source note)"
+                        )
+                else:
+                    rep.empty_verses.append(f"{book_id} {v.chapter}:{v.verse_start}")
             by_chapter.setdefault(v.chapter, []).append(v)
 
         # verse-count deviation vs. reference versification
@@ -103,6 +135,19 @@ def validate_translation(tid: str, parsed: dict[str, ParsedBook]) -> Translation
             # anomaly: chapter with no verses at all
             if not verses_here:
                 rep.anomalies.append(f"{book_id} {ci}: chapter has no verses")
+
+    # Variants this translation dropped entirely (no parsed verse) become injected
+    # omitted=1 empty rows in the build. Count them and confirm the full union of
+    # disputed references will resolve to a row in this translation.
+    for (b, ch, vs) in books.OMITTED_VARIANTS:
+        if (b, ch, vs) not in parsed_variants:
+            rep.n_omitted += 1
+            rep.n_omitted_injected += 1
+            rep.omitted_verses.append(f"{b} {ch}:{vs} (injected)")
+            rep.omitted_notes_missing.append(
+                f"{b} {ch}:{vs} (injected, no source note)"
+            )
+    rep.omitted_verses.sort()
 
     return rep
 
@@ -120,6 +165,32 @@ def render_report(reports: dict[str, TranslationReport]) -> str:
     lines.append("not silent fixes. Pipeline never marks a corpus ship-ready.")
     lines.append("=" * 72)
 
+    # Cross-translation union check: every disputed reference must resolve to a row
+    # in every translation (real verse or omitted=1 empty row). Reported up front.
+    union = list(books.OMITTED_VARIANTS)
+    lines.append("")
+    lines.append("## OMITTED-VERSE UNION (critical-text variants)")
+    lines.append(f"  {len(union)} disputed references; each must resolve to a row in "
+                 "all four translations.")
+    unresolved: list[str] = []
+    for b, ch, vs in union:
+        ref = f"{b} {ch}:{vs}"
+        resolves_everywhere = all(
+            ref in r.real_variant_refs
+            or any(ov.startswith(ref) for ov in r.omitted_verses)
+            for r in reports.values()
+        )
+        if not resolves_everywhere:
+            unresolved.append(ref)
+    if unresolved:
+        lines.append(f"  UNRESOLVED in >=1 translation ({len(unresolved)}): "
+                     + ", ".join(unresolved))
+    else:
+        lines.append("  OK: all disputed references resolve in every translation.")
+    lines.append("  per-translation omitted counts: "
+                 + ", ".join(f"{tid}={reports[tid].n_omitted}"
+                             for tid in sorted(reports)))
+
     for tid in sorted(reports):
         r = reports[tid]
         lines.append("")
@@ -127,6 +198,9 @@ def render_report(reports: dict[str, TranslationReport]) -> str:
         lines.append(f"  books={r.n_books}/66  chapters={r.n_chapters}  "
                      f"verses={r.n_verses}  red-letter verses={r.n_red_letter_verses}  "
                      f"bridges={r.n_bridges}")
+        lines.append(f"  omitted (critical-text) rows={r.n_omitted}  "
+                     f"(with source_note={r.n_omitted_with_note}, "
+                     f"injected={r.n_omitted_injected})")
         lines.append(f"  errors={r.error_total}  flags={r.flag_total}")
 
         def block(title: str, items: list[str], cap: int = 50) -> None:
@@ -141,7 +215,9 @@ def render_report(reports: dict[str, TranslationReport]) -> str:
         block("MISSING BOOKS", r.missing_books)
         block("EXTRA / NON-CANON BOOKS", r.extra_books)
         block("CHAPTER MISMATCHES", r.chapter_count_mismatches)
-        block("EMPTY VERSES (textual variants?)", r.empty_verses)
+        block("OMITTED VERSES (critical-text, omitted=1)", r.omitted_verses)
+        block("OMITTED VERSES WITHOUT SOURCE NOTE (review)", r.omitted_notes_missing)
+        block("EMPTY VERSES (unexpected — not a known variant)", r.empty_verses)
         block("VERSE-COUNT DEVIATIONS (vs reference)", r.verse_count_deviations)
         block("STRUCTURAL ANOMALIES", r.anomalies)
         block("PARSER WARNINGS", r.parser_warnings)

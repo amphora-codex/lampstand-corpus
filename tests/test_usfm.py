@@ -98,3 +98,37 @@ def test_headings_dropped():
     pb = parse_usfm(raw)
     assert len(pb.verses) == 1
     assert pb.verses[0].text == "In the beginning."
+
+
+def test_omitted_verse_empty_text_no_source_note():
+    # A normal (non-footnote) empty verse parses to empty text and a NULL note.
+    pb = parse_usfm("\\id MAT\n\\c 18\n\\p \\v 11\n\\v 12 What do you think?\n")
+    v11 = next(v for v in pb.verses if v.verse_start == 11)
+    assert v11.text == ""
+    assert v11.source_note is None
+
+
+def test_omitted_verse_recovers_source_note():
+    # ASV-style: the omitted verse carries an "ancient authorities insert" footnote;
+    # we recover its plain text (caller, \fr ref, and \ft/\fqa tags stripped).
+    raw = ("\\id MAT\n\\c 18\n"
+           "\\v 11 \\f + \\fr 18:11 \\ft Many authorities insert v. 11. "
+           "\\fqa For the son of man came to save that which was lost. "
+           "\\ft See Luk 19:10.\\f*\n")
+    pb = parse_usfm(raw)
+    v = pb.verses[0]
+    assert v.text == ""
+    assert v.source_note is not None
+    assert "Many authorities insert" in v.source_note
+    assert "save that which was lost" in v.source_note
+    assert "\\f" not in v.source_note and "18:11" not in v.source_note
+
+
+def test_source_note_only_on_empty_verses():
+    # A verse with real text never gets a source_note even if it carries a footnote.
+    raw = ("\\id JHN\n\\c 1\n\\p \\v 6 There was a man"
+           "\\f + \\fr 1:6 \\ft a note\\f* sent from God.\n")
+    pb = parse_usfm(raw)
+    v = pb.verses[0]
+    assert v.text == "There was a man sent from God."
+    assert v.source_note is None

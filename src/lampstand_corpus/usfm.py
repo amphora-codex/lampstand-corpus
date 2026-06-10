@@ -28,7 +28,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from .books import CANON
+from .books import CANON, OMITTED_VARIANT_SET
 
 
 @dataclass
@@ -47,6 +47,11 @@ class ParsedVerse:
     verse_end: int          # == verse_start for single verses
     text: str
     wj_spans: list[WjSpan] = field(default_factory=list)
+    # Plain text of a source textual footnote carried *on this verse*, if any.
+    # Populated only for verses whose body text is empty (critical-text
+    # omissions where the source hangs an "ancient authorities insert…" note on
+    # the empty verse — ASV and WEB do this). Best-effort; NULL otherwise.
+    source_note: str | None = None
 
     @property
     def is_bridge(self) -> bool:
@@ -69,6 +74,18 @@ class ParsedBook:
 # A footnote / cross-ref note: \f ... \f*  or  \x ... \x*  (non-greedy, no nesting
 # of f/x within f/x in our sources). Removed entirely from display text.
 _NOTE_RE = re.compile(r"\\(?:f|x)\b.*?\\(?:f|x)\*", re.DOTALL)
+
+# A *footnote only* (\f ... \f*), used to recover the note text on an omitted
+# verse. Captures the inner body so we can render it as the source_note.
+_FOOTNOTE_RE = re.compile(r"\\f\b\s*(.*?)\\f\*", re.DOTALL)
+
+# Footnote sub-markers we strip to recover plain note prose. \fr is the
+# verse-reference echo (e.g. "17:21"); the leading "+" / "-" is the caller. The
+# \ft (text) and \fqa (alternate reading) runs carry the human-readable body.
+_FOOTNOTE_CALLER_RE = re.compile(r"^\s*[-+?]\s*")
+_FOOTNOTE_FR_RE = re.compile(r"\\fr\b\s*\S+\s*")
+_FOOTNOTE_FV_RE = re.compile(r"\\fv\b\s*\d+\s*\\fv\*")  # embedded verse marker
+_FOOTNOTE_TAG_RE = re.compile(r"\\\+?[a-z]+\d?\*?")     # \ft \fqa \fk etc.
 
 # \ref display|LINK\ref*  -> keep the display portion before the pipe.
 _REF_RE = re.compile(r"\\ref\s+([^|\\]*?)(?:\|[^\\]*?)?\\ref\*", re.DOTALL)
@@ -113,6 +130,33 @@ def _clean_inline(text: str) -> str:
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r" ([,.;:!?’”])", r"\1", text)  # tidy space before punctuation
     return text.strip()
+
+
+def _extract_footnote_text(raw: str) -> str | None:
+    """Recover the plain-text body of the *first* footnote in ``raw``.
+
+    Used only for omitted/empty verses, where the source hangs an
+    "ancient authorities insert…" note on the empty verse. Strips the caller,
+    the ``\\fr`` reference echo, embedded ``\\fv`` verse markers, ``\\ref``
+    links, and footnote sub-tags (``\\ft``/``\\fqa``), leaving readable prose.
+    Returns ``None`` when there is no footnote.
+    """
+    m = _FOOTNOTE_RE.search(raw)
+    if not m:
+        return None
+    body = m.group(1)
+    body = _FOOTNOTE_CALLER_RE.sub("", body)
+    body = _FOOTNOTE_FR_RE.sub("", body)
+    body = _FOOTNOTE_FV_RE.sub("", body)
+    body = _REF_RE.sub(lambda mm: mm.group(1), body)
+    body = _WORD_RE.sub(lambda mm: mm.group(1), body)
+    body = _FOOTNOTE_TAG_RE.sub("", body)
+    body = body.replace("¶", " ")
+    body = unicodedata.normalize("NFC", body)
+    body = re.sub(r"[ \t]+", " ", body)
+    body = re.sub(r" ([,.;:!?’”])", r"\1", body)
+    body = body.strip()
+    return body or None
 
 
 def _extract_wj(raw: str) -> tuple[str, list[WjSpan]]:
@@ -195,10 +239,13 @@ def parse_usfm(content: str) -> ParsedBook:
             return
         raw = " ".join(p for p in cur_buf if p)
         text, spans = _extract_wj(raw)
+        # An omitted verse is one whose body cleaned to nothing. Where the source
+        # hangs a textual footnote on that empty verse (ASV/WEB), recover it.
+        note = _extract_footnote_text(raw) if not text else None
         verses.append(ParsedVerse(
             book=book_id, chapter=chapter,
             verse_start=cur_v_start, verse_end=cur_v_end or cur_v_start,
-            text=text, wj_spans=spans,
+            text=text, wj_spans=spans, source_note=note,
         ))
         cur_v_start = cur_v_end = None
         cur_buf = []
@@ -289,9 +336,11 @@ def parse_usfm(content: str) -> ParsedBook:
 
     flush()
 
-    # Sanity warnings: empty verses.
+    # Sanity warnings: empty verses. Known critical-text omissions are expected
+    # to be empty (they become omitted=1 rows downstream), so don't warn on them —
+    # only an *unexpected* empty verse is a parser anomaly worth surfacing.
     for v in verses:
-        if not v.text:
+        if not v.text and (book_id, v.chapter, v.verse_start) not in OMITTED_VARIANT_SET:
             warnings.append(f"{book_id} {v.chapter}:{v.verse_start} parsed empty")
 
     return ParsedBook(book=book_id, verses=verses, warnings=warnings)

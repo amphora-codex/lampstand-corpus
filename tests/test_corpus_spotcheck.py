@@ -31,6 +31,15 @@ def _verse(conn, translation, book, chapter, verse) -> str | None:
     return row[0] if row else None
 
 
+def _row(conn, translation, book, chapter, verse):
+    """Full omitted-aware row (text, omitted, source_note) or None."""
+    return conn.execute(
+        "SELECT text, omitted, source_note FROM verse WHERE translation=? "
+        "AND book=? AND chapter=? AND verse_start=?",
+        (translation, book, chapter, verse),
+    ).fetchone()
+
+
 @pytest.fixture(scope="module")
 def conn():
     c = sqlite3.connect(DB)
@@ -89,21 +98,61 @@ def test_asv_has_no_red_letter(conn):
     assert n == 0
 
 
-def test_no_empty_text_except_known_variants(conn):
-    # Every stored verse has text, except documented textual-variant omissions.
+def test_empty_text_rows_are_flagged_or_known(conn):
+    # Every empty-text row is either an omitted=1 critical-text variant, or the
+    # one documented versification artifact (WEB's relocated Romans doxology).
     rows = conn.execute(
-        "SELECT translation, book, chapter, verse_start FROM verse WHERE text=''"
+        "SELECT translation, book, chapter, verse_start, omitted FROM verse "
+        "WHERE text=''"
     ).fetchall()
-    # All empties must be among the known omitted/relocated variant verses.
-    known = {
-        ("asv", "MAT", 17, 21), ("asv", "MAT", 18, 11), ("asv", "MAT", 23, 14),
-        ("asv", "MRK", 7, 16), ("asv", "MRK", 9, 44), ("asv", "MRK", 9, 46),
-        ("asv", "MRK", 11, 26), ("asv", "MRK", 15, 28), ("asv", "LUK", 17, 36),
-        ("asv", "LUK", 23, 17), ("asv", "JHN", 5, 4), ("asv", "ACT", 8, 37),
-        ("asv", "ACT", 15, 34), ("asv", "ACT", 24, 7), ("asv", "ACT", 28, 29),
-        ("asv", "ROM", 16, 24),
-        ("web", "LUK", 17, 36), ("web", "ACT", 8, 37), ("web", "ACT", 15, 34),
-        ("web", "ACT", 24, 7), ("web", "ROM", 16, 25),
-    }
-    unexpected = [tuple(r) for r in rows if tuple(r) not in known]
-    assert not unexpected, f"unexpected empty verses: {unexpected}"
+    known_non_omitted = {("web", "ROM", 16, 25)}  # doxology renumbering, not omission
+    for tid, b, ch, v, omitted in rows:
+        if (tid, b, ch, v) in known_non_omitted:
+            assert omitted == 0
+        else:
+            assert omitted == 1, f"empty but not flagged omitted: {tid} {b} {ch}:{v}"
+
+
+def test_matt_18_11_omitted_in_critical_text(conn):
+    # The classic "missing verse." Critical-text translations (BSB, ASV) carry it
+    # as an omitted=1 empty row; TR/majority translations (KJV, WEB) keep the text.
+    for tid in ("bsb", "asv"):
+        text, omitted, _note = _row(conn, tid, "MAT", 18, 11)
+        assert text == "" and omitted == 1, tid
+    for tid in ("kjv", "web"):
+        text, omitted, _note = _row(conn, tid, "MAT", 18, 11)
+        assert text and omitted == 0, tid
+        assert "save" in text.lower(), tid
+
+
+def test_john_3_16_not_omitted_anywhere(conn):
+    for tid in ("bsb", "kjv", "asv", "web"):
+        text, omitted, _note = _row(conn, tid, "JHN", 3, 16)
+        assert text and omitted == 0, tid
+
+
+def test_every_disputed_reference_resolves_in_all_translations(conn):
+    # Uniform addressability: each disputed reference must return a row in every
+    # translation — the union resolves everywhere, no NULL rows.
+    from lampstand_corpus import books
+
+    for b, ch, v in books.OMITTED_VARIANTS:
+        for tid in ("bsb", "kjv", "asv", "web"):
+            row = _row(conn, tid, b, ch, v)
+            assert row is not None, f"{tid} missing row for {b} {ch}:{v}"
+
+
+def test_asv_omitted_verses_carry_source_note(conn):
+    # ASV hangs an "ancient authorities insert…" footnote on each omitted verse;
+    # we recover it as source_note.
+    _t, omitted, note = _row(conn, "asv", "MAT", 17, 21)
+    assert omitted == 1
+    assert note and "authorities" in note.lower()
+    assert "\\f" not in note and "\\ft" not in note  # markup stripped
+
+
+def test_bsb_injected_omissions_have_null_note(conn):
+    # BSB drops the row entirely and carries the note on the *preceding* verse;
+    # attribution across verses would be a guess, so source_note stays NULL.
+    _t, omitted, note = _row(conn, "bsb", "MAT", 18, 11)
+    assert omitted == 1 and note is None

@@ -8,6 +8,12 @@ bit-for-bit identical database.
 
 Red-letter (words-of-Christ) data is stored as a JSON array of ``[start, end]``
 character offsets on each verse row, plus a boolean flag for cheap filtering.
+
+Disputed critical-text omissions (books.OMITTED_VARIANTS) are standardized here:
+every such reference resolves to a row in every translation — a real verse where
+the translation includes it, or an ``omitted=1`` empty row where it does not — so
+the app can render a uniform footnote / tap-to-explain affordance. ``source_note``
+carries the source's textual footnote on an omitted verse when one is present.
 """
 
 from __future__ import annotations
@@ -48,9 +54,11 @@ CREATE TABLE verse (
     chapter      INTEGER NOT NULL,
     verse_start  INTEGER NOT NULL,
     verse_end    INTEGER NOT NULL,  -- == verse_start unless a bridge
-    text         TEXT NOT NULL,
+    text         TEXT NOT NULL,     -- "" for an omitted (critical-text) verse
     red_letter   INTEGER NOT NULL DEFAULT 0,  -- 0/1: any words-of-Christ
     wj_spans     TEXT,              -- JSON [[start,end],...] or NULL
+    omitted      INTEGER NOT NULL DEFAULT 0,  -- 0/1: critical-text omission, empty body
+    source_note  TEXT,              -- textual footnote on an omitted verse, or NULL
     PRIMARY KEY (translation, book, chapter, verse_start)
 );
 
@@ -111,19 +119,47 @@ def write_bibles(
             )
 
         # Verses in fixed order: translation, then canonical book, chapter, verse.
+        # As we write, we standardize the disputed critical-text omissions so every
+        # reference in books.OMITTED_VARIANTS resolves to a row in every translation:
+        #   * a parsed verse whose body is empty AND whose ref is a known variant
+        #     is marked omitted=1 (ASV/WEB empties);
+        #   * a known variant with no parsed row at all gets an injected omitted=1
+        #     empty row in canonical position (BSB drops these rows entirely).
         for tid in sorted(parsed):
+            present_variants: set[tuple[str, int, int]] = set()
             for book_id in books.ORDER:
                 pb = parsed[tid].get(book_id)
                 if pb is None:
                     continue
+                # Build the verse list for this book, then splice in any injected
+                # omitted rows so ordering stays canonical and deterministic.
+                rows: list[tuple] = []
                 for v in sorted(pb.verses, key=lambda x: (x.chapter, x.verse_start)):
+                    ref = (book_id, v.chapter, v.verse_start)
+                    is_variant = ref in books.OMITTED_VARIANT_SET
+                    if is_variant:
+                        present_variants.add(ref)
                     spans = [[s.start, s.end] for s in v.wj_spans]
-                    conn.execute(
-                        "INSERT INTO verse VALUES (?,?,?,?,?,?,?,?)",
-                        (tid, book_id, v.chapter, v.verse_start, v.verse_end,
-                         v.text, 1 if spans else 0,
-                         json.dumps(spans, separators=(",", ":")) if spans else None),
-                    )
+                    omitted = 1 if (is_variant and v.text == "") else 0
+                    rows.append((
+                        tid, book_id, v.chapter, v.verse_start, v.verse_end,
+                        v.text, 1 if spans else 0,
+                        json.dumps(spans, separators=(",", ":")) if spans else None,
+                        omitted, v.source_note,
+                    ))
+
+                # Inject omitted=1 empty rows for variants this translation dropped
+                # entirely (no parsed verse). source_note is NULL: the source carries
+                # the note on the *preceding* verse (BSB), and attributing it across
+                # verses would be a guess — flagged for human review, not resolved.
+                injected = [
+                    (tid, b, ch, vs, vs, "", 0, None, 1, None)
+                    for (b, ch, vs) in books.OMITTED_VARIANTS
+                    if b == book_id and (b, ch, vs) not in present_variants
+                ]
+                rows.extend(injected)
+                rows.sort(key=lambda r: (r[2], r[3]))  # (chapter, verse_start)
+                conn.executemany("INSERT INTO verse VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
         conn.commit()
     finally:
         conn.close()

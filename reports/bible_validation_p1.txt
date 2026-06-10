@@ -4,69 +4,92 @@ Note: deviations and empty verses are FLAGS for human review,
 not silent fixes. Pipeline never marks a corpus ship-ready.
 ========================================================================
 
+## OMITTED-VERSE UNION (critical-text variants)
+  16 disputed references; each must resolve to a row in all four translations.
+  OK: all disputed references resolve in every translation.
+  per-translation omitted counts: asv=16, bsb=16, kjv=0, web=4
+
 ## ASV
   books=66/66  chapters=1189  verses=31102  red-letter verses=0  bridges=0
-  errors=0  flags=16
-  EMPTY VERSES (textual variants?) (16):
-    - MAT 17:21
-    - MAT 18:11
-    - MAT 23:14
-    - MRK 7:16
-    - MRK 9:44
-    - MRK 9:46
-    - MRK 11:26
-    - MRK 15:28
-    - LUK 17:36
-    - LUK 23:17
-    - JHN 5:4
-    - ACT 8:37
+  omitted (critical-text) rows=16  (with source_note=16, injected=0)
+  errors=0  flags=0
+  OMITTED VERSES (critical-text, omitted=1) (16):
     - ACT 15:34
     - ACT 24:7
     - ACT 28:29
+    - ACT 8:37
+    - JHN 5:4
+    - LUK 17:36
+    - LUK 23:17
+    - MAT 17:21
+    - MAT 18:11
+    - MAT 23:14
+    - MRK 11:26
+    - MRK 15:28
+    - MRK 7:16
+    - MRK 9:44
+    - MRK 9:46
     - ROM 16:24
-  PARSER WARNINGS (16):
-    - MAT 17:21 parsed empty
-    - MAT 18:11 parsed empty
-    - MAT 23:14 parsed empty
-    - MRK 7:16 parsed empty
-    - MRK 9:44 parsed empty
-    - MRK 9:46 parsed empty
-    - MRK 11:26 parsed empty
-    - MRK 15:28 parsed empty
-    - LUK 17:36 parsed empty
-    - LUK 23:17 parsed empty
-    - JHN 5:4 parsed empty
-    - ACT 8:37 parsed empty
-    - ACT 15:34 parsed empty
-    - ACT 24:7 parsed empty
-    - ACT 28:29 parsed empty
-    - ROM 16:24 parsed empty
 
 ## BSB
   books=66/66  chapters=1189  verses=30969  red-letter verses=609  bridges=0
+  omitted (critical-text) rows=16  (with source_note=0, injected=16)
   errors=0  flags=0
+  OMITTED VERSES (critical-text, omitted=1) (16):
+    - ACT 15:34 (injected)
+    - ACT 24:7 (injected)
+    - ACT 28:29 (injected)
+    - ACT 8:37 (injected)
+    - JHN 5:4 (injected)
+    - LUK 17:36 (injected)
+    - LUK 23:17 (injected)
+    - MAT 17:21 (injected)
+    - MAT 18:11 (injected)
+    - MAT 23:14 (injected)
+    - MRK 11:26 (injected)
+    - MRK 15:28 (injected)
+    - MRK 7:16 (injected)
+    - MRK 9:44 (injected)
+    - MRK 9:46 (injected)
+    - ROM 16:24 (injected)
+  OMITTED VERSES WITHOUT SOURCE NOTE (review) (16):
+    - MAT 17:21 (injected, no source note)
+    - MAT 18:11 (injected, no source note)
+    - MAT 23:14 (injected, no source note)
+    - MRK 7:16 (injected, no source note)
+    - MRK 9:44 (injected, no source note)
+    - MRK 9:46 (injected, no source note)
+    - MRK 11:26 (injected, no source note)
+    - MRK 15:28 (injected, no source note)
+    - LUK 17:36 (injected, no source note)
+    - LUK 23:17 (injected, no source note)
+    - JHN 5:4 (injected, no source note)
+    - ACT 8:37 (injected, no source note)
+    - ACT 15:34 (injected, no source note)
+    - ACT 24:7 (injected, no source note)
+    - ACT 28:29 (injected, no source note)
+    - ROM 16:24 (injected, no source note)
 
 ## KJV
   books=66/66  chapters=1189  verses=31102  red-letter verses=2028  bridges=0
+  omitted (critical-text) rows=0  (with source_note=0, injected=0)
   errors=0  flags=0
 
 ## WEB
   books=66/66  chapters=1189  verses=31103  red-letter verses=2059  bridges=0
-  errors=0  flags=7
-  EMPTY VERSES (textual variants?) (5):
-    - LUK 17:36
-    - ACT 8:37
+  omitted (critical-text) rows=4  (with source_note=4, injected=0)
+  errors=0  flags=3
+  OMITTED VERSES (critical-text, omitted=1) (4):
     - ACT 15:34
     - ACT 24:7
+    - ACT 8:37
+    - LUK 17:36
+  EMPTY VERSES (unexpected — not a known variant) (1):
     - ROM 16:25
   VERSE-COUNT DEVIATIONS (vs reference) (2):
     - ROM 14: max verse 26, reference expects 23
     - ROM 16: max verse 25, reference expects 27
-  PARSER WARNINGS (5):
-    - LUK 17:36 parsed empty
-    - ACT 8:37 parsed empty
-    - ACT 15:34 parsed empty
-    - ACT 24:7 parsed empty
+  PARSER WARNINGS (1):
     - ROM 16:25 parsed empty
 
 ========================================================================
