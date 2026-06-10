@@ -149,11 +149,14 @@ def write_bibles(
                     ))
 
                 # Inject omitted=1 empty rows for variants this translation dropped
-                # entirely (no parsed verse). source_note is NULL: the source carries
-                # the note on the *preceding* verse (BSB), and attributing it across
-                # verses would be a guess — flagged for human review, not resolved.
+                # entirely (no parsed verse). BSB carries the omitted verse's wording
+                # on the *preceding* verse's footnote via an embedded \fv marker; we
+                # recover it (pb.omission_notes) and attach it as source_note. When no
+                # \fv segment is recoverable the note stays NULL — never fabricated —
+                # and the validator flags it for human review.
                 injected = [
-                    (tid, b, ch, vs, vs, "", 0, None, 1, None)
+                    (tid, b, ch, vs, vs, "", 0, None, 1,
+                     pb.omission_notes.get((ch, vs)))
                     for (b, ch, vs) in books.OMITTED_VARIANTS
                     if b == book_id and (b, ch, vs) not in present_variants
                 ]

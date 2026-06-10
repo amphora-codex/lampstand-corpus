@@ -7,7 +7,7 @@ test_corpus_spotcheck.py and skip when snapshots aren't present.
 
 from __future__ import annotations
 
-from lampstand_corpus.usfm import parse_usfm
+from lampstand_corpus.usfm import extract_bsb_omission_notes, parse_usfm
 
 
 def test_basic_verse_and_chapter():
@@ -132,3 +132,40 @@ def test_source_note_only_on_empty_verses():
     v = pb.verses[0]
     assert v.text == "There was a man sent from God."
     assert v.source_note is None
+
+
+def test_extract_bsb_omission_note_basic():
+    # BSB Matt 18:11 lives inside 18:10's footnote as \fv 11\fv*...; recover it,
+    # keyed by (chapter, verse), with \ref display kept and markup stripped.
+    raw = (
+        "\\id MAT\n\\c 18\n\\p \\v 10 See that you do not look down on these."
+        "\\f + \\fr 18:10 \\ft BYZ and TR include \\fqa \\fv 11\\fv*For the Son of "
+        "Man came to save the lost\\ft ; see \\ref Luke 19:10|LUK 19:10\\ref*.\\f*\n"
+        "\\p \\v 12 What do you think?\n"
+    )
+    notes = extract_bsb_omission_notes(raw)
+    assert notes[(18, 11)] == "For the Son of Man came to save the lost"
+
+
+def test_extract_bsb_omission_note_multiple_fv_in_one_footnote():
+    # A single footnote can name several omitted verses (Acts 24:7-8). Each \fv
+    # marker is mapped independently to its own segment.
+    raw = (
+        "\\id ACT\n\\c 24\n\\p \\v 6 who even tried to desecrate the temple."
+        "\\f + \\fr 24:6 \\ft TR includes \\fqa and we would have judged him "
+        "according to our law. \\fv 7\\fv*But Lysias the commander came with great "
+        "force and took him out of our hands, \\fv 8\\fv*ordering his accusers to "
+        "come before you.\\f*\n"
+    )
+    notes = extract_bsb_omission_notes(raw)
+    assert notes[(24, 7)].startswith("But Lysias the commander came with great force")
+    assert notes[(24, 8)] == "ordering his accusers to come before you."
+
+
+def test_extract_bsb_omission_note_absent_when_no_fv():
+    # A footnote with no \fv marker yields nothing — never fabricated.
+    raw = (
+        "\\id JHN\n\\c 1\n\\p \\v 6 There was a man"
+        "\\f + \\fr 1:6 \\ft just a translation note\\f* sent from God.\n"
+    )
+    assert extract_bsb_omission_notes(raw) == {}

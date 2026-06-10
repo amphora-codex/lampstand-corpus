@@ -151,8 +151,22 @@ def test_asv_omitted_verses_carry_source_note(conn):
     assert "\\f" not in note and "\\ft" not in note  # markup stripped
 
 
-def test_bsb_injected_omissions_have_null_note(conn):
-    # BSB drops the row entirely and carries the note on the *preceding* verse;
-    # attribution across verses would be a guess, so source_note stays NULL.
-    _t, omitted, note = _row(conn, "bsb", "MAT", 18, 11)
-    assert omitted == 1 and note is None
+def test_bsb_matt_18_11_has_recovered_source_note(conn):
+    # BSB drops the omitted row entirely and carries the verse's wording on the
+    # PRECEDING verse's footnote via an embedded \fv 11\fv* marker. P1.2 recovers
+    # it and attaches it as source_note — so it must now be non-null and clean.
+    text, omitted, note = _row(conn, "bsb", "MAT", 18, 11)
+    assert text == "" and omitted == 1
+    assert note is not None
+    assert "Son of Man came to save" in note
+    assert "\\f" not in note and "\\fv" not in note  # markup stripped
+
+
+def test_bsb_all_omitted_verses_attributed(conn):
+    # All 16 BSB critical-text omissions are recoverable via \fv markers; target
+    # is 16/16. If the source ever drops a \fv segment, this surfaces it.
+    rows = conn.execute(
+        "SELECT source_note FROM verse WHERE translation='bsb' AND omitted=1"
+    ).fetchall()
+    assert len(rows) == 16
+    assert all(r[0] for r in rows), "a BSB omitted verse lost its source_note"

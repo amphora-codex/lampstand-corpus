@@ -67,6 +67,11 @@ class ParsedBook:
     book: str
     verses: list[ParsedVerse]
     warnings: list[str] = field(default_factory=list)
+    # BSB only: omitted-verse attributions recovered from preceding-verse
+    # footnotes via embedded ``\fv N\fv*`` markers, keyed by (chapter, verse).
+    # Empty for translations that render the omitted row directly. See
+    # :func:`extract_bsb_omission_notes`.
+    omission_notes: dict[tuple[int, int], str] = field(default_factory=dict)
 
 
 # --- regexes -----------------------------------------------------------------
@@ -157,6 +162,75 @@ def _extract_footnote_text(raw: str) -> str | None:
     body = re.sub(r" ([,.;:!?’”])", r"\1", body)
     body = body.strip()
     return body or None
+
+
+# --- BSB omitted-verse footnote attribution ---------------------------------
+#
+# BSB drops the omitted verse's row entirely and carries its explanatory note on
+# the PRECEDING verse's footnote, with an embedded ``\fv N\fv*`` marker naming the
+# omitted verse, e.g. Matt 18:11's note lives inside 18:10's footnote:
+#
+#   \f + \fr 18:10 \ft BYZ and TR include \fqa \fv 11\fv*For the Son of Man came
+#   to save the lost\ft ; see \ref Luke 19:10|LUK 19:10\ref*.\f*
+#
+# We recover, per footnote, the text that immediately follows each ``\fv N\fv*``
+# marker (the omitted verse's own wording) up to the next footnote sub-marker, and
+# key it by (chapter, N). Chapter comes from the footnote's ``\fr`` reference echo.
+# This never fabricates: a verse with no recoverable ``\fv`` segment is simply
+# absent from the returned map (callers leave source_note NULL and flag it).
+
+# A whole footnote, captured so we can scan its body for \fv markers.
+_BSB_FOOTNOTE_RE = re.compile(r"\\f\b(.*?)\\f\*", re.DOTALL)
+# The \fr reference echo, e.g. "18:10" or "9:43" — chapter is the part before ":".
+_BSB_FR_REF_RE = re.compile(r"\\fr\b\s*(\d+):\d+")
+# An embedded omitted-verse marker, capturing the verse number it names.
+_BSB_FV_MARKER_RE = re.compile(r"\\fv\b\s*(\d+)\s*\\fv\*")
+# Boundary that ends one \fv segment: the next footnote sub-marker or the close.
+_BSB_FV_STOP_RE = re.compile(r"\\(?:fv|ft|fqa|fk|fr|fp|fl)\b|\\f\*")
+
+
+def _clean_footnote_segment(seg: str) -> str | None:
+    """Clean a recovered ``\\fv`` segment into readable verse prose, or None."""
+    seg = _REF_RE.sub(lambda mm: mm.group(1), seg)
+    seg = _WORD_RE.sub(lambda mm: mm.group(1), seg)
+    seg = _FOOTNOTE_TAG_RE.sub("", seg)
+    seg = seg.replace("¶", " ")
+    seg = unicodedata.normalize("NFC", seg)
+    seg = re.sub(r"[ \t]+", " ", seg)
+    seg = re.sub(r" ([,.;:!?’”])", r"\1", seg)
+    # Leading ellipsis/connector noise ("...", "…") sometimes precedes the text
+    # when the source elides into a longer variant; trim it but keep real prose.
+    seg = seg.strip().lstrip(".… ").strip()
+    return seg or None
+
+
+def extract_bsb_omission_notes(content: str) -> dict[tuple[int, int], str]:
+    """Harvest BSB omitted-verse attributions from a raw USFM book.
+
+    Returns ``{(chapter, verse): note_text}`` for every omitted verse whose text
+    the BSB carries via an embedded ``\\fv N\\fv*`` marker on a preceding verse's
+    footnote. Only verses with a genuinely recoverable segment appear; nothing is
+    fabricated. A footnote may name several omitted verses (e.g. Acts 24:7-8);
+    each ``\\fv`` marker is mapped independently.
+    """
+    out: dict[tuple[int, int], str] = {}
+    for fm in _BSB_FOOTNOTE_RE.finditer(content):
+        body = fm.group(1)
+        if "\\fv" not in body:
+            continue
+        fr = _BSB_FR_REF_RE.search(body)
+        if not fr:
+            continue
+        chapter = int(fr.group(1))
+        for vm in _BSB_FV_MARKER_RE.finditer(body):
+            vnum = int(vm.group(1))
+            rest = body[vm.end():]
+            stop = _BSB_FV_STOP_RE.search(rest)
+            seg = rest[:stop.start()] if stop else rest
+            note = _clean_footnote_segment(seg)
+            if note:
+                out[(chapter, vnum)] = note
+    return out
 
 
 def _extract_wj(raw: str) -> tuple[str, list[WjSpan]]:
@@ -343,4 +417,12 @@ def parse_usfm(content: str) -> ParsedBook:
         if not v.text and (book_id, v.chapter, v.verse_start) not in OMITTED_VARIANT_SET:
             warnings.append(f"{book_id} {v.chapter}:{v.verse_start} parsed empty")
 
-    return ParsedBook(book=book_id, verses=verses, warnings=warnings)
+    # Harvest BSB-style omitted-verse attributions from preceding-verse footnotes.
+    # Translation-agnostic: translations that render the verse directly simply
+    # produce no \fv-marked omission notes, so the map is empty and unused.
+    omission_notes = extract_bsb_omission_notes(content)
+
+    return ParsedBook(
+        book=book_id, verses=verses, warnings=warnings,
+        omission_notes=omission_notes,
+    )
