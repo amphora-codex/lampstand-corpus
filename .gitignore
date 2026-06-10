@@ -1,0 +1,28 @@
+# ── Compiled corpus artifacts — NEVER committed (built, not source) ──
+output/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.embeddings
+*.index
+*.faiss
+*.npy
+
+# ── Downloaded model weights (e.g. BGE-small) ──
+models/
+
+# ── Python ──
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# ── macOS / editor ──
+.DS_Store
+.vscode/
+.idea/

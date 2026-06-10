@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lampstand-corpus"
+version = "0.1.0"
+description = "Corpus ingestion, normalization, embedding, and validation pipeline for LampStand."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Amphora LLC" }]
+dependencies = [
+    "requests>=2.32",        # source snapshot downloads
+    "beautifulsoup4>=4.12",  # CCEL HTML parsing
+    "lxml>=5.2",             # HTML/USX parsing
+    "pydantic>=2.7",         # typed normalized records + provenance
+    "rank-bm25>=0.2.2",      # sparse keyword index
+    "numpy>=1.26",
+    # Embedding model per spec §4.2 (BGE-small). sentence-transformers pulls in
+    # torch (large). Embedding computation is the heavy step (run in batch);
+    # an ONNX-runtime path is a lighter alternative to evaluate if torch is a
+    # burden on the build machine.
+    "sentence-transformers>=3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.5",
+]
+
+[project.scripts]
+# Filled in as the CLI takes shape (fetch / normalize / build / validate).
+# lampstand-corpus = "lampstand_corpus.cli:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
