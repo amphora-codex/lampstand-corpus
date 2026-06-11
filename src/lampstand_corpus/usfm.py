@@ -52,6 +52,11 @@ class ParsedVerse:
     # omissions where the source hangs an "ancient authorities insert…" note on
     # the empty verse — ASV and WEB do this). Best-effort; NULL otherwise.
     source_note: str | None = None
+    # Hebrew Psalm superscription (``\d``) text carried on this verse, if any. In
+    # the BSB the superscription is numbered as verse 1 (``\d \v 1 …``); we keep
+    # the superscription prose here (so the app can render it distinctly) while the
+    # verse's ``text`` holds the body line(s). NULL when there is no superscription.
+    superscription: str | None = None
 
     @property
     def is_bridge(self) -> bool:
@@ -115,10 +120,16 @@ _PARA_TAGS = {"p", "m", "pi", "pi1", "pi2", "q", "q1", "q2", "q3", "q4", "qr",
               "pmc", "pmr", "nb", "b", "tr", "th1", "th2", "tc1", "tc2"}
 
 # Markers whose *whole line* is discarded (headings, titles, references, intro).
+# NOTE: ``\d`` (descriptive title / Hebrew Psalm superscription) is handled
+# SEPARATELY below — not here — because the BSB numbers the superscription as
+# ``\d \v 1 …`` (the superscription carries the verse-1 marker). Dropping the whole
+# ``\d`` line would discard BSB's verse 1 entirely (both the superscription text and
+# the first body line that follows). We instead drop only the superscription *text*
+# and keep processing any ``\v`` on the line, so BSB's verse 1 survives.
 _DROP_LINE_TAGS = {"id", "usfm", "ide", "h", "toc1", "toc2", "toc3", "toca1",
                    "toca2", "toca3", "mt", "mt1", "mt2", "mt3", "mte", "ms",
                    "ms1", "ms2", "mr", "s", "s1", "s2", "s3", "sr", "r", "rq",
-                   "d", "sp", "cl", "cp", "cd", "rem", "sts", "imt", "is",
+                   "sp", "cl", "cp", "cd", "rem", "sts", "imt", "is",
                    "ip", "im", "io", "io1", "io2", "iot", "ie", "iex", "qa",
                    "periph"}
 
@@ -305,9 +316,13 @@ def parse_usfm(content: str) -> ParsedBook:
     cur_v_start: int | None = None
     cur_v_end: int | None = None
     cur_buf: list[str] = []
+    # Superscription (\d) text waiting to attach to the next verse it numbers. In
+    # the BSB the superscription IS verse 1 (``\d \v 1 …``); we hold its prose here
+    # and attach it to that verse while keeping the verse's body text separate.
+    pending_superscription: list[str] = []
 
     def flush() -> None:
-        nonlocal cur_v_start, cur_v_end, cur_buf
+        nonlocal cur_v_start, cur_v_end, cur_buf, pending_superscription
         if cur_v_start is None:
             cur_buf = []
             return
@@ -316,13 +331,22 @@ def parse_usfm(content: str) -> ParsedBook:
         # An omitted verse is one whose body cleaned to nothing. Where the source
         # hangs a textual footnote on that empty verse (ASV/WEB), recover it.
         note = _extract_footnote_text(raw) if not text else None
+        sup = _clean_inline(" ".join(p for p in pending_superscription if p)) \
+            if pending_superscription else None
         verses.append(ParsedVerse(
             book=book_id, chapter=chapter,
             verse_start=cur_v_start, verse_end=cur_v_end or cur_v_start,
             text=text, wj_spans=spans, source_note=note,
+            superscription=sup or None,
         ))
         cur_v_start = cur_v_end = None
         cur_buf = []
+        pending_superscription = []
+
+    # Set when a \d superscription opened a verse whose inline text is the
+    # superscription itself (BSB ``\d \v 1 …``); the NEXT \v's inline text routes to
+    # pending_superscription, and the body that follows attaches to that verse.
+    expecting_superscription = False
 
     # Tokenise by marker. USFM verse text can span multiple physical lines, and
     # multiple \v can sit on one \p line, so we work marker-by-marker.
@@ -375,18 +399,54 @@ def parse_usfm(content: str) -> ParsedBook:
                     break
                 cur_v_start = int(vm.group(1))
                 cur_v_end = int(vm.group(2)) if vm.group(2) else cur_v_start
+                # If a \d superscription opened this verse, its inline text is the
+                # superscription, not the body — route it to the superscription
+                # buffer. The body line(s) follow on later \q markers with no \v and
+                # land in cur_buf via the para handler.
+                target = pending_superscription if expecting_superscription \
+                    else cur_buf
+                expecting_superscription = False
                 # The remaining text on the line up to the next \v / \c belongs here.
                 # Find next \v or \c.
                 nxt = re.search(r"\\[cv]\b", text_after)
                 if nxt:
-                    cur_buf.append(text_after[:nxt.start()])
+                    target.append(text_after[:nxt.start()])
                     # continue scanning from that marker
                     s = text_after[nxt.start():]
                     idx = 0
                     continue
                 else:
-                    cur_buf.append(text_after)
+                    target.append(text_after)
                     break
+            elif tag == "d":
+                # Descriptive title / Hebrew Psalm superscription. We KEEP the
+                # superscription prose (as verse metadata) but never as body text.
+                # Two source shapes:
+                #   * BSB NUMBERS it:  ``\d \v 1 A Psalm of David…`` then the verse-1
+                #     body line follows on a later ``\q`` (no ``\v``). The ``\v 1`` is
+                #     ON THIS LINE — route its inline text to the superscription and
+                #     keep scanning so verse 1 (its body) still exists.
+                #   * KJV/ASV/WEB leave it UNNUMBERED: ``\d Michtam of David.`` on its
+                #     own line, with ``\v 1`` on the NEXT line carrying the real body.
+                #     Here we must NOT mark the next verse as superscription — only
+                #     capture the \d text and attach it to whatever verse follows.
+                # The discriminator is whether a ``\v`` sits on THIS \d line.
+                rest = s[after:]
+                nxt = re.search(r"\\[cv]\b", rest)
+                if nxt and re.match(r"\\v\b", rest[nxt.start():]):
+                    # Numbered superscription: the \v on this line carries it.
+                    expecting_superscription = True
+                    s = rest[nxt.start():]
+                    idx = 0
+                    continue
+                # Unnumbered superscription (its body verse follows on a later line):
+                # capture the \d prose; do NOT consume the next verse's text.
+                pending_superscription.append(rest if not nxt else rest[:nxt.start()])
+                if nxt:
+                    s = rest[nxt.start():]
+                    idx = 0
+                    continue
+                break
             elif tag in _DROP_LINE_TAGS:
                 break  # discard whole line
             elif tag in _PARA_TAGS:

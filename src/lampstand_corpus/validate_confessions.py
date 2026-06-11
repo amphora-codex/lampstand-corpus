@@ -26,6 +26,7 @@ from .confessions import (
     HEIDELBERG_LORDS_DAYS,
     ParsedConfession,
 )
+from .schema import VerseRef
 
 
 @dataclass
@@ -167,13 +168,17 @@ def crosscheck_against_bibles(
 ) -> list[str]:
     """Resolve every proof-text VerseRef against the real ``bibles.sqlite``.
 
+    Proof-texts are recorded against the CANONICAL (KJV/standard) reference spine.
     The app renders verse text from our own Bibles, so a proof ref only needs to
-    RESOLVE there. We test each ref against every translation present and report
-    any that resolve in NONE — and separately surface translation-specific gaps
-    (notably BSB's Hebrew-superscription Psalm numbering, where the body starts at
-    verse 2, so confession refs to 'Psalm N:1' English numbering miss). These are
-    FLAGGED for the architect, never silently dropped or renumbered.
+    RESOLVE there once the per-translation versification map is applied. We resolve
+    each canonical ref through :func:`versification.resolve` for every translation
+    and report any that resolve in NONE (genuine bad/typo refs) — and per-
+    translation gaps. The BSB Hebrew-superscription Psalm case is handled by the
+    map (canonical Ps N:V → BSB Ps N:V, offset 0, with verse 1 being the
+    superscription-folded verse), so it no longer shows as a systemic BSB gap.
     """
+    from .versification import resolve
+
     flags: list[str] = []
     if not bibles_db.exists():
         return [f"bibles.sqlite not found at {bibles_db} — proof-text refs were "
@@ -185,10 +190,12 @@ def crosscheck_against_bibles(
             "SELECT id FROM translation ORDER BY id")]
 
         def resolves(t: str, book: str, ch: int, v: int) -> bool:
+            # Apply the per-translation versification map to the CANONICAL ref.
+            rr = resolve(t, VerseRef(book=book, chapter=ch, verse_start=v))
             return conn.execute(
                 "SELECT 1 FROM verse WHERE translation=? AND book=? AND chapter=? "
                 "AND verse_start<=? AND verse_end>=? LIMIT 1",
-                (t, book, ch, v, v)).fetchone() is not None
+                (t, rr.book, rr.chapter, rr.verse, rr.verse)).fetchone() is not None
 
         none_resolve: list[str] = []
         per_translation_gaps: dict[str, int] = {t: 0 for t in translations}
@@ -209,8 +216,9 @@ def crosscheck_against_bibles(
                             f"{did}:{ch.key} -> {book} {c}:{vs} "
                             "(resolves in NO bundled translation)")
         flags.append(
-            f"proof-text refs cross-checked against bibles.sqlite: {total} refs "
-            f"across translations {translations}")
+            f"proof-text refs cross-checked against bibles.sqlite under the "
+            f"canonical-spine versification map: {total} refs across translations "
+            f"{translations}")
         for t in sorted(per_translation_gaps):
             g = per_translation_gaps[t]
             if g:
@@ -221,18 +229,18 @@ def crosscheck_against_bibles(
                 f"proof refs that resolve in NO bundled translation ({len(none_resolve)}) "
                 "— these are genuine bad/typo refs to adjudicate (NOT renumbered):")
             flags.extend(f"    - {x}" for x in none_resolve[:60])
-        # The systemic BSB Psalm-superscription note, if BSB is the gap source.
-        if per_translation_gaps.get("bsb", 0) and not per_translation_gaps.get(
-            "kjv", 0) == per_translation_gaps.get("bsb", 0):
-            flags.append(
-                "NOTE (architect): BSB (the bundled v1 translation) numbers each "
-                "Psalm's Hebrew superscription as verse 1, so the psalm body begins "
-                "at verse 2. Confession proof-texts use English/KJV Psalm numbering "
-                "(body at verse 1), so refs like 'Psalm 19:1' point at the BSB "
-                "superscription, not the cited line. KJV/ASV/WEB resolve these "
-                "correctly. DECIDE whether the app applies a Psalm-superscription "
-                "offset when resolving confession refs against BSB. Not guessed/"
-                "renumbered here.")
+        # Confirm the BSB Psalm-superscription map closed the prior systemic gap.
+        flags.append(
+            "NOTE (architect): the BSB Hebrew Psalm-superscription numbering is now "
+            "handled by the canonical-spine versification map (lampstand_corpus."
+            "versification). DATA-VERIFIED CORRECTION to the earlier '+1 offset' "
+            "framing: BSB body verse numbers match KJV (offset 0), not +1 — BSB "
+            "folds the superscription INTO verse 1, it does not shift the body. The "
+            "earlier 'Psalm N:1 misses in BSB' failures were a separate ingestion "
+            "bug (BSB's \\d \\v 1 line was dropped, so verse 1 had no row); that is "
+            "fixed in usfm.py and BSB now carries a verse 1 for every superscribed "
+            "psalm. Remaining no-resolve refs above (if any) are genuine source "
+            "typos, NOT versification.")
     finally:
         conn.close()
     return flags

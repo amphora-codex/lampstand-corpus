@@ -169,3 +169,53 @@ def test_extract_bsb_omission_note_absent_when_no_fv():
         "\\f + \\fr 1:6 \\ft just a translation note\\f* sent from God.\n"
     )
     assert extract_bsb_omission_notes(raw) == {}
+
+
+# --- Psalm superscription handling (\d) --------------------------------------
+def test_bsb_numbered_superscription_keeps_verse_one_body():
+    # BSB numbers the superscription as verse 1 (\d \v 1 ...) and the body follows
+    # on a \q line with no \v. Verse 1 must SURVIVE with the body line as its text
+    # and the superscription captured separately — not dropped, not merged.
+    raw = (
+        "\\id PSA\n\\c 3\n\\s1 Deliver Me\n"
+        "\\d \\v 1 A Psalm of David, when he fled from Absalom.\n"
+        "\\q1 O LORD, how my foes have increased!\n"
+        "\\q2 How many rise up against me!\n"
+        "\\q1 \\v 2 Many say of me.\n"
+    )
+    pb = parse_usfm(raw)
+    v1 = next(v for v in pb.verses if v.verse_start == 1)
+    assert "O LORD, how my foes have increased" in v1.text
+    assert "Psalm of David" not in v1.text          # superscription not in body
+    assert v1.superscription == "A Psalm of David, when he fled from Absalom."
+    v2 = next(v for v in pb.verses if v.verse_start == 2)
+    assert v2.text == "Many say of me."
+    assert v2.superscription is None
+
+
+def test_kjv_unnumbered_superscription_does_not_steal_verse_one():
+    # KJV/ASV/WEB leave the superscription unnumbered: \d on its own line, then
+    # \v 1 on the NEXT line carrying the real body. The body must NOT be routed to
+    # the superscription; verse 1 keeps its text and the \d is captured as metadata.
+    raw = (
+        "\\id PSA\n\\c 16\n"
+        "\\d Michtam of David.\n"
+        "\\q1\n"
+        "\\v 1 Preserve me, O God: for in thee do I put my trust.\n"
+        "\\v 2 O my soul, thou hast said unto the LORD.\n"
+    )
+    pb = parse_usfm(raw)
+    v1 = next(v for v in pb.verses if v.verse_start == 1)
+    assert v1.text == "Preserve me, O God: for in thee do I put my trust."
+    assert v1.superscription == "Michtam of David."
+    v2 = next(v for v in pb.verses if v.verse_start == 2)
+    assert v2.text == "O my soul, thou hast said unto the LORD."
+
+
+def test_no_superscription_psalm_unaffected():
+    # A psalm without \d numbers normally; verse 1 has no superscription.
+    raw = "\\id PSA\n\\c 1\n\\q1 \\v 1 Blessed is the man.\n\\q1 \\v 2 But his delight.\n"
+    pb = parse_usfm(raw)
+    v1 = next(v for v in pb.verses if v.verse_start == 1)
+    assert v1.text == "Blessed is the man."
+    assert v1.superscription is None
