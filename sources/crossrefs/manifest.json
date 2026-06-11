@@ -1,0 +1,18 @@
+{
+  "attribution": "Cross-reference data courtesy of www.openbible.info, used under CC-BY.",
+  "license": "CC-BY 4.0 (www.openbible.info)",
+  "retrieved": "2026-06-10",
+  "sources": {
+    "tsk": {
+      "attribution": "Cross-reference data courtesy of www.openbible.info, used under CC-BY.",
+      "file": "sources/crossrefs/cross_references.txt",
+      "license": "CC-BY 4.0 (www.openbible.info)",
+      "name": "Treasury of Scripture Knowledge cross-references (OpenBible.info)",
+      "retrieved": "2026-06-10",
+      "sha256": "d9df28f784e0933bc2d5edc22e73e12a85566d26ca30e35ff47204bd5c7be86c",
+      "url": "https://a.openbible.info/data/cross-references.zip",
+      "zip_file": "sources/crossrefs/cross-references.zip",
+      "zip_sha256": "03b09d9484bb5345023ba1696c2c05f26bb3bb8c4dbed20c049b2fdd600ade9a"
+    }
+  }
+}
