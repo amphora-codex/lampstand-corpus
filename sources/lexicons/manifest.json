@@ -1,0 +1,45 @@
+{
+  "retrieved": "2026-06-10",
+  "sources": {
+    "bdb": {
+      "aux_file": "sources/lexicons/bdb/LexicalIndex.xml",
+      "aux_note": "LexicalIndex.xml \u2014 Strong's<->BDB entry-id linkage; required to key BDB entries by Strong's number",
+      "aux_sha256": "8f7a605c58899d2f44430149c143c00903976e1e91232476677972a69e5bc85f",
+      "aux_url": "https://raw.githubusercontent.com/openscriptures/HebrewLexicon/master/LexicalIndex.xml",
+      "file": "sources/lexicons/bdb/BrownDriverBriggs.xml",
+      "language": "hebrew",
+      "lexicon": "bdb",
+      "license": "CC-BY-4.0 (OpenScriptures Hebrew Lexicon edition)",
+      "name": "Brown-Driver-Briggs Hebrew Lexicon",
+      "retrieved": "2026-06-10",
+      "sha256": "2b52658a4323d91674cda4090ab8b3ebddfff640f4f18143c28300e80b2c38f8",
+      "text_license": "Public domain (Brown-Driver-Briggs, 1906)",
+      "url": "https://raw.githubusercontent.com/openscriptures/HebrewLexicon/master/BrownDriverBriggs.xml",
+      "version": "openscriptures/HebrewLexicon BDB XML (snapshot 2026-06-10)"
+    },
+    "strongs-greek": {
+      "file": "sources/lexicons/strongs-greek/strongs-greek-dictionary.js",
+      "language": "greek",
+      "lexicon": "strongs",
+      "license": "CC-BY-SA (OpenScriptures edition)",
+      "name": "Strong's Greek Dictionary",
+      "retrieved": "2026-06-10",
+      "sha256": "7624ee738ae47e80f1a352223e28a26d011c9cd4898822cee52f47a010c04efd",
+      "text_license": "Public domain (Strong's Greek Dictionary, 1890)",
+      "url": "https://raw.githubusercontent.com/openscriptures/strongs/master/greek/strongs-greek-dictionary.js",
+      "version": "openscriptures/strongs greek JSON (snapshot 2026-06-10)"
+    },
+    "strongs-hebrew": {
+      "file": "sources/lexicons/strongs-hebrew/strongs-hebrew-dictionary.js",
+      "language": "hebrew",
+      "lexicon": "strongs",
+      "license": "CC-BY-SA (OpenScriptures edition)",
+      "name": "Strong's Hebrew Dictionary",
+      "retrieved": "2026-06-10",
+      "sha256": "5ce6aeed551c709f49bcfa341cadf2f34bc7599b85d9de9e6ac2ecbf60fc3739",
+      "text_license": "Public domain (Strong's Hebrew Dictionary, 1894)",
+      "url": "https://raw.githubusercontent.com/openscriptures/strongs/master/hebrew/strongs-hebrew-dictionary.js",
+      "version": "openscriptures/strongs hebrew JSON (snapshot 2026-06-10)"
+    }
+  }
+}

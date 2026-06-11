@@ -1,0 +1,52 @@
+LampStand corpus — lexicon validation report (M1-P4)
+================================================================
+
+CANDIDATE ONLY. Not ship-ready: the architect's 23-point spot-check gates ship (CLAUDE.md §Human spot-check).
+
+ERROR / FLAG SUMMARY
+----------------------------------------------------------------
+  total errors: 0
+  total flags:  25
+
+LEXICON DICTIONARIES
+----------------------------------------------------------------
+  bdb [hebrew]
+    entries=11845 linked-to-strongs=8828 distinct-strongs=8256 with-definition=7329
+    flag: bdb: 3017 BDB entries have no Strong's number in LexicalIndex (kept, keyed by BDB id; not guessed) — human to confirm coverage
+    flag: bdb: linked 8256 distinct Strong's H-numbers via LexicalIndex (of 8674 possible)
+    flag: bdb: 4516 entries have no <def> gloss (BDB cross-reference / root-pointer stubs — expected, not errored)
+
+  strongs-greek [greek]
+    entries=5523 linked-to-strongs=5523 distinct-strongs=5523 with-definition=5503
+    coverage span: 1..5624
+    GAP: 101 missing Strong's numbers in 1..5624: G2717, G3203-G3302
+    flag: strongs-greek:G302 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-greek:G687 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-greek:G814 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-greek:G976 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-greek:G1065 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-greek:G1122 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-greek:G1473 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-greek:G1682 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: ... (+12 more)
+
+  strongs-hebrew [hebrew]
+    entries=8674 linked-to-strongs=8674 distinct-strongs=8674 with-definition=8674
+    coverage span: 1..8674
+
+ORPHAN STRONG'S (referenced, no dictionary entry)
+----------------------------------------------------------------
+  from tagged text: 0
+  from BDB links:   0
+
+TAGGED ORIGINAL-LANGUAGE TEXT (P4b)
+----------------------------------------------------------------
+  oshb [hebrew]
+    words=306785 verses=23213 books=39 words-with-strongs=300808
+    FLAG: oshb: 202 distinct verses use Masoretic numbering that diverges from the English/KJV spine (expected — reconciled by the P5 canonical versification map; e.g. 1CH 5:27, 1CH 5:28, 1CH 5:29, 1CH 5:30, 1CH 5:31, 1CH 5:32, 1CH 5:33, 1CH 5:34, 1CH 5:35, 1CH 5:36)
+
+FLAGGED FOR HUMAN REVIEW
+----------------------------------------------------------------
+  1. Thayer's Greek-English lexicon: no clean, canonical, machine-readable public-domain dataset found in a source of record (OpenScriptures ships Strong's + BDB, not Thayer's; a GitHub survey found only GPL-incompatible or non-canonical aggregator copies). OMITTED, not fabricated (CLAUDE.md). Strong's Greek glosses cover the basic need; a canonical Thayer's source needs architect + theological-advisor approval before ingestion.
+  2. MorphGNT/SBLGNT carries lemma + morphology but NO Strong's numbers, so it cannot supply the verse->Strong's link word-study needs without an out-of-corpus lemma->Strong's bridge; AND the SBLGNT text is under the SBLGNT EULA (not pure PD — bundling is an architect decision). Snapshotted for provenance; NOT ingested this run.
+

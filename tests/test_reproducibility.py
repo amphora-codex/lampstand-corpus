@@ -19,6 +19,9 @@ COMMENTARIES_MANIFEST = (
 CONFESSIONS_MANIFEST = (
     REPO_ROOT / "sources" / "confessions" / "manifest.json"
 )
+LEXICONS_MANIFEST = (
+    REPO_ROOT / "sources" / "lexicons" / "manifest.json"
+)
 
 
 def _sha(path: Path) -> str:
@@ -71,4 +74,21 @@ def test_confessions_build_is_deterministic(tmp_path):
     b = tmp_path / "b.sqlite"
     write_confessions(parsed, a)
     write_confessions(parsed, b)
+    assert _sha(a) == _sha(b)
+
+
+@pytest.mark.skipif(
+    not LEXICONS_MANIFEST.exists(),
+    reason="lexicon snapshots not present; run `cli snapshot-lexicons` first",
+)
+def test_lexicons_build_is_deterministic(tmp_path):
+    from lampstand_corpus.build_lexicons import write_lexicons
+    from lampstand_corpus.cli import normalize_lexicons, normalize_tagged
+
+    lexicons = normalize_lexicons()
+    tagged = normalize_tagged()
+    a = tmp_path / "a.sqlite"
+    b = tmp_path / "b.sqlite"
+    write_lexicons(lexicons, a, tagged=tagged)
+    write_lexicons(lexicons, b, tagged=tagged)
     assert _sha(a) == _sha(b)
