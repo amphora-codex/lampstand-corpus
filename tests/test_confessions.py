@@ -316,6 +316,36 @@ class TestConfessionsDB:
         }
         assert keys == {"20.4", "22.3", "23.3", "24.4", "25.6", "31.1", "31.2"}
 
+    def test_wcf_1788_verbatim_text_only_on_amended_loci(self, conn):
+        # Verbatim 1788 revised wording is populated ONLY on amended loci, and on
+        # nothing beyond them. 24.4 is the one justified gap (this PD American
+        # edition's ch. 24 is a later denominational rewrite, not 1788 text).
+        keys = {
+            r[0] for r in conn.execute(
+                "SELECT key FROM section WHERE document='wcf' "
+                "AND amendment_1788_text IS NOT NULL")
+        }
+        assert keys == {"20.4", "22.3", "23.3", "25.6", "31.1", "31.2"}
+        # No other document carries verbatim 1788 text.
+        other = conn.execute(
+            "SELECT COUNT(*) FROM section WHERE document!='wcf' "
+            "AND amendment_1788_text IS NOT NULL").fetchone()[0]
+        assert other == 0
+
+    def test_wcf_1788_verbatim_differs_from_original_and_drops_antichrist(self, conn):
+        # 25.6: the revised text must NOT call the Pope 'Antichrist' / 'man of sin'
+        # (the 1788 revision removed that), and must differ from the retained
+        # original prose stored in `text`.
+        orig, revised = conn.execute(
+            "SELECT text, amendment_1788_text FROM section "
+            "WHERE document='wcf' AND key='25.6'").fetchone()
+        assert revised is not None and revised != orig
+        assert "Antichrist" in orig and "man of sin" in orig
+        assert "Antichrist" not in revised and "man of sin" not in revised
+        assert "vicar of Christ" in revised  # the revised wording's hallmark
+        # The denominational bracket markers must be stripped from the 1788 base.
+        assert "[PCUS" not in revised and "[UPCUSA" not in revised
+
     def test_lbcf_has_32_chapters_incl_church(self, conn):
         n = conn.execute(
             "SELECT COUNT(DISTINCT chapter) FROM section WHERE document='lbcf'"

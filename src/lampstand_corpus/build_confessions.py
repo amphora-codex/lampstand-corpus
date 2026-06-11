@@ -48,6 +48,7 @@ CREATE TABLE section (
     text            TEXT NOT NULL,
     proof_texts     TEXT,              -- JSON [{book,chapter,verse_start,...}] or NULL
     amendment_1788  TEXT,              -- WCF 1788 American-revision note / NULL
+    amendment_1788_text TEXT,          -- WCF 1788 verbatim revised wording / NULL
     PRIMARY KEY (document, key)
 );
 
@@ -92,7 +93,7 @@ def write_confessions(
                 proofs = m.get("proof_texts") or []
                 title = m.get("chapter_title") or m.get("article_title")
                 conn.execute(
-                    "INSERT INTO section VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO section VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         did, ch.key, ord_i,
                         m.get("chapter"), m.get("section"),
@@ -103,6 +104,7 @@ def write_confessions(
                         json.dumps(proofs, separators=(",", ":"), sort_keys=True)
                         if proofs else None,
                         m.get("amendment_1788"),
+                        m.get("amendment_1788_text"),
                     ),
                 )
         conn.commit()

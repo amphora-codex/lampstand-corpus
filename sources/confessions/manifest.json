@@ -47,6 +47,11 @@
       "version": "1677/89 text (ParticularBaptists/lbcf-1689 lbcf.json); 32 chapters"
     },
     "wcf": {
+      "amend_file": "sources/confessions/wcf/westminster3-american-revision.xml",
+      "amend_license": "Public domain (1788 American revision text; CCEL ThML)",
+      "amend_note": "1788 American-revision verbatim text source for the six amended loci; original numbering recovered from parenthetical titles; later [PCUS]/[UPCUSA] denominational brackets removed for the 1788 base reading (flagged)",
+      "amend_sha256": "f3017e0bac771d64a73586a97af55f843034ade20bdd03265adddb81788a06cc",
+      "amend_url": "https://ccel.org/ccel/anonymous/westminster3.xml",
       "file": "sources/confessions/wcf/wcf-original-1646.json",
       "license": "Public domain (original 1646/47 text)",
       "name": "Westminster Confession of Faith",
