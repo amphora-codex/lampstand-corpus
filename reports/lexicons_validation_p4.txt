@@ -6,7 +6,7 @@ CANDIDATE ONLY. Not ship-ready: the architect's 23-point spot-check gates ship (
 ERROR / FLAG SUMMARY
 ----------------------------------------------------------------
   total errors: 0
-  total flags:  25
+  total flags:  82
 
 LEXICON DICTIONARIES
 ----------------------------------------------------------------
@@ -34,19 +34,37 @@ LEXICON DICTIONARIES
     entries=8674 linked-to-strongs=8674 distinct-strongs=8674 with-definition=8674
     coverage span: 1..8674
 
-ORPHAN STRONG'S (referenced, no dictionary entry)
+  tbesg [greek]
+    entries=11035 linked-to-strongs=11035 distinct-strongs=10740 with-definition=11035
+    FLAG (long def): tbesg:G575 (4358 chars)
+    FLAG (long def): tbesg:G1096 (4066 chars)
+    FLAG (long def): tbesg:G1223 (4899 chars)
+    FLAG (long def): tbesg:G1275 (4947 chars)
+    FLAG (long def): tbesg:G1487G (4443 chars)
+    FLAG (long def): tbesg:G1487H (4443 chars)
+    FLAG (long def): tbesg:G1487I (4443 chars)
+    FLAG (long def): tbesg:G1487J (4443 chars)
+    FLAG (long def): tbesg:G1487K (4443 chars)
+    FLAG (long def): tbesg:G1487L (4443 chars)
+    flag: tbesg: parsed 11035 Greek lexicon entries keyed by extended (disambiguated) Strong's; substitute for Thayer's (Abbott-Smith-based)
+
+ORPHAN STRONG'S (referenced, no lexicon entry)
 ----------------------------------------------------------------
-  from tagged text: 0
-  from BDB links:   0
+  from OSHB Hebrew text (-> Strong's-Hebrew): 0
+  from TAGNT Greek text (-> TBESG/Strong's-Greek): 0
+  from BDB links (-> Strong's-Hebrew): 0
 
 TAGGED ORIGINAL-LANGUAGE TEXT (P4b)
 ----------------------------------------------------------------
   oshb [hebrew]
     words=306785 verses=23213 books=39 words-with-strongs=300808
     FLAG: oshb: 202 distinct verses use Masoretic numbering that diverges from the English/KJV spine (expected — reconciled by the P5 canonical versification map; e.g. 1CH 5:27, 1CH 5:28, 1CH 5:29, 1CH 5:30, 1CH 5:31, 1CH 5:32, 1CH 5:33, 1CH 5:34, 1CH 5:35, 1CH 5:36)
+  tagnt [greek]
+    words=141720 verses=7948 books=27 words-with-strongs=141720
+    flag: tagnt: edition membership captured per word in the 'editions' column (e.g. NA28+NA27+Tyn+SBL+WH+Treg+TR+Byz); the word-type prefix (NKO etc.) is retained on the 'lemma_raw' source token
 
 FLAGGED FOR HUMAN REVIEW
 ----------------------------------------------------------------
-  1. Thayer's Greek-English lexicon: no clean, canonical, machine-readable public-domain dataset found in a source of record (OpenScriptures ships Strong's + BDB, not Thayer's; a GitHub survey found only GPL-incompatible or non-canonical aggregator copies). OMITTED, not fabricated (CLAUDE.md). Strong's Greek glosses cover the basic need; a canonical Thayer's source needs architect + theological-advisor approval before ingestion.
-  2. MorphGNT/SBLGNT carries lemma + morphology but NO Strong's numbers, so it cannot supply the verse->Strong's link word-study needs without an out-of-corpus lemma->Strong's bridge; AND the SBLGNT text is under the SBLGNT EULA (not pure PD — bundling is an architect decision). Snapshotted for provenance; NOT ingested this run.
+  1. Thayer's Greek-English lexicon: no clean, canonical, machine-readable public-domain dataset found in a source of record. SUBSTITUTE INGESTED — the STEPBible TBESG (Tyndale Brief lexicon of Extended Strong's for Greek, Abbott-Smith-based, CC-BY 4.0) is the architect-approved stand-in for Thayer's and is now in lexicons.sqlite. A canonical Thayer's proper would still need architect + theological-advisor approval before ingestion.
+  2. MorphGNT/SBLGNT carries lemma + morphology but NO Strong's numbers, so it cannot supply the verse->Strong's link word-study needs without an out-of-corpus lemma->Strong's bridge; AND the SBLGNT text is under the SBLGNT EULA (not pure PD — bundling is an architect decision). NOT ingested: the Greek NT tagging is now supplied by the STEPBible TAGNT (CC-BY 4.0), which DOES carry disambiguated Strong's. SBLGNT remains snapshotted for provenance only. (OpenGNT was also considered and REJECTED: CC-BY-SA, a copyleft term we avoid bundling.)
 

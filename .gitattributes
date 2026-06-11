@@ -17,3 +17,4 @@ sources/commentaries/manifest.json text -filter -diff -merge
 sources/commentaries/spurgeon/manifest.json text -filter -diff -merge
 sources/lexicons/manifest.json text -filter -diff -merge
 sources/lexicons/tagged_manifest.json text -filter -diff -merge
+sources/lexicons/stepbible/manifest.json text -filter -diff -merge

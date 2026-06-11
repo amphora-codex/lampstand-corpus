@@ -86,9 +86,12 @@ CREATE TABLE tagged_word (
     verse      INTEGER NOT NULL,
     position   INTEGER NOT NULL,   -- 1-based word index within the verse
     surface    TEXT NOT NULL,
-    strongs    TEXT NOT NULL,      -- JSON array of 'H####' (may be empty)
+    strongs    TEXT NOT NULL,      -- JSON array of 'H####' / 'G####[suffix]' (may be empty)
     morph      TEXT,
     lemma_raw  TEXT NOT NULL,
+    lemma      TEXT,               -- TAGNT Greek dictionary form (NULL for OSHB)
+    gloss      TEXT,               -- TAGNT Greek gloss (NULL for OSHB)
+    editions   TEXT,               -- TAGNT edition membership (NULL for OSHB)
     PRIMARY KEY (source, book, chapter, verse, position)
 );
 
@@ -148,12 +151,16 @@ def write_lexicons(
 
         for sid in sorted(tagged):
             pt = tagged[sid]
-            src = TAGGED_TEXT_SOURCES[sid]
             prov = pt.provenance
+            name = pt.name or TAGGED_TEXT_SOURCES.get(sid).name  # type: ignore[union-attr]
+            attribution = pt.attribution or (
+                TAGGED_TEXT_SOURCES[sid].attribution if sid in TAGGED_TEXT_SOURCES
+                else ""
+            )
             conn.execute(
                 "INSERT INTO tagged_source VALUES (?,?,?,?,?,?,?,?,?)",
-                (sid, src.name, pt.language, prov.version, prov.license,
-                 src.attribution, prov.url, prov.retrieved, prov.checksum),
+                (sid, name, pt.language, prov.version, prov.license,
+                 attribution, prov.url, prov.retrieved, prov.checksum),
             )
             words = sorted(
                 pt.words,
@@ -162,11 +169,11 @@ def write_lexicons(
             )
             for w in words:
                 conn.execute(
-                    "INSERT INTO tagged_word VALUES (?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO tagged_word VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     (sid, w.ref.book, w.ref.chapter, w.ref.verse_start,
                      w.position, w.surface,
                      json.dumps(w.strongs, separators=(",", ":")),
-                     w.morph, w.lemma_raw),
+                     w.morph, w.lemma_raw, w.lemma, w.gloss, w.editions),
                 )
         conn.commit()
     finally:
@@ -174,10 +181,13 @@ def write_lexicons(
 
 
 def _lexicon_name(pl: ParsedLexicon) -> str:
-    from .lexicons import LEXICON_SOURCES
+    from .lexicons import LEXICON_SOURCES, STEPBIBLE_SOURCES
 
     src = LEXICON_SOURCES.get(pl.id)
-    return src.name if src else pl.id
+    if src:
+        return src.name
+    step = STEPBIBLE_SOURCES.get(pl.id)
+    return step.name if step else pl.id
 
 
 def _text_license(prov) -> str:
@@ -189,4 +199,8 @@ def _text_license(prov) -> str:
     for src in LEXICON_SOURCES.values():
         if src.url == prov.url:
             return src.text_license
+    # TBESG (STEPBible): the dataset itself is CC-BY 4.0; its underlying lexical
+    # content (Abbott-Smith's Manual Greek Lexicon, 1922) is public domain.
+    if "STEPBible" in prov.url or "tbesg" in prov.source.lower():
+        return "Public domain (Abbott-Smith Manual Greek Lexicon, 1922)"
     return prov.license
