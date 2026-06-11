@@ -9,7 +9,7 @@ pipeline never marks a corpus ship-ready.
   Henry  — Commentary on the Whole Bible (complete)
   JFB    — Commentary Critical & Explanatory on the Whole Bible (complete)
   Calvin — Genesis + Psalms + New Testament ONLY (remaining OT deferred)
-  Spurgeon — Treasury of David (Psalms), Internet Archive Google OCR (CANDIDATE; OCR-quality + 104-118 gap below); Gill — deferred v1.1
+  Spurgeon — Treasury of David (Psalms), Internet Archive OCR (CANDIDATE; 147/150 psalms incl. the gap-filled 104-118 from treasuryofdavidc0005spur; see OCR-quality section); Gill — deferred v1.1
 
 ## CALVIN
   chunks=41694  books=26/26  chapters=436  text=24,301,961 chars
@@ -48,12 +48,12 @@ pipeline never marks a corpus ship-ready.
     - jfb: 1 verse-anchor key(s) repeat within the commentator (CCEL split one chapter across sibling div blocks, or a single-chapter book's whole-chapter and verse-1 anchors coincide). Both blocks kept; later occurrence(s) given a deterministic '~N' key suffix — verify this is a benign source split, not a merge error — review
 
 ## SPURGEON
-  chunks=10087  books=1/1  chapters=132  text=11,768,683 chars
-  errors=0  flags=89
+  chunks=11392  books=1/1  chapters=147  text=13,138,505 chars
+  errors=0  flags=98
   books covered: PSA
   BOOKS WITH PARTIAL CHAPTER COVERAGE (review) (1):
-    - PSA: 132/150 chapters
-  UNUSUALLY LONG COMMENT BLOCKS (anomaly — verify not a merge) (77):
+    - PSA: 147/150 chapters
+  UNUSUALLY LONG COMMENT BLOCKS (anomaly — verify not a merge) (83):
     - spurgeon:PSA.1.0#expo1 (13,351 chars) passage=None
     - spurgeon:PSA.2.0#expo1 (13,389 chars) passage=None
     - spurgeon:PSA.3.0#expo1 (12,295 chars) passage=None
@@ -113,10 +113,11 @@ pipeline never marks a corpus ship-ready.
     - spurgeon:PSA.91.16#expo1 (14,782 chars) passage=None
     - spurgeon:PSA.93.0#expo1 (18,111 chars) passage=None
     - spurgeon:PSA.93.4#hint1 (26,770 chars) passage=None
-    - spurgeon:PSA.119.0#expo1 (32,363 chars) passage=None
-    ... and 17 more
-  PARSER / CCEL AMBIGUITY FLAGS (review) (11):
-    - spurgeon: Psalms 104-118 ABSENT — No *spurgoog Google scan on archive.org covers Psalms 104-118 (all twelve candidate items were probed; none contains Psalm 104-118 header or body text). The Treasury volume for this range is absent from the approved scan set. ARCHITECT: source a clean public-domain scan of Treasury of David vol. covering Psalms 104-118 before this ships; do NOT substitute a non-approved text to fill it. — review
+    - spurgeon:PSA.105.31#expo1 (13,190 chars) passage=None
+    ... and 23 more
+  PARSER / CCEL AMBIGUITY FLAGS (review) (14):
+    - spurgeon: former Psalms 104-118 gap RESOLVED — RESOLVED: Psalms 104-118 were gap-filled from an alternate PD Internet Archive scan (treasuryofdavidc0005spur, vol. 5, 1882). No *spurgoog Google scan covers this range, so a non-Google PD scan was used for tod5 only. Psalms 104-118 GAP-FILLED from archive.org item 'treasuryofdavidc0005spur' (The Treasury of David, vol. 5, 1882; title-page range 'PSALM CIV. TO CXVIII.'). This is an ALTERNATE PD scan set, NOT the *spurgoog Google scans used for the other six volumes (the *spurgoog set has no item covering 104-118). It is a cleaner non-Google scan (0 Google-watermark tokens). Same cleaning + four-component segmentation as the rest of Spurgeon. ARCHITECT: spot-check these psalms against a printed Treasury vol. 5. — review
+    - spurgeon: Psalms 104-118 GAP-FILLED from archive.org item 'treasuryofdavidc0005spur' (The Treasury of David, vol. 5, 1882; title-page range 'PSALM CIV. TO CXVIII.'). This is an ALTERNATE PD scan set, NOT the *spurgoog Google scans used for the other six volumes (the *spurgoog set has no item covering 104-118). It is a cleaner non-Google scan (0 Google-watermark tokens). Same cleaning + four-component segmentation as the rest of Spurgeon. ARCHITECT: spot-check these psalms against a printed Treasury vol. 5. — review
     - spurgeon: overlapping *spurgoog scan sets resolved by title-page range + running-header probe; cleaner copy chosen per range. Rejected duplicates: treasurydavidco08spurgoog (Ps 1-26 dup of tod1 (treasurydavidco02): 166 vs 11 residual Google-watermark tokens); treasurydavidvo01spurgoog (Ps 53-78 dup of tod3 (treasurydavidco03): 514 vs 11 watermark tokens); treasurydavid00spurgoog (Ps 79-103 dup of tod4 (treasurydavidco01): 408 vs 11 watermark tokens; tod4 also more complete); treasurydavidco06spurgoog (Ps 79-103 dup of tod4 (treasurydavidco01): smaller, 98 watermark tokens, lower vowel ratio); treasurydavidvo00spurgoog (Ps 119-124 dup of tod6 (treasurydavidco07): near-equal OCR; tod6 marginally more complete); treasurydavidco04spurgoog (Ps 125-150 dup of tod7 (treasurydavidco00): smaller scan (1.64M vs 2.37M chars), less complete) — verify the volume->psalm mapping — review
     - spurgeon/tod1 (treasurydavidco02spurgoog): 2 psalm head(s) [7, 11] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
     - spurgeon/tod1 (treasurydavidco02spurgoog, declared Ps 1-26): PSALM head(s) outside range [40] — likely a running-header OCR misread; kept and anchored to the read number — review
@@ -125,29 +126,31 @@ pipeline never marks a corpus ship-ready.
     - spurgeon/tod3 (treasurydavidco03spurgoog, declared Ps 53-78): PSALM head(s) outside range [95] — likely a running-header OCR misread; kept and anchored to the read number — review
     - spurgeon/tod4 (treasurydavidco01spurgoog): 5 psalm head(s) [81, 88, 94, 100, 103] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
     - spurgeon/tod4 (treasurydavidco01spurgoog, declared Ps 79-103): PSALM head(s) outside range [70] — likely a running-header OCR misread; kept and anchored to the read number — review
+    - spurgeon/tod5 (treasuryofdavidc0005spur): 4 psalm head(s) [104, 107, 111, 114] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
+    - spurgeon/tod5 (treasuryofdavidc0005spur, declared Ps 104-118): PSALM head(s) outside range [140] — likely a running-header OCR misread; kept and anchored to the read number — review
     - spurgeon/tod7 (treasurydavidco00spurgoog): 5 psalm head(s) [127, 131, 132, 138, 149] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
     - spurgeon/tod7 (treasurydavidco00spurgoog): Psalm head(s) [133, 143] could not be located (both the all-caps roman heading and the running-header ordinal OCR'd unreadable). Each missing psalm's commentary is present but absorbed into the PRECEDING psalm's block — a mis-anchor, not a deletion. Verify and split against a printed edition before ship — review
 
 ## SPURGEON — TREASURY OF DAVID (OCR candidate; v1-vs-v1.1 gate)
-  chunks=10,087  psalms_with_content=132/150  text=11,768,683 chars
-  components: title=427, exposition=3649, notes=3335, hints=2063, works=613
-  psalms with all of exposition+notes+hints captured: 78/150
+  chunks=11,392  psalms_with_content=147/150  text=13,138,505 chars
+  components: title=470, exposition=3885, notes=4059, hints=2363, works=615
+  psalms with all of exposition+notes+hints captured: 91/150
 
   PSALM COVERAGE
-    present: 132 psalms
-    MISSING VOLUME (no *spurgoog scan exists): Psalms 104-118 (15 psalms) — ARCHITECT must source a scan
+    present: 147 psalms
+    FORMER GAP RESOLVED: Psalms 104-118 gap-filled from the alternate PD scan treasuryofdavidc0005spur (vol. 5, 1882) — spot-check these vs a printed Treasury vol. 5
     OCR-LOST HEADS (content present but mis-anchored into the preceding psalm): [44, 133, 143] — verify/split vs printed edition
-    not-captured total: 18 (= 15 missing-volume + 3 OCR-lost)
+    not-captured total: 3 [44, 133, 143] (= 0 missing-volume + 3 OCR-lost)
 
   OCR-QUALITY ASSESSMENT (residual-noise estimate)
-    per-chunk garble ratio: mean=0.020 median=0.013 p90=0.048 p99=0.121 max=0.286
-    chunks reading as rough (garble>=0.30): 0/10087
+    per-chunk garble ratio: mean=0.019 median=0.012 p90=0.047 p99=0.118 max=0.286
+    chunks reading as rough (garble>=0.30): 0/11392
     VERDICT: MINOR ARTIFACTS — running text is clean at the word level; residual noise is intra-word letter substitution (e.g. 'rwordi' for 'records', 'j^rateful' for 'grateful') and OCR-mangled Hebrew/Greek quotations. Readable; a human editor pass would polish it. Plausibly v1-shippable IF the architect accepts visible-but-readable OCR and sources the 104-118 gap.
-    NOTE: Hebrew/Greek quotations are OCR-garbage and were NOT reconstructed (flagged, not fabricated). Spot-check should sample psalms across all six volumes, not just the cleanest.
+    NOTE: Hebrew/Greek quotations are OCR-garbage and were NOT reconstructed (flagged, not fabricated). Spot-check should sample psalms across all seven volumes (incl. the gap-filled tod5, Psalms 104-118 from treasuryofdavidc0005spur), not just the cleanest.
 
 ## SOURCES SKIPPED / DEFERRED IN SCOPE (flagged for human review)
-  - Spurgeon — Treasury of David (Psalms) — NOW INGESTED from architect-approved Internet Archive Google OCR (CANDIDATE, not ship-ready)
-      The CCEL edition is image-only, so the architect approved the seven Google-digitized *spurgoog DjVu scans on archive.org (PD; Spurgeon d.1892). Six of the seven volumes are available and ingested (Psalms 1-103 and 119-150); the volume covering PSALMS 104-118 is ABSENT from the entire *spurgoog scan set (all twelve candidate items probed; none contains it) and is FLAGGED for the architect to source a replacement scan before ship — no substitute text was used. This is OCR: see the dedicated Treasury OCR-quality section below for the residual-noise assessment that gates v1-vs-v1.1.
+  - Spurgeon — Treasury of David (Psalms) — NOW INGESTED from architect-approved Internet Archive OCR (CANDIDATE, not ship-ready)
+      The CCEL edition is image-only, so the architect approved the Google-digitized *spurgoog DjVu scans on archive.org (PD; Spurgeon d.1892) for six volumes (Psalms 1-103 and 119-150). The seventh volume (PSALMS 104-118) is ABSENT from the entire *spurgoog set (all twelve candidate items probed; none contains it), so it has been GAP-FILLED from an alternate PD scan — archive.org 'treasuryofdavidc0005spur' (Treasury of David vol. 5, 1882; title-page range 'PSALM CIV. TO CXVIII.'), a cleaner non-Google scan (0 Google-watermark tokens) — ingested with the SAME cleaning + four-component segmentation. Coverage is now 147/150 psalms (104-118 complete; the 3 not captured — 44, 133, 143 — are pre-existing OCR-mis-anchored heads in the *spurgoog volumes, unrelated to the gap-fill). This is OCR: see the dedicated Treasury OCR-quality section below for the residual-noise assessment that gates v1-vs-v1.1, and SPOT-CHECK the gap-filled 104-118 against printed vol. 5.
   - John Gill — Exposition of the Whole Bible — NOT INGESTED (deferred to v1.1)
       Per the architect-locked scope, Gill is deferred to corpus v1.1 and is deliberately not defined as a source in this phase. Confirmed absent.
   - John Calvin — remaining OT — DEFERRED (cleanly skipped)

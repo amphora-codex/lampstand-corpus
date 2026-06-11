@@ -325,8 +325,12 @@ def cmd_snapshot_spurgeon() -> None:
         print(f"  {stem} ({ve['identifier']}) Ps {ve['psalm_first']}-"
               f"{ve['psalm_last']}: {ve['sha256']}")
     mv = entry["missing_volume"]
-    print(f"  MISSING from the *spurgoog set: Psalms {mv['psalm_first']}-"
-          f"{mv['psalm_last']} (flagged for the architect)")
+    if mv["psalm_first"] is None:
+        print("  Psalms 104-118 gap-filled from treasuryofdavidc0005spur "
+              "(vol. 5, 1882; flagged for the architect spot-check)")
+    else:
+        print(f"  MISSING from the *spurgoog set: Psalms {mv['psalm_first']}-"
+              f"{mv['psalm_last']} (flagged for the architect)")
 
 
 def cmd_build_commentaries() -> None:

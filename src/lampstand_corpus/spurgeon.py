@@ -94,27 +94,44 @@ class SpurgeonVolume:
         return SPURGEON_DIR / f"{self.stem}.txt"
 
 
-# The six AVAILABLE volumes (cleanest scan per range). Psalms 104-118 has NO
-# *spurgoog scan and is intentionally absent here — surfaced as a hard gap.
+# The SEVEN volumes (cleanest scan per range). Psalms 104-118 (tod5) is now filled
+# from an alternate PD Internet Archive scan — see TOD5_SOURCE_NOTE below.
 SPURGEON_VOLUMES: tuple[SpurgeonVolume, ...] = (
     SpurgeonVolume("tod1", "treasurydavidco02spurgoog", 1, 26),
     SpurgeonVolume("tod2", "treasurydavidco05spurgoog", 27, 52),
     SpurgeonVolume("tod3", "treasurydavidco03spurgoog", 53, 78),
     SpurgeonVolume("tod4", "treasurydavidco01spurgoog", 79, 103),
-    # tod5 (Psalms 104-118) — MISSING from the *spurgoog set; see MISSING_VOLUME.
+    # tod5 (Psalms 104-118): GAP-FILLED from an alternate PD scan (NOT *spurgoog).
+    # treasuryofdavidc0005spur is vol. 5 (1882), title-page range line "PSALM CIV.
+    # TO CXVIII.", a clean non-Google scan (zero Google-watermark tokens); all 15
+    # psalms 104-118 carry running-ordinal headers. Spurgeon d.1892 / Treasury
+    # completed 1885 — firmly public domain.
+    SpurgeonVolume("tod5", "treasuryofdavidc0005spur", 104, 118),
     SpurgeonVolume("tod6", "treasurydavidco07spurgoog", 119, 124),
     SpurgeonVolume("tod7", "treasurydavidco00spurgoog", 125, 150),
 )
 
-# The gap, flagged for the architect to source a replacement scan before ship.
-MISSING_VOLUME: tuple[int, int, str] = (
-    104, 118,
-    "No *spurgoog Google scan on archive.org covers Psalms 104-118 (all twelve "
-    "candidate items were probed; none contains Psalm 104-118 header or body "
-    "text). The Treasury volume for this range is absent from the approved scan "
-    "set. ARCHITECT: source a clean public-domain scan of Treasury of David vol. "
-    "covering Psalms 104-118 before this ships; do NOT substitute a non-approved "
-    "text to fill it.",
+# The exact source used to fill the former 104-118 gap (FLAGGED per the task so the
+# spot-check knows precisely which scan supplied these psalms).
+TOD5_SOURCE_NOTE: str = (
+    "Psalms 104-118 GAP-FILLED from archive.org item 'treasuryofdavidc0005spur' "
+    "(The Treasury of David, vol. 5, 1882; title-page range 'PSALM CIV. TO "
+    "CXVIII.'). This is an ALTERNATE PD scan set, NOT the *spurgoog Google scans "
+    "used for the other six volumes (the *spurgoog set has no item covering "
+    "104-118). It is a cleaner non-Google scan (0 Google-watermark tokens). Same "
+    "cleaning + four-component segmentation as the rest of Spurgeon. ARCHITECT: "
+    "spot-check these psalms against a printed Treasury vol. 5."
+)
+
+# No remaining structural gap — the 104-118 volume is now sourced. Kept as an
+# empty sentinel (range collapses) so callers that referenced MISSING_VOLUME keep
+# working and the manifest records that the gap was closed.
+MISSING_VOLUME: tuple[int | None, int | None, str] = (
+    None, None,
+    "RESOLVED: Psalms 104-118 were gap-filled from an alternate PD Internet "
+    "Archive scan (treasuryofdavidc0005spur, vol. 5, 1882). No *spurgoog Google "
+    "scan covers this range, so a non-Google PD scan was used for tod5 only. "
+    + TOD5_SOURCE_NOTE,
 )
 
 # Duplicate scans rejected in favour of the cleaner copy (kept for audit, not
@@ -149,8 +166,9 @@ class SpurgeonSource:
     author: str = "Charles Haddon Spurgeon"
     work: str = "The Treasury of David (an exposition of the Psalms)"
     version: str = (
-        "Internet Archive Google-digitized DjVu OCR (six of seven volumes; "
-        "Psalms 104-118 volume missing from the *spurgoog scan set — flagged)"
+        "Internet Archive DjVu OCR — all seven volumes; six from the Google-"
+        "digitized *spurgoog scans, tod5 (Psalms 104-118) gap-filled from the "
+        "alternate PD scan treasuryofdavidc0005spur (vol. 5, 1882)"
     )
     license: str = "Public domain (Spurgeon d.1892; Treasury completed 1885)"
     kind: str = "spurgeon-ia"
@@ -537,9 +555,14 @@ def parse_spurgeon(
     # (psalm, verse, component) -> running paragraph ordinal, kept O(1) per chunk.
     para_counter: dict[tuple[int, int, str], int] = {}
 
-    # Surface the structural gap and the duplicate-resolution decisions up front.
+    # Surface the resolved 104-118 gap (now filled), the exact gap-fill source, and
+    # the duplicate-resolution decisions up front.
     lo, hi, why = MISSING_VOLUME
-    flags.append(f"spurgeon: Psalms {lo}-{hi} ABSENT — {why} — review")
+    if lo is None:
+        flags.append(f"spurgeon: former Psalms 104-118 gap RESOLVED — {why} — review")
+    else:
+        flags.append(f"spurgeon: Psalms {lo}-{hi} ABSENT — {why} — review")
+    flags.append(f"spurgeon: {TOD5_SOURCE_NOTE} — review")
     flags.append(
         "spurgeon: overlapping *spurgoog scan sets resolved by title-page range + "
         "running-header probe; cleaner copy chosen per range. Rejected duplicates: "

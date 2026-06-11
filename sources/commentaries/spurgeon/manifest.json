@@ -5,9 +5,9 @@
       "author": "Charles Haddon Spurgeon",
       "license": "Public domain (Spurgeon d.1892; Treasury completed 1885)",
       "missing_volume": {
-        "note": "No *spurgoog Google scan on archive.org covers Psalms 104-118 (all twelve candidate items were probed; none contains Psalm 104-118 header or body text). The Treasury volume for this range is absent from the approved scan set. ARCHITECT: source a clean public-domain scan of Treasury of David vol. covering Psalms 104-118 before this ships; do NOT substitute a non-approved text to fill it.",
-        "psalm_first": 104,
-        "psalm_last": 118
+        "note": "RESOLVED: Psalms 104-118 were gap-filled from an alternate PD Internet Archive scan (treasuryofdavidc0005spur, vol. 5, 1882). No *spurgoog Google scan covers this range, so a non-Google PD scan was used for tod5 only. Psalms 104-118 GAP-FILLED from archive.org item 'treasuryofdavidc0005spur' (The Treasury of David, vol. 5, 1882; title-page range 'PSALM CIV. TO CXVIII.'). This is an ALTERNATE PD scan set, NOT the *spurgoog Google scans used for the other six volumes (the *spurgoog set has no item covering 104-118). It is a cleaner non-Google scan (0 Google-watermark tokens). Same cleaning + four-component segmentation as the rest of Spurgeon. ARCHITECT: spot-check these psalms against a printed Treasury vol. 5.",
+        "psalm_first": null,
+        "psalm_last": null
       },
       "name": "Charles H. Spurgeon \u2014 The Treasury of David",
       "rejected_duplicates": {
@@ -20,7 +20,8 @@
       },
       "retrieved": "2026-06-10",
       "shortcode": "CHS",
-      "version": "Internet Archive Google-digitized DjVu OCR (six of seven volumes; Psalms 104-118 volume missing from the *spurgoog scan set \u2014 flagged)",
+      "tod5_gap_fill": "Psalms 104-118 GAP-FILLED from archive.org item 'treasuryofdavidc0005spur' (The Treasury of David, vol. 5, 1882; title-page range 'PSALM CIV. TO CXVIII.'). This is an ALTERNATE PD scan set, NOT the *spurgoog Google scans used for the other six volumes (the *spurgoog set has no item covering 104-118). It is a cleaner non-Google scan (0 Google-watermark tokens). Same cleaning + four-component segmentation as the rest of Spurgeon. ARCHITECT: spot-check these psalms against a printed Treasury vol. 5.",
+      "version": "Internet Archive DjVu OCR \u2014 all seven volumes; six from the Google-digitized *spurgoog scans, tod5 (Psalms 104-118) gap-filled from the alternate PD scan treasuryofdavidc0005spur (vol. 5, 1882)",
       "volumes": {
         "tod1": {
           "file": "sources/commentaries/spurgeon/tod1.txt",
@@ -53,6 +54,14 @@
           "psalm_last": 103,
           "sha256": "840ae001f0aedd6694067cb0e371e5acee2e67f4c7615d5ae6d5c837ec4c577e",
           "url": "https://archive.org/download/treasurydavidco01spurgoog/treasurydavidco01spurgoog_djvu.txt"
+        },
+        "tod5": {
+          "file": "sources/commentaries/spurgeon/tod5.txt",
+          "identifier": "treasuryofdavidc0005spur",
+          "psalm_first": 104,
+          "psalm_last": 118,
+          "sha256": "fa06a48a8b185040837e9121cc861e9389233363701d6b0bfd73428232fac0ab",
+          "url": "https://archive.org/download/treasuryofdavidc0005spur/treasuryofdavidc0005spur_djvu.txt"
         },
         "tod6": {
           "file": "sources/commentaries/spurgeon/tod6.txt",
