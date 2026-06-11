@@ -21,12 +21,23 @@ Usage (P3 commentaries):
 when its snapshots are present (run ``snapshot-spurgeon`` first); otherwise the
 three CCEL commentators build without it.
 
+Usage (P4 lexicons):
+    python -m lampstand_corpus.cli snapshot-lexicons   # Strong's G/H + BDB sources
+    python -m lampstand_corpus.cli snapshot-tagged      # OSHB Hebrew + SBLGNT (flag)
+    python -m lampstand_corpus.cli build-lexicons       # build lexicons.sqlite
+    python -m lampstand_corpus.cli validate-lexicons    # write report (no DB)
+
+``build-lexicons`` / ``validate-lexicons`` automatically include the OSHB
+Strong's-tagged Hebrew text when its snapshots are present (run ``snapshot-tagged``
+first); otherwise the dictionaries build without the tagged-word table.
+
 Reads committed snapshots from sources/, writes output/*.sqlite (gitignored) and
 reports/*.txt.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -37,12 +48,25 @@ from . import books
 from .build import write_bibles
 from .build_commentaries import write_commentaries
 from .build_confessions import write_confessions
+from .build_lexicons import write_lexicons
 from .commentaries import (
     COMMENTARIES_DIR,
     COMMENTARY_SOURCES,
     parse_commentary,
 )
 from .confessions import CONFESSION_SOURCES, CONFESSIONS_DIR, parse_confession
+from .lexicons import (
+    FLAGGED_TEXT_SOURCES,
+    LEXICON_SOURCES,
+    LEXICONS_DIR,
+    TAGGED_TEXT_SOURCES,
+    THAYERS_FLAG,
+    ParsedLexicon,
+    ParsedTaggedText,
+    parse_bdb,
+    parse_oshb,
+    parse_strongs,
+)
 from .schema import Provenance
 from .sources import (
     BIBLE_SOURCES,
@@ -50,7 +74,9 @@ from .sources import (
     snapshot_bibles,
     snapshot_commentaries,
     snapshot_confessions,
+    snapshot_lexicons,
     snapshot_spurgeon,
+    snapshot_tagged_text,
 )
 from .spurgeon import (
     SPURGEON_DIR,
@@ -69,6 +95,12 @@ from .validate_confessions import (
     crosscheck_wcf_prose,
     render_confession_report,
     validate_all_confessions,
+)
+from .validate_lexicons import (
+    render_lexicon_report,
+    validate_lexicon,
+    validate_orphans,
+    validate_tagged,
 )
 
 REPO_ROOT = SOURCES_DIR.parent
@@ -362,6 +394,145 @@ def _emit_commentary_report(parsed: dict) -> None:
               f"errors={r.error_total} flags={r.flag_total}")
 
 
+# --- P4 lexicons -------------------------------------------------------------
+def normalize_lexicons() -> dict[str, ParsedLexicon]:
+    """Parse every committed lexicon dictionary snapshot into ParsedLexicons."""
+    manifest_path = LEXICONS_DIR / "manifest.json"
+    if not manifest_path.exists():
+        print("No sources/lexicons/manifest.json — run `snapshot-lexicons` "
+              "first.", file=sys.stderr)
+        sys.exit(2)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    parsed: dict[str, ParsedLexicon] = {}
+    for lid, src in LEXICON_SOURCES.items():
+        entry = manifest["sources"][lid]
+        prov = Provenance(
+            source=f"openscriptures:{lid}",
+            version=entry["version"],
+            license=entry["license"],
+            retrieved=entry["retrieved"],
+            url=entry["url"],
+            checksum=entry["sha256"],
+        )
+        content = src.dest.read_text(encoding="utf-8")
+        if src.lexicon == "strongs":
+            pl = parse_strongs(src, prov, content)
+        else:  # bdb — needs the LexicalIndex aux file for Strong's linkage
+            aux_path = LEXICONS_DIR / src.id / "LexicalIndex.xml"
+            index_xml = aux_path.read_text(encoding="utf-8")
+            pl = parse_bdb(src, prov, content, index_xml)
+        parsed[lid] = pl
+        print(f"  {lid}: {len(pl.entries)} entries, {len(pl.flags)} flag(s)")
+    return parsed
+
+
+def normalize_tagged() -> dict[str, ParsedTaggedText]:
+    """Parse the committed OSHB Strong's-tagged Hebrew snapshots, if present.
+
+    Returns an empty dict (with a note) when the tagged snapshots haven't been
+    fetched — the dictionaries still build without the tagged-word table. SBLGNT
+    is snapshot-only + flagged and is intentionally NOT normalized.
+    """
+    manifest_path = LEXICONS_DIR / "tagged_manifest.json"
+    if not manifest_path.exists():
+        print("  tagged-text: no snapshot manifest — run `snapshot-tagged` to "
+              "include the OSHB Strong's-tagged Hebrew text.")
+        return {}
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    parsed: dict[str, ParsedTaggedText] = {}
+    for sid, src in TAGGED_TEXT_SOURCES.items():
+        entry = manifest["ingested"][sid]
+        # One provenance per source; checksum is the sorted concatenation of the
+        # per-file checksums so it's stable + reproducible.
+        file_sums = sorted(f["sha256"] for f in entry["files"].values())
+        combined = hashlib.sha256("".join(file_sums).encode()).hexdigest()
+        prov = Provenance(
+            source=f"openscriptures:{sid}",
+            version=entry["version"],
+            license=entry["license"],
+            retrieved=entry["retrieved"],
+            url=src.base_url,
+            checksum=combined,
+        )
+        content_by_book = {
+            stem: src.dest(stem).read_text(encoding="utf-8")
+            for stem in src.book_stems
+        }
+        pt = parse_oshb(src, prov, content_by_book)
+        parsed[sid] = pt
+        print(f"  {sid}: {len(pt.words)} tagged words across "
+              f"{len(pt.books_seen)} books, {len(pt.flags)} flag(s)")
+    return parsed
+
+
+def cmd_snapshot_lexicons() -> None:
+    print("Snapshotting lexicon sources -> sources/lexicons/ + manifest.json")
+    manifest = snapshot_lexicons(RETRIEVED)
+    for lid, e in sorted(manifest["sources"].items()):
+        print(f"  {lid}: {e['sha256']}  {e['file']}")
+        if "aux_file" in e:
+            print(f"     aux {e['aux_sha256']}  {e['aux_file']}")
+
+
+def cmd_snapshot_tagged() -> None:
+    print("Snapshotting tagged-text sources -> sources/lexicons/ "
+          "+ tagged_manifest.json")
+    manifest = snapshot_tagged_text(RETRIEVED)
+    for sid, e in sorted(manifest["ingested"].items()):
+        print(f"  INGESTED {sid}: {len(e['files'])} file(s) [{e['license']}]")
+    for sid, e in sorted(manifest["flagged"].items()):
+        print(f"  FLAGGED  {sid}: {len(e['files'])} file(s) "
+              f"snapshotted for provenance only")
+        print(f"     {e['flag']}")
+
+
+def cmd_build_lexicons() -> None:
+    print("Normalizing lexicon snapshots...")
+    lexicons = normalize_lexicons()
+    tagged = normalize_tagged()
+    out = OUTPUT_DIR / "lexicons.sqlite"
+    print(f"Building {out} ...")
+    write_lexicons(lexicons, out, tagged=tagged)
+    print(f"  wrote {out} ({out.stat().st_size:,} bytes)")
+    _emit_lexicon_report(lexicons, tagged)
+
+
+def cmd_validate_lexicons() -> None:
+    print("Normalizing lexicon snapshots (validate only)...")
+    lexicons = normalize_lexicons()
+    tagged = normalize_tagged()
+    _emit_lexicon_report(lexicons, tagged)
+
+
+def _emit_lexicon_report(
+    lexicons: dict[str, ParsedLexicon], tagged: dict[str, ParsedTaggedText]
+) -> None:
+    lex_reports = {lid: validate_lexicon(pl) for lid, pl in lexicons.items()}
+    tagged_reports = {sid: validate_tagged(pt) for sid, pt in tagged.items()}
+    orphans = validate_orphans(lexicons, tagged)
+    text = render_lexicon_report(
+        lex_reports,
+        tagged_reports=tagged_reports,
+        orphans=orphans,
+        thayers_flag=THAYERS_FLAG,
+        sblgnt_flag=FLAGGED_TEXT_SOURCES["sblgnt"].flag,
+    )
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    rp = REPORTS_DIR / "lexicons_validation_p4.txt"
+    rp.write_text(text, encoding="utf-8")
+    print(f"  wrote {rp}")
+    for lid, r in sorted(lex_reports.items()):
+        print(f"  {lid}: entries={r.n_entries} linked={r.n_linked} "
+              f"errors={r.error_total} flags={r.flag_total}")
+    for sid, r in sorted(tagged_reports.items()):
+        print(f"  {sid}: words={r.n_words} books={r.n_books} "
+              f"errors={r.error_total} flags={r.flag_total}")
+    print(f"  orphan Strong's: tagged={len(orphans.from_tagged)} "
+          f"bdb={len(orphans.from_bdb)}")
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     cmd = argv[0] if argv else "all"
@@ -389,6 +560,14 @@ def main(argv: list[str] | None = None) -> int:
         cmd_build_commentaries()
     elif cmd == "validate-commentaries":
         cmd_validate_commentaries()
+    elif cmd == "snapshot-lexicons":
+        cmd_snapshot_lexicons()
+    elif cmd == "snapshot-tagged":
+        cmd_snapshot_tagged()
+    elif cmd == "build-lexicons":
+        cmd_build_lexicons()
+    elif cmd == "validate-lexicons":
+        cmd_validate_lexicons()
     else:
         print(__doc__)
         return 1

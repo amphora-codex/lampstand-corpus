@@ -6,6 +6,7 @@ sources/**/*.txt filter=lfs diff=lfs merge=lfs -text
 sources/**/*.xml filter=lfs diff=lfs merge=lfs -text
 sources/**/*.usx filter=lfs diff=lfs merge=lfs -text
 sources/**/*.md filter=lfs diff=lfs merge=lfs -text
+sources/**/*.js filter=lfs diff=lfs merge=lfs -text
 
 # The provenance manifest is small, human-readable, and meant to be read/diffed
 # directly in the repo — keep it as normal text, not LFS. (Overrides the broad
@@ -14,3 +15,5 @@ sources/manifest.json text -filter -diff -merge
 sources/confessions/manifest.json text -filter -diff -merge
 sources/commentaries/manifest.json text -filter -diff -merge
 sources/commentaries/spurgeon/manifest.json text -filter -diff -merge
+sources/lexicons/manifest.json text -filter -diff -merge
+sources/lexicons/tagged_manifest.json text -filter -diff -merge

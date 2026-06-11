@@ -308,5 +308,126 @@ def snapshot_spurgeon(retrieved: str, *, force: bool = False) -> dict:
     return manifest
 
 
-# TODO(P4+): lexicon (OpenScriptures), TSK cross-ref snapshot definitions land in
-# later phases.
+def snapshot_lexicons(retrieved: str, *, force: bool = False) -> dict:
+    """Download (if absent) each lexicon dictionary source + write its manifest.
+
+    Strong's Greek/Hebrew ``.js`` dictionaries and the BDB XML (with its companion
+    ``LexicalIndex.xml`` aux file, which carries the Strong's<->BDB linkage). All
+    canonical OpenScriptures sources; the underlying dictionary text is PD, the
+    OpenScriptures editions are CC-BY-SA (Strong's) / CC-BY-4.0 (BDB) — both
+    licenses recorded. Snapshots commit under ``sources/lexicons/<id>/`` via
+    git-lfs. Idempotent like the other snapshot functions.
+    """
+    from .lexicons import (
+        BDB_INDEX_FILENAME,
+        BDB_INDEX_URL,
+        LEXICON_SOURCES,
+        LEXICONS_DIR,
+    )
+
+    manifest: dict = {"retrieved": retrieved, "sources": {}}
+    for src in LEXICON_SOURCES.values():
+        if force or not src.dest.exists():
+            checksum = fetch(src.url, src.dest, timeout=180)
+        else:
+            checksum = sha256_of(src.dest)
+        entry: dict = {
+            "name": src.name,
+            "language": src.language,
+            "lexicon": src.lexicon,
+            "url": src.url,
+            "file": str(src.dest.relative_to(SOURCES_DIR.parent)),
+            "version": src.version,
+            "license": src.license,
+            "text_license": src.text_license,
+            "retrieved": retrieved,
+            "sha256": checksum,
+        }
+        if src.id == "bdb":
+            aux_dest = LEXICONS_DIR / src.id / BDB_INDEX_FILENAME
+            if force or not aux_dest.exists():
+                aux_checksum = fetch(BDB_INDEX_URL, aux_dest, timeout=180)
+            else:
+                aux_checksum = sha256_of(aux_dest)
+            entry["aux_file"] = str(aux_dest.relative_to(SOURCES_DIR.parent))
+            entry["aux_url"] = BDB_INDEX_URL
+            entry["aux_sha256"] = aux_checksum
+            entry["aux_note"] = (
+                "LexicalIndex.xml — Strong's<->BDB entry-id linkage; required to "
+                "key BDB entries by Strong's number"
+            )
+        manifest["sources"][src.id] = entry
+    manifest_path = LEXICONS_DIR / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
+
+
+def snapshot_tagged_text(retrieved: str, *, force: bool = False) -> dict:
+    """Download (if absent) the Strong's-tagged original-language text (P4b).
+
+    Ingested: OSHB (morphhb) Hebrew, 39 ``wlc/*.xml`` files, CC-BY-4.0.
+    Snapshot-only + FLAGGED: MorphGNT/SBLGNT Greek (no Strong's tagging; SBLGNT
+    EULA on the text). Both recorded in ``sources/lexicons/tagged_manifest.json``.
+    """
+    from .lexicons import (
+        FLAGGED_TEXT_SOURCES,
+        LEXICONS_DIR,
+        TAGGED_TEXT_SOURCES,
+    )
+
+    manifest: dict = {"retrieved": retrieved, "ingested": {}, "flagged": {}}
+    for src in TAGGED_TEXT_SOURCES.values():
+        files: dict = {}
+        for stem in src.book_stems:
+            dest = src.dest(stem)
+            if force or not dest.exists():
+                checksum = fetch(src.url(stem), dest, timeout=180)
+            else:
+                checksum = sha256_of(dest)
+            files[stem] = {
+                "url": src.url(stem),
+                "file": str(dest.relative_to(SOURCES_DIR.parent)),
+                "sha256": checksum,
+            }
+        manifest["ingested"][src.id] = {
+            "name": src.name,
+            "language": src.language,
+            "version": src.version,
+            "license": src.license,
+            "attribution": src.attribution,
+            "retrieved": retrieved,
+            "files": files,
+        }
+    for src in FLAGGED_TEXT_SOURCES.values():
+        files = {}
+        for fname in src.files:
+            dest = src.dest(fname)
+            if force or not dest.exists():
+                checksum = fetch(src.url(fname), dest, timeout=180)
+            else:
+                checksum = sha256_of(dest)
+            files[fname] = {
+                "url": src.url(fname),
+                "file": str(dest.relative_to(SOURCES_DIR.parent)),
+                "sha256": checksum,
+            }
+        manifest["flagged"][src.id] = {
+            "name": src.name,
+            "version": src.version,
+            "license": src.license,
+            "flag": src.flag,
+            "retrieved": retrieved,
+            "files": files,
+        }
+    manifest_path = LEXICONS_DIR / "tagged_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
+
+
+# TODO(P5+): TSK cross-ref snapshot definitions land in a later phase.
