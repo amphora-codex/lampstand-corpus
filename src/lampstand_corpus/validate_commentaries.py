@@ -162,15 +162,21 @@ def validate_all_commentaries(
 # the deferrals confirmed by this phase. Each entry: (label, why).
 SKIPPED_AND_DEFERRED: list[tuple[str, str]] = [
     ("Spurgeon — Treasury of David (Psalms) — NOW INGESTED from architect-approved "
-     "Internet Archive Google OCR (CANDIDATE, not ship-ready)",
-     "The CCEL edition is image-only, so the architect approved the seven Google-"
-     "digitized *spurgoog DjVu scans on archive.org (PD; Spurgeon d.1892). Six of "
-     "the seven volumes are available and ingested (Psalms 1-103 and 119-150); the "
-     "volume covering PSALMS 104-118 is ABSENT from the entire *spurgoog scan set "
-     "(all twelve candidate items probed; none contains it) and is FLAGGED for the "
-     "architect to source a replacement scan before ship — no substitute text was "
-     "used. This is OCR: see the dedicated Treasury OCR-quality section below for "
-     "the residual-noise assessment that gates v1-vs-v1.1."),
+     "Internet Archive OCR (CANDIDATE, not ship-ready)",
+     "The CCEL edition is image-only, so the architect approved the Google-"
+     "digitized *spurgoog DjVu scans on archive.org (PD; Spurgeon d.1892) for six "
+     "volumes (Psalms 1-103 and 119-150). The seventh volume (PSALMS 104-118) is "
+     "ABSENT from the entire *spurgoog set (all twelve candidate items probed; none "
+     "contains it), so it has been GAP-FILLED from an alternate PD scan — "
+     "archive.org 'treasuryofdavidc0005spur' (Treasury of David vol. 5, 1882; "
+     "title-page range 'PSALM CIV. TO CXVIII.'), a cleaner non-Google scan (0 "
+     "Google-watermark tokens) — ingested with the SAME cleaning + four-component "
+     "segmentation. Coverage is now 147/150 psalms (104-118 complete; the 3 not "
+     "captured — 44, 133, 143 — are pre-existing OCR-mis-anchored heads in the "
+     "*spurgoog volumes, unrelated to the gap-fill). This is OCR: see the dedicated "
+     "Treasury OCR-quality section below for the residual-noise assessment that "
+     "gates v1-vs-v1.1, and SPOT-CHECK the gap-filled 104-118 against printed "
+     "vol. 5."),
     ("John Gill — Exposition of the Whole Bible — NOT INGESTED (deferred to v1.1)",
      "Per the architect-locked scope, Gill is deferred to corpus v1.1 and is "
      "deliberately not defined as a source in this phase. Confirmed absent."),
@@ -205,7 +211,10 @@ def render_spurgeon_section(parsed) -> list[str]:
     seen = parsed.psalms_seen
     all_psalms = set(range(1, 151))
     lo, hi, _why = MISSING_VOLUME
-    missing_volume = set(range(lo, hi + 1))
+    # The 104-118 volume is now gap-filled (lo/hi are None when resolved); treat the
+    # missing-volume set as empty so coverage is assessed across all 150 psalms.
+    missing_volume = set(range(lo, hi + 1)) if lo is not None and hi is not None \
+        else set()
     # In-range psalms with no captured content (OCR-lost heads), excluding the
     # whole missing volume.
     covered_ranges: set[int] = set()
@@ -261,15 +270,20 @@ def render_spurgeon_section(parsed) -> list[str]:
     lines.append("")
     lines.append("  PSALM COVERAGE")
     lines.append(f"    present: {len(seen)} psalms")
-    lines.append(f"    MISSING VOLUME (no *spurgoog scan exists): Psalms {lo}-{hi} "
-                 f"({len(missing_volume)} psalms) — ARCHITECT must source a scan")
+    if missing_volume:
+        lines.append(f"    MISSING VOLUME (no *spurgoog scan exists): Psalms {lo}-{hi} "
+                     f"({len(missing_volume)} psalms) — ARCHITECT must source a scan")
+    else:
+        lines.append("    FORMER GAP RESOLVED: Psalms 104-118 gap-filled from the "
+                     "alternate PD scan treasuryofdavidc0005spur (vol. 5, 1882) — "
+                     "spot-check these vs a printed Treasury vol. 5")
     if ocr_lost:
         lines.append(f"    OCR-LOST HEADS (content present but mis-anchored into the "
                      f"preceding psalm): {ocr_lost} — verify/split vs printed edition")
     else:
         lines.append("    OCR-LOST HEADS: none (all in-range psalm heads located)")
     still_missing = sorted(all_psalms - seen)
-    lines.append(f"    not-captured total: {len(still_missing)} "
+    lines.append(f"    not-captured total: {len(still_missing)} {still_missing} "
                  f"(= {len(missing_volume)} missing-volume + {len(ocr_lost)} "
                  "OCR-lost)")
     lines.append("")
@@ -280,7 +294,8 @@ def render_spurgeon_section(parsed) -> list[str]:
     lines.append(f"    VERDICT: {verdict}")
     lines.append("    NOTE: Hebrew/Greek quotations are OCR-garbage and were NOT "
                  "reconstructed (flagged, not fabricated). Spot-check should sample "
-                 "psalms across all six volumes, not just the cleanest.")
+                 "psalms across all seven volumes (incl. the gap-filled tod5, "
+                 "Psalms 104-118 from treasuryofdavidc0005spur), not just the cleanest.")
     return lines
 
 
@@ -302,9 +317,10 @@ def render_commentary_report(
                  "(complete)")
     lines.append("  Calvin — Genesis + Psalms + New Testament ONLY (remaining OT "
                  "deferred)")
-    lines.append("  Spurgeon — Treasury of David (Psalms), Internet Archive Google "
-                 "OCR (CANDIDATE; OCR-quality + 104-118 gap below); Gill — deferred "
-                 "v1.1")
+    lines.append("  Spurgeon — Treasury of David (Psalms), Internet Archive OCR "
+                 "(CANDIDATE; 147/150 psalms incl. the gap-filled 104-118 from "
+                 "treasuryofdavidc0005spur; see OCR-quality section); Gill — "
+                 "deferred v1.1")
 
     for cid in sorted(reports):
         r = reports[cid]

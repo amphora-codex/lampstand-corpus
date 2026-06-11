@@ -249,14 +249,14 @@ def snapshot_commentaries(retrieved: str, *, force: bool = False) -> dict:
 
 
 def snapshot_spurgeon(retrieved: str, *, force: bool = False) -> dict:
-    """Download (if absent) each available Treasury-of-David volume's djvu OCR.
+    """Download (if absent) each Treasury-of-David volume's djvu OCR.
 
-    Source is the architect-approved Internet Archive ``*spurgoog`` Google scans
-    (public domain). Six of the seven physical volumes are available; Psalms
-    104-118 is missing from the scan set (see spurgeon.MISSING_VOLUME) and is
-    surfaced in the manifest, not silently dropped. Snapshots are committed under
-    ``sources/commentaries/spurgeon/`` via git-lfs. Returns the manifest dict and
-    writes ``sources/commentaries/spurgeon/manifest.json``.
+    Six volumes come from the Internet Archive ``*spurgoog`` Google scans (public
+    domain). The seventh (tod5, Psalms 104-118) has NO ``*spurgoog`` item, so it is
+    gap-filled from an alternate PD scan (``treasuryofdavidc0005spur``, vol. 5,
+    1882) — surfaced in the manifest with its exact identifier. Snapshots are
+    committed under ``sources/commentaries/spurgeon/`` via git-lfs. Returns the
+    manifest dict and writes ``sources/commentaries/spurgeon/manifest.json``.
     """
     from .spurgeon import (
         MISSING_VOLUME,
@@ -264,6 +264,7 @@ def snapshot_spurgeon(retrieved: str, *, force: bool = False) -> dict:
         SPURGEON_DIR,
         SPURGEON_SOURCE,
         SPURGEON_VOLUMES,
+        TOD5_SOURCE_NOTE,
     )
 
     vols: dict = {}
@@ -294,6 +295,7 @@ def snapshot_spurgeon(retrieved: str, *, force: bool = False) -> dict:
                 "retrieved": retrieved,
                 "volumes": vols,
                 "missing_volume": {"psalm_first": lo, "psalm_last": hi, "note": why},
+                "tod5_gap_fill": TOD5_SOURCE_NOTE,
                 "rejected_duplicates": REJECTED_DUPLICATES,
             }
         },

@@ -168,24 +168,26 @@ def test_parse_fixture_anchors_to_psalm_verses():
 
 
 # --- source-registration + gap guards ----------------------------------------
-def test_six_volumes_and_missing_104_118():
+def test_seven_volumes_with_104_118_gap_filled():
     stems = [v.stem for v in SPURGEON_VOLUMES]
-    assert stems == ["tod1", "tod2", "tod3", "tod4", "tod6", "tod7"]  # tod5 absent
+    assert stems == ["tod1", "tod2", "tod3", "tod4", "tod5", "tod6", "tod7"]
+    # The 104-118 gap is RESOLVED (lo/hi None); tod5 carries it from the alternate
+    # PD scan treasuryofdavidc0005spur (NOT a *spurgoog Google scan).
     lo, hi, _why = MISSING_VOLUME
-    assert (lo, hi) == (104, 118)
-    # No available volume covers any of 104-118.
-    for v in SPURGEON_VOLUMES:
-        assert not (v.psalm_first <= 104 <= v.psalm_last)
-        assert not (v.psalm_first <= 118 <= v.psalm_last)
+    assert (lo, hi) == (None, None)
+    tod5 = next(v for v in SPURGEON_VOLUMES if v.stem == "tod5")
+    assert (tod5.psalm_first, tod5.psalm_last) == (104, 118)
+    assert tod5.identifier == "treasuryofdavidc0005spur"
+    assert "spurgoog" not in tod5.identifier
 
 
-def test_volumes_tile_1_103_and_119_150_without_overlap():
+def test_volumes_tile_all_150_without_overlap():
     covered: set[int] = set()
     for v in SPURGEON_VOLUMES:
         rng = set(range(v.psalm_first, v.psalm_last + 1))
         assert not (covered & rng), "volume ranges must not overlap"
         covered |= rng
-    assert covered == set(range(1, 104)) | set(range(119, 151))
+    assert covered == set(range(1, 151))  # all 150 psalms now tiled
 
 
 def test_rejected_duplicates_are_not_in_chosen_volumes():
@@ -222,12 +224,14 @@ class TestSpurgeonDB:
             "SELECT DISTINCT book FROM comment WHERE commentator='spurgeon'")}
         assert books == {"PSA"}
 
-    def test_psalm_coverage_excludes_missing_volume(self, conn):
+    def test_psalm_coverage_includes_gap_filled_104_118(self, conn):
         psalms = {r[0] for r in conn.execute(
             "SELECT DISTINCT chapter FROM comment WHERE commentator='spurgeon'")}
-        # The 104-118 volume is absent from the scan set.
-        assert not (psalms & set(range(104, 119)))
-        # But the available ranges are well-covered.
+        # The former 104-118 gap is now filled from treasuryofdavidc0005spur — every
+        # psalm in that range has commentary.
+        assert set(range(104, 119)) <= psalms, \
+            f"missing in 104-118: {sorted(set(range(104, 119)) - psalms)}"
+        # And the *spurgoog ranges are well-covered.
         assert {1, 23, 119, 150} <= psalms
 
     def test_four_components_present(self, conn):
