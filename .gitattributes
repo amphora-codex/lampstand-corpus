@@ -13,3 +13,4 @@ sources/**/*.md filter=lfs diff=lfs merge=lfs -text
 sources/manifest.json text -filter -diff -merge
 sources/confessions/manifest.json text -filter -diff -merge
 sources/commentaries/manifest.json text -filter -diff -merge
+sources/commentaries/spurgeon/manifest.json text -filter -diff -merge

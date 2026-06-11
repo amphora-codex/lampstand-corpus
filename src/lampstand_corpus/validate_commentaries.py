@@ -41,6 +41,8 @@ EXPECTED_BOOKS: dict[str, frozenset[str]] = {
     "henry": books.CANON,
     "jfb": books.CANON,
     "calvin": CALVIN_EXPECTED_BOOKS,
+    # Spurgeon's Treasury of David is Psalms only — expected coverage is PSA alone.
+    "spurgeon": frozenset({"PSA"}),
 }
 
 
@@ -159,14 +161,16 @@ def validate_all_commentaries(
 # (surfaced for human sourcing; never substituted with a derived/OCR text), and
 # the deferrals confirmed by this phase. Each entry: (label, why).
 SKIPPED_AND_DEFERRED: list[tuple[str, str]] = [
-    ("Spurgeon — Treasury of David (Psalms) — SKIPPED, flagged for human sourcing",
-     "The only CCEL edition (spurgeon/treasury1-6) is a PAGE-IMAGE SCAN: every "
-     "volume's body is nothing but <img> references to ~2900 PNG page scans, with "
-     "no machine-readable commentary text (the sole extractable text is the print-"
-     "page-number index). Ingesting it would require OCR — a guess, not a parse — "
-     "which CLAUDE.md forbids. ARCHITECT: approve a clean full-text public-domain "
-     "Treasury of David source before inclusion. (Mirrors the P2 1689/Belgic "
-     "handling.)"),
+    ("Spurgeon — Treasury of David (Psalms) — NOW INGESTED from architect-approved "
+     "Internet Archive Google OCR (CANDIDATE, not ship-ready)",
+     "The CCEL edition is image-only, so the architect approved the seven Google-"
+     "digitized *spurgoog DjVu scans on archive.org (PD; Spurgeon d.1892). Six of "
+     "the seven volumes are available and ingested (Psalms 1-103 and 119-150); the "
+     "volume covering PSALMS 104-118 is ABSENT from the entire *spurgoog scan set "
+     "(all twelve candidate items probed; none contains it) and is FLAGGED for the "
+     "architect to source a replacement scan before ship — no substitute text was "
+     "used. This is OCR: see the dedicated Treasury OCR-quality section below for "
+     "the residual-noise assessment that gates v1-vs-v1.1."),
     ("John Gill — Exposition of the Whole Bible — NOT INGESTED (deferred to v1.1)",
      "Per the architect-locked scope, Gill is deferred to corpus v1.1 and is "
      "deliberately not defined as a source in this phase. Confirmed absent."),
@@ -180,8 +184,108 @@ SKIPPED_AND_DEFERRED: list[tuple[str, str]] = [
 ]
 
 
+def render_spurgeon_section(parsed) -> list[str]:
+    """OCR-quality + Psalm-coverage assessment for the Treasury of David.
+
+    ``parsed`` is the ParsedSpurgeon (duck-typed: .chunks / .flags / .psalms_seen).
+    This is the section the architect's spot-check reads to decide v1-vs-v1.1: an
+    honest residual-OCR-noise estimate plus the structural gaps. Statistics only;
+    the human still adjudicates whether the noise is shippable.
+    """
+    from .spurgeon import MISSING_VOLUME, SPURGEON_VOLUMES
+
+    lines: list[str] = []
+    lines.append("")
+    lines.append("## SPURGEON — TREASURY OF DAVID (OCR candidate; v1-vs-v1.1 gate)")
+    if parsed is None:
+        lines.append("  (Spurgeon snapshots not present — run `snapshot-spurgeon`.)")
+        return lines
+
+    chunks = parsed.chunks
+    seen = parsed.psalms_seen
+    all_psalms = set(range(1, 151))
+    lo, hi, _why = MISSING_VOLUME
+    missing_volume = set(range(lo, hi + 1))
+    # In-range psalms with no captured content (OCR-lost heads), excluding the
+    # whole missing volume.
+    covered_ranges: set[int] = set()
+    for v in SPURGEON_VOLUMES:
+        covered_ranges |= set(range(v.psalm_first, v.psalm_last + 1))
+    ocr_lost = sorted(covered_ranges - seen)
+    total_chars = sum(len(c.text) for c in chunks)
+
+    # Component coverage.
+    from collections import Counter
+    comp = Counter(c.meta.get("component", "?") for c in chunks)
+    # Per-psalm: does it have all four substantive components?
+    psalm_comps: dict[int, set[str]] = {}
+    for c in chunks:
+        psalm_comps.setdefault(c.ref.chapter, set()).add(c.meta.get("component"))
+    full_four = sorted(
+        p for p, cs in psalm_comps.items()
+        if {"exposition", "notes", "hints"} <= cs
+    )
+
+    # OCR noise: distribution of the per-chunk garble ratio (1 - fraction of
+    # vowel-bearing words). Low mean => the running text is clean at word level;
+    # the residual noise is intra-word letter substitution, not lost words.
+    garbles = sorted(c.meta.get("garble_ratio", 0.0) for c in chunks)
+    n = len(garbles)
+    mean_g = sum(garbles) / n if n else 0.0
+    median_g = garbles[n // 2] if n else 0.0
+    p90 = garbles[int(n * 0.90)] if n else 0.0
+    p99 = garbles[int(n * 0.99)] if n else 0.0
+    worst = garbles[-1] if n else 0.0
+    rough = sum(1 for g in garbles if g >= 0.30)
+
+    if mean_g < 0.04 and p90 < 0.08:
+        verdict = ("MINOR ARTIFACTS — running text is clean at the word level; "
+                   "residual noise is intra-word letter substitution (e.g. "
+                   "'rwordi' for 'records', 'j^rateful' for 'grateful') and "
+                   "OCR-mangled Hebrew/Greek quotations. Readable; a human editor "
+                   "pass would polish it. Plausibly v1-shippable IF the architect "
+                   "accepts visible-but-readable OCR and sources the 104-118 gap.")
+    elif mean_g < 0.10:
+        verdict = ("ROUGH IN PLACES — noticeable word-level OCR damage; recommend "
+                   "deferring to v1.1 unless a cleaning/editing pass is funded.")
+    else:
+        verdict = ("ROUGH — heavy OCR damage; defer to v1.1.")
+
+    lines.append(f"  chunks={len(chunks):,}  psalms_with_content={len(seen)}/150  "
+                 f"text={total_chars:,} chars")
+    lines.append("  components: " + ", ".join(
+        f"{k}={comp[k]}" for k in ("title", "exposition", "notes", "hints", "works")
+    ))
+    lines.append(f"  psalms with all of exposition+notes+hints captured: "
+                 f"{len(full_four)}/150")
+    lines.append("")
+    lines.append("  PSALM COVERAGE")
+    lines.append(f"    present: {len(seen)} psalms")
+    lines.append(f"    MISSING VOLUME (no *spurgoog scan exists): Psalms {lo}-{hi} "
+                 f"({len(missing_volume)} psalms) — ARCHITECT must source a scan")
+    if ocr_lost:
+        lines.append(f"    OCR-LOST HEADS (content present but mis-anchored into the "
+                     f"preceding psalm): {ocr_lost} — verify/split vs printed edition")
+    else:
+        lines.append("    OCR-LOST HEADS: none (all in-range psalm heads located)")
+    still_missing = sorted(all_psalms - seen)
+    lines.append(f"    not-captured total: {len(still_missing)} "
+                 f"(= {len(missing_volume)} missing-volume + {len(ocr_lost)} "
+                 "OCR-lost)")
+    lines.append("")
+    lines.append("  OCR-QUALITY ASSESSMENT (residual-noise estimate)")
+    lines.append(f"    per-chunk garble ratio: mean={mean_g:.3f} median={median_g:.3f}"
+                 f" p90={p90:.3f} p99={p99:.3f} max={worst:.3f}")
+    lines.append(f"    chunks reading as rough (garble>=0.30): {rough}/{n}")
+    lines.append(f"    VERDICT: {verdict}")
+    lines.append("    NOTE: Hebrew/Greek quotations are OCR-garbage and were NOT "
+                 "reconstructed (flagged, not fabricated). Spot-check should sample "
+                 "psalms across all six volumes, not just the cleanest.")
+    return lines
+
+
 def render_commentary_report(
-    reports: dict[str, CommentaryReport]
+    reports: dict[str, CommentaryReport], *, spurgeon=None
 ) -> str:
     lines: list[str] = []
     lines.append("LampStand corpus — P3 commentaries validation report")
@@ -198,8 +302,9 @@ def render_commentary_report(
                  "(complete)")
     lines.append("  Calvin — Genesis + Psalms + New Testament ONLY (remaining OT "
                  "deferred)")
-    lines.append("  Spurgeon Treasury of David — skipped (image-only CCEL source); "
-                 "Gill — deferred v1.1")
+    lines.append("  Spurgeon — Treasury of David (Psalms), Internet Archive Google "
+                 "OCR (CANDIDATE; OCR-quality + 104-118 gap below); Gill — deferred "
+                 "v1.1")
 
     for cid in sorted(reports):
         r = reports[cid]
@@ -234,6 +339,9 @@ def render_commentary_report(
         block("UNUSUALLY LONG COMMENT BLOCKS (anomaly — verify not a merge)",
               r.long_blocks)
         block("PARSER / CCEL AMBIGUITY FLAGS (review)", r.parser_flags)
+
+    # Dedicated Treasury-of-David OCR-quality + coverage section (the v1/v1.1 gate).
+    lines.extend(render_spurgeon_section(spurgeon))
 
     lines.append("")
     lines.append("## SOURCES SKIPPED / DEFERRED IN SCOPE (flagged for human review)")

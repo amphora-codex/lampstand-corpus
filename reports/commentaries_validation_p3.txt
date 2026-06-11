@@ -9,7 +9,7 @@ pipeline never marks a corpus ship-ready.
   Henry  — Commentary on the Whole Bible (complete)
   JFB    — Commentary Critical & Explanatory on the Whole Bible (complete)
   Calvin — Genesis + Psalms + New Testament ONLY (remaining OT deferred)
-  Spurgeon Treasury of David — skipped (image-only CCEL source); Gill — deferred v1.1
+  Spurgeon — Treasury of David (Psalms), Internet Archive Google OCR (CANDIDATE; OCR-quality + 104-118 gap below); Gill — deferred v1.1
 
 ## CALVIN
   chunks=41694  books=26/26  chapters=436  text=24,301,961 chars
@@ -47,9 +47,107 @@ pipeline never marks a corpus ship-ready.
   PARSER / CCEL AMBIGUITY FLAGS (review) (1):
     - jfb: 1 verse-anchor key(s) repeat within the commentator (CCEL split one chapter across sibling div blocks, or a single-chapter book's whole-chapter and verse-1 anchors coincide). Both blocks kept; later occurrence(s) given a deterministic '~N' key suffix — verify this is a benign source split, not a merge error — review
 
+## SPURGEON
+  chunks=10087  books=1/1  chapters=132  text=11,768,683 chars
+  errors=0  flags=89
+  books covered: PSA
+  BOOKS WITH PARTIAL CHAPTER COVERAGE (review) (1):
+    - PSA: 132/150 chapters
+  UNUSUALLY LONG COMMENT BLOCKS (anomaly — verify not a merge) (77):
+    - spurgeon:PSA.1.0#expo1 (13,351 chars) passage=None
+    - spurgeon:PSA.2.0#expo1 (13,389 chars) passage=None
+    - spurgeon:PSA.3.0#expo1 (12,295 chars) passage=None
+    - spurgeon:PSA.4.0#expo1 (12,717 chars) passage=None
+    - spurgeon:PSA.5.0#expo1 (18,604 chars) passage=None
+    - spurgeon:PSA.6.0#expo3 (21,761 chars) passage=None
+    - spurgeon:PSA.8.0#expo1 (14,175 chars) passage=None
+    - spurgeon:PSA.9.0#titl1 (18,260 chars) passage=None
+    - spurgeon:PSA.10.0#expo1 (20,811 chars) passage=None
+    - spurgeon:PSA.12.0#expo1 (12,118 chars) passage=None
+    - spurgeon:PSA.14.0#expo1 (17,059 chars) passage=None
+    - spurgeon:PSA.16.0#expo2 (14,305 chars) passage=None
+    - spurgeon:PSA.17.2#expo1 (12,386 chars) passage=None
+    - spurgeon:PSA.27.14#expo1 (62,716 chars) passage=None
+    - spurgeon:PSA.28.0#note1 (21,013 chars) passage=None
+    - spurgeon:PSA.29.0#note1 (32,164 chars) passage=None
+    - spurgeon:PSA.30.0#note1 (39,370 chars) passage=None
+    - spurgeon:PSA.31.21#expo1 (56,729 chars) passage=None
+    - spurgeon:PSA.32.0#work1 (16,648 chars) passage=None
+    - spurgeon:PSA.32.6#expo3 (15,809 chars) passage=None
+    - spurgeon:PSA.32.11#expo1 (49,259 chars) passage=None
+    - spurgeon:PSA.33.21#expo1 (52,734 chars) passage=None
+    - spurgeon:PSA.34.7#expo2 (23,248 chars) passage=None
+    - spurgeon:PSA.34.15#expo2 (14,441 chars) passage=None
+    - spurgeon:PSA.34.19#expo1 (14,926 chars) passage=None
+    - spurgeon:PSA.35.0#note1 (43,120 chars) passage=None
+    - spurgeon:PSA.36.0#note1 (35,533 chars) passage=None
+    - spurgeon:PSA.37.40#expo1 (74,710 chars) passage=None
+    - spurgeon:PSA.38.22#expo1 (45,078 chars) passage=None
+    - spurgeon:PSA.39.0#note1 (28,186 chars) passage=None
+    - spurgeon:PSA.39.11#note1 (32,593 chars) passage=None
+    - spurgeon:PSA.40.3#note1 (27,456 chars) passage=None
+    - spurgeon:PSA.40.8#note1 (14,328 chars) passage=None
+    - spurgeon:PSA.41.0#note1 (19,872 chars) passage=None
+    - spurgeon:PSA.41.9#note2 (13,548 chars) passage=None
+    - spurgeon:PSA.42.0#note1 (13,228 chars) passage=None
+    - spurgeon:PSA.42.4#note1 (41,777 chars) passage=None
+    - spurgeon:PSA.43.0#note1 (29,573 chars) passage=None
+    - spurgeon:PSA.43.3#expo3 (27,028 chars) passage=None
+    - spurgeon:PSA.43.4#expo1 (20,134 chars) passage=None
+    - spurgeon:PSA.45.0#work1 (23,008 chars) passage=None
+    - spurgeon:PSA.45.2#expo1 (37,083 chars) passage=None
+    - spurgeon:PSA.45.15#expo1 (17,233 chars) passage=None
+    - spurgeon:PSA.46.11#expo1 (31,072 chars) passage=None
+    - spurgeon:PSA.48.0#note1 (14,626 chars) passage=None
+    - spurgeon:PSA.49.6#expo1 (28,219 chars) passage=None
+    - spurgeon:PSA.50.0#note1 (18,160 chars) passage=None
+    - spurgeon:PSA.50.10#note1 (21,722 chars) passage=None
+    - spurgeon:PSA.51.0#note1 (39,960 chars) passage=None
+    - spurgeon:PSA.51.8#work1 (31,061 chars) passage=None
+    - spurgeon:PSA.52.0#note1 (15,305 chars) passage=None
+    - spurgeon:PSA.72.7#expo1 (12,527 chars) passage=None
+    - spurgeon:PSA.78.1#expo1 (12,953 chars) passage=None
+    - spurgeon:PSA.78.14#expo1 (12,784 chars) passage=None
+    - spurgeon:PSA.91.0#expo5 (12,673 chars) passage=None
+    - spurgeon:PSA.91.6#expo7 (20,820 chars) passage=None
+    - spurgeon:PSA.91.16#expo1 (14,782 chars) passage=None
+    - spurgeon:PSA.93.0#expo1 (18,111 chars) passage=None
+    - spurgeon:PSA.93.4#hint1 (26,770 chars) passage=None
+    - spurgeon:PSA.119.0#expo1 (32,363 chars) passage=None
+    ... and 17 more
+  PARSER / CCEL AMBIGUITY FLAGS (review) (11):
+    - spurgeon: Psalms 104-118 ABSENT — No *spurgoog Google scan on archive.org covers Psalms 104-118 (all twelve candidate items were probed; none contains Psalm 104-118 header or body text). The Treasury volume for this range is absent from the approved scan set. ARCHITECT: source a clean public-domain scan of Treasury of David vol. covering Psalms 104-118 before this ships; do NOT substitute a non-approved text to fill it. — review
+    - spurgeon: overlapping *spurgoog scan sets resolved by title-page range + running-header probe; cleaner copy chosen per range. Rejected duplicates: treasurydavidco08spurgoog (Ps 1-26 dup of tod1 (treasurydavidco02): 166 vs 11 residual Google-watermark tokens); treasurydavidvo01spurgoog (Ps 53-78 dup of tod3 (treasurydavidco03): 514 vs 11 watermark tokens); treasurydavid00spurgoog (Ps 79-103 dup of tod4 (treasurydavidco01): 408 vs 11 watermark tokens; tod4 also more complete); treasurydavidco06spurgoog (Ps 79-103 dup of tod4 (treasurydavidco01): smaller, 98 watermark tokens, lower vowel ratio); treasurydavidvo00spurgoog (Ps 119-124 dup of tod6 (treasurydavidco07): near-equal OCR; tod6 marginally more complete); treasurydavidco04spurgoog (Ps 125-150 dup of tod7 (treasurydavidco00): smaller scan (1.64M vs 2.37M chars), less complete) — verify the volume->psalm mapping — review
+    - spurgeon/tod1 (treasurydavidco02spurgoog): 2 psalm head(s) [7, 11] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
+    - spurgeon/tod1 (treasurydavidco02spurgoog, declared Ps 1-26): PSALM head(s) outside range [40] — likely a running-header OCR misread; kept and anchored to the read number — review
+    - spurgeon/tod2 (treasurydavidco05spurgoog): Psalm head(s) [44] could not be located (both the all-caps roman heading and the running-header ordinal OCR'd unreadable). Each missing psalm's commentary is present but absorbed into the PRECEDING psalm's block — a mis-anchor, not a deletion. Verify and split against a printed edition before ship — review
+    - spurgeon/tod3 (treasurydavidco03spurgoog): 2 psalm head(s) [56, 76] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
+    - spurgeon/tod3 (treasurydavidco03spurgoog, declared Ps 53-78): PSALM head(s) outside range [95] — likely a running-header OCR misread; kept and anchored to the read number — review
+    - spurgeon/tod4 (treasurydavidco01spurgoog): 5 psalm head(s) [81, 88, 94, 100, 103] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
+    - spurgeon/tod4 (treasurydavidco01spurgoog, declared Ps 79-103): PSALM head(s) outside range [70] — likely a running-header OCR misread; kept and anchored to the read number — review
+    - spurgeon/tod7 (treasurydavidco00spurgoog): 5 psalm head(s) [127, 131, 132, 138, 149] were unreadable as an all-caps roman heading and were recovered from their running-header ordinal — boundary is approximate (the header sits a page or so into the psalm); verify the opening of these psalms against a printed edition — review
+    - spurgeon/tod7 (treasurydavidco00spurgoog): Psalm head(s) [133, 143] could not be located (both the all-caps roman heading and the running-header ordinal OCR'd unreadable). Each missing psalm's commentary is present but absorbed into the PRECEDING psalm's block — a mis-anchor, not a deletion. Verify and split against a printed edition before ship — review
+
+## SPURGEON — TREASURY OF DAVID (OCR candidate; v1-vs-v1.1 gate)
+  chunks=10,087  psalms_with_content=132/150  text=11,768,683 chars
+  components: title=427, exposition=3649, notes=3335, hints=2063, works=613
+  psalms with all of exposition+notes+hints captured: 78/150
+
+  PSALM COVERAGE
+    present: 132 psalms
+    MISSING VOLUME (no *spurgoog scan exists): Psalms 104-118 (15 psalms) — ARCHITECT must source a scan
+    OCR-LOST HEADS (content present but mis-anchored into the preceding psalm): [44, 133, 143] — verify/split vs printed edition
+    not-captured total: 18 (= 15 missing-volume + 3 OCR-lost)
+
+  OCR-QUALITY ASSESSMENT (residual-noise estimate)
+    per-chunk garble ratio: mean=0.020 median=0.013 p90=0.048 p99=0.121 max=0.286
+    chunks reading as rough (garble>=0.30): 0/10087
+    VERDICT: MINOR ARTIFACTS — running text is clean at the word level; residual noise is intra-word letter substitution (e.g. 'rwordi' for 'records', 'j^rateful' for 'grateful') and OCR-mangled Hebrew/Greek quotations. Readable; a human editor pass would polish it. Plausibly v1-shippable IF the architect accepts visible-but-readable OCR and sources the 104-118 gap.
+    NOTE: Hebrew/Greek quotations are OCR-garbage and were NOT reconstructed (flagged, not fabricated). Spot-check should sample psalms across all six volumes, not just the cleanest.
+
 ## SOURCES SKIPPED / DEFERRED IN SCOPE (flagged for human review)
-  - Spurgeon — Treasury of David (Psalms) — SKIPPED, flagged for human sourcing
-      The only CCEL edition (spurgeon/treasury1-6) is a PAGE-IMAGE SCAN: every volume's body is nothing but <img> references to ~2900 PNG page scans, with no machine-readable commentary text (the sole extractable text is the print-page-number index). Ingesting it would require OCR — a guess, not a parse — which CLAUDE.md forbids. ARCHITECT: approve a clean full-text public-domain Treasury of David source before inclusion. (Mirrors the P2 1689/Belgic handling.)
+  - Spurgeon — Treasury of David (Psalms) — NOW INGESTED from architect-approved Internet Archive Google OCR (CANDIDATE, not ship-ready)
+      The CCEL edition is image-only, so the architect approved the seven Google-digitized *spurgoog DjVu scans on archive.org (PD; Spurgeon d.1892). Six of the seven volumes are available and ingested (Psalms 1-103 and 119-150); the volume covering PSALMS 104-118 is ABSENT from the entire *spurgoog scan set (all twelve candidate items probed; none contains it) and is FLAGGED for the architect to source a replacement scan before ship — no substitute text was used. This is OCR: see the dedicated Treasury OCR-quality section below for the residual-noise assessment that gates v1-vs-v1.1.
   - John Gill — Exposition of the Whole Bible — NOT INGESTED (deferred to v1.1)
       Per the architect-locked scope, Gill is deferred to corpus v1.1 and is deliberately not defined as a source in this phase. Confirmed absent.
   - John Calvin — remaining OT — DEFERRED (cleanly skipped)

@@ -17,7 +17,7 @@ From a set of versioned, public-domain source snapshots, the pipeline emits the 
 
 - **Bibles:** Berean Standard Bible (bereanbible.com, CC0), KJV / ASV / WEB (eBible.org, public domain) — USFM.
 - **Confessions/catechisms:** WCF — original 1646/47 text (`andrewhwaller/westminster-json`, MIT repo / PD text), prose cross-checked against Wikisource Burges-1646, with the six 1788 American-revision loci marked; 1689 LBCF (`ParticularBaptists/lbcf-1689`, CC0); Belgic Confession (Wikisource 1840 RPDC, PD); WLC / WSC / Heidelberg / Canons of Dort (CCEL ThML, PD). Underlying confessions are public domain; upstream repo licenses recorded in the source manifest.
-- **Commentaries:** CCEL (each commentator verified against an authoritative edition).
+- **Commentaries:** CCEL (each commentator verified against an authoritative edition) — Matthew Henry, Jamieson-Fausset-Brown, Calvin (Genesis + Psalms + NT for v1). **Spurgeon's *Treasury of David*** (Psalms) is ingested from the architect-approved Google-digitized Internet Archive `*spurgoog` DjVu OCR (PD; Spurgeon d.1892), since the CCEL edition is image-only. This is OCR (a *candidate*, not ship-ready); the volume covering Psalms 104-118 is absent from the scan set and is flagged for the architect to source.
 - **Lexicons:** OpenScriptures `strongs`, `HebrewLexicon` (BDB), `morphgnt/sblgnt`; Thayer's.
 - **Cross-references:** Treasury of Scripture Knowledge (OpenBible.info / CCEL).
 

@@ -171,11 +171,22 @@ def test_calvin_expected_books_exclude_unwritten_nt():
     assert "ISA" not in CALVIN_EXPECTED_BOOKS
 
 
-def test_spurgeon_and_gill_not_sources():
-    # Spurgeon (image-only CCEL) and Gill (deferred v1.1) must not be ingestable.
+def test_ccel_sources_are_the_three_whole_bible_commentators():
+    # COMMENTARY_SOURCES is the CCEL-only dict the snapshot loop iterates. Spurgeon
+    # is ingested from Internet Archive OCR (a different path) and lives in the
+    # combined registry, NOT here; Gill is deferred to v1.1.
     assert "spurgeon" not in COMMENTARY_SOURCES
     assert "gill" not in COMMENTARY_SOURCES
     assert set(COMMENTARY_SOURCES) == {"henry", "jfb", "calvin"}
+
+
+def test_spurgeon_now_in_combined_registry():
+    from lampstand_corpus.commentaries import all_commentary_sources
+
+    combined = all_commentary_sources()
+    assert "spurgeon" in combined
+    assert "gill" not in combined  # still deferred to v1.1
+    assert combined["spurgeon"].shortcode == "CHS"
 
 
 # --- validation --------------------------------------------------------------
@@ -218,9 +229,13 @@ class TestCommentariesDB:
         yield c
         c.close()
 
-    def test_three_commentators_present(self, conn):
+    def test_commentators_present(self, conn):
+        # Henry, JFB, Calvin (CCEL) + Spurgeon (Internet Archive OCR). Spurgeon is
+        # present only when its snapshots were fetched before the build; tolerate
+        # both so a CCEL-only build still passes.
         ids = {r[0] for r in conn.execute("SELECT id FROM commentator")}
-        assert ids == {"henry", "jfb", "calvin"}
+        assert {"henry", "jfb", "calvin"} <= ids
+        assert ids <= {"henry", "jfb", "calvin", "spurgeon"}
 
     def test_every_comment_ref_is_in_canon(self, conn):
         from lampstand_corpus import books
