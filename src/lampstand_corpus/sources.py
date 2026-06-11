@@ -480,4 +480,60 @@ def snapshot_stepbible(retrieved: str, *, force: bool = False) -> dict:
     return manifest
 
 
-# TODO(P5+): TSK cross-ref snapshot definitions land in a later phase.
+def snapshot_crossrefs(retrieved: str, *, force: bool = False) -> dict:
+    """Download (if absent) the OpenBible.info TSK cross-reference dataset (P5).
+
+    Fetches ``cross-references.zip`` and extracts the single ``cross_references.txt``
+    member into ``sources/crossrefs/`` (committed via git-lfs). The dataset is
+    **CC-BY** (www.openbible.info) — the required attribution is recorded in the
+    manifest alongside the URL, retrieval date, and SHA-256 of BOTH the zip and the
+    extracted text file. Idempotent like the other snapshot functions. Returns the
+    manifest dict and writes ``sources/crossrefs/manifest.json``.
+    """
+    import zipfile
+
+    from .crossrefs import (
+        CROSSREFS_ATTRIBUTION,
+        CROSSREFS_DIR,
+        CROSSREFS_LICENSE,
+        CROSSREFS_NAME,
+        CROSSREFS_TXT,
+        CROSSREFS_URL,
+        CROSSREFS_ZIP,
+    )
+
+    zip_dest = CROSSREFS_DIR / CROSSREFS_ZIP
+    txt_dest = CROSSREFS_DIR / CROSSREFS_TXT
+    if force or not zip_dest.exists():
+        zip_checksum = fetch(CROSSREFS_URL, zip_dest, timeout=180)
+    else:
+        zip_checksum = sha256_of(zip_dest)
+    if force or not txt_dest.exists():
+        with zipfile.ZipFile(zip_dest) as zf:
+            txt_dest.write_bytes(zf.read(CROSSREFS_TXT))
+    txt_checksum = sha256_of(txt_dest)
+
+    manifest: dict = {
+        "retrieved": retrieved,
+        "license": CROSSREFS_LICENSE,
+        "attribution": CROSSREFS_ATTRIBUTION,
+        "sources": {
+            "tsk": {
+                "name": CROSSREFS_NAME,
+                "url": CROSSREFS_URL,
+                "zip_file": str(zip_dest.relative_to(SOURCES_DIR.parent)),
+                "zip_sha256": zip_checksum,
+                "file": str(txt_dest.relative_to(SOURCES_DIR.parent)),
+                "sha256": txt_checksum,
+                "license": CROSSREFS_LICENSE,
+                "attribution": CROSSREFS_ATTRIBUTION,
+                "retrieved": retrieved,
+            }
+        },
+    }
+    manifest_path = CROSSREFS_DIR / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest

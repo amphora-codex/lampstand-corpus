@@ -22,6 +22,9 @@ CONFESSIONS_MANIFEST = (
 LEXICONS_MANIFEST = (
     REPO_ROOT / "sources" / "lexicons" / "manifest.json"
 )
+CROSSREFS_MANIFEST = (
+    REPO_ROOT / "sources" / "crossrefs" / "manifest.json"
+)
 
 
 def _sha(path: Path) -> str:
@@ -91,4 +94,20 @@ def test_lexicons_build_is_deterministic(tmp_path):
     b = tmp_path / "b.sqlite"
     write_lexicons(lexicons, a, tagged=tagged)
     write_lexicons(lexicons, b, tagged=tagged)
+    assert _sha(a) == _sha(b)
+
+
+@pytest.mark.skipif(
+    not CROSSREFS_MANIFEST.exists(),
+    reason="crossref snapshot not present; run `cli snapshot-crossrefs` first",
+)
+def test_crossrefs_build_is_deterministic(tmp_path):
+    from lampstand_corpus.build_crossrefs import write_crossrefs
+    from lampstand_corpus.cli import normalize_crossrefs
+
+    parsed = normalize_crossrefs()
+    a = tmp_path / "a.sqlite"
+    b = tmp_path / "b.sqlite"
+    write_crossrefs(parsed, a)
+    write_crossrefs(parsed, b)
     assert _sha(a) == _sha(b)

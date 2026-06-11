@@ -33,6 +33,11 @@ Strong's-tagged Hebrew text and the STEPBible Greek TAGNT/TBESG when their
 snapshots are present (run ``snapshot-tagged`` + ``snapshot-stepbible`` first);
 otherwise the dictionaries build without the missing tables.
 
+Usage (P5 cross-references):
+    python -m lampstand_corpus.cli snapshot-crossrefs  # OpenBible TSK (CC-BY) zip
+    python -m lampstand_corpus.cli build-crossrefs     # build crossrefs.sqlite
+    python -m lampstand_corpus.cli validate-crossrefs  # write report (no DB)
+
 Reads committed snapshots from sources/, writes output/*.sqlite (gitignored) and
 reports/*.txt.
 """
@@ -50,6 +55,7 @@ from . import books
 from .build import write_bibles
 from .build_commentaries import write_commentaries
 from .build_confessions import write_confessions
+from .build_crossrefs import write_crossrefs
 from .build_lexicons import write_lexicons
 from .commentaries import (
     COMMENTARIES_DIR,
@@ -57,6 +63,11 @@ from .commentaries import (
     parse_commentary,
 )
 from .confessions import CONFESSION_SOURCES, CONFESSIONS_DIR, parse_confession
+from .crossrefs import (
+    CROSSREFS_DIR,
+    ParsedCrossRefs,
+    parse_crossrefs,
+)
 from .lexicons import (
     FLAGGED_TEXT_SOURCES,
     LEXICON_SOURCES,
@@ -82,6 +93,7 @@ from .sources import (
     snapshot_bibles,
     snapshot_commentaries,
     snapshot_confessions,
+    snapshot_crossrefs,
     snapshot_lexicons,
     snapshot_spurgeon,
     snapshot_stepbible,
@@ -104,6 +116,10 @@ from .validate_confessions import (
     crosscheck_wcf_prose,
     render_confession_report,
     validate_all_confessions,
+)
+from .validate_crossrefs import (
+    render_crossref_report,
+    validate_crossrefs,
 )
 from .validate_lexicons import (
     render_lexicon_report,
@@ -621,6 +637,71 @@ def _emit_lexicon_report(
           f"greek-tagged={len(orphans.from_greek)} bdb={len(orphans.from_bdb)}")
 
 
+# --- P5 cross-references -----------------------------------------------------
+def normalize_crossrefs() -> ParsedCrossRefs:
+    """Parse the committed TSK cross-reference snapshot into normalized refs."""
+    manifest_path = CROSSREFS_DIR / "manifest.json"
+    if not manifest_path.exists():
+        print("No sources/crossrefs/manifest.json — run `snapshot-crossrefs` "
+              "first.", file=sys.stderr)
+        sys.exit(2)
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = manifest["sources"]["tsk"]
+    prov = Provenance(
+        source="openbible:tsk",
+        version=f"OpenBible.info cross-references (retrieved {entry['retrieved']})",
+        license=entry["license"],
+        retrieved=entry["retrieved"],
+        url=entry["url"],
+        checksum=entry["sha256"],
+    )
+    txt_path = CROSSREFS_DIR / "cross_references.txt"
+    content = txt_path.read_text(encoding="utf-8")
+    parsed = parse_crossrefs(content, prov)
+    print(f"  tsk: {len(parsed.refs)} cross-references "
+          f"({len(parsed.unparsed)} unparsed line(s))")
+    return parsed
+
+
+def cmd_snapshot_crossrefs() -> None:
+    print("Snapshotting TSK cross-references -> sources/crossrefs/ + manifest.json")
+    manifest = snapshot_crossrefs(RETRIEVED)
+    e = manifest["sources"]["tsk"]
+    print(f"  license: {manifest['license']}")
+    print(f"  attribution: {manifest['attribution']}")
+    print(f"  zip {e['zip_sha256']}  {e['zip_file']}")
+    print(f"  txt {e['sha256']}  {e['file']}")
+
+
+def cmd_build_crossrefs() -> None:
+    print("Normalizing cross-reference snapshot...")
+    parsed = normalize_crossrefs()
+    out = OUTPUT_DIR / "crossrefs.sqlite"
+    print(f"Building {out} ...")
+    write_crossrefs(parsed, out)
+    print(f"  wrote {out} ({out.stat().st_size:,} bytes)")
+    _emit_crossref_report(parsed)
+
+
+def cmd_validate_crossrefs() -> None:
+    print("Normalizing cross-reference snapshot (validate only)...")
+    parsed = normalize_crossrefs()
+    _emit_crossref_report(parsed)
+
+
+def _emit_crossref_report(parsed: ParsedCrossRefs) -> None:
+    rep = validate_crossrefs(parsed)
+    text = render_crossref_report(rep)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    rp = REPORTS_DIR / "crossrefs_validation_p5.txt"
+    rp.write_text(text, encoding="utf-8")
+    print(f"  wrote {rp}")
+    print(f"  refs={rep.n_refs} sources={rep.n_distinct_sources} "
+          f"ranges={rep.n_ranges} errors={rep.error_total} flags={rep.flag_total}")
+    print(f"  non-resolving: source={rep.n_nonresolving_source} "
+          f"target={rep.n_nonresolving_target}")
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     cmd = argv[0] if argv else "all"
@@ -658,6 +739,12 @@ def main(argv: list[str] | None = None) -> int:
         cmd_build_lexicons()
     elif cmd == "validate-lexicons":
         cmd_validate_lexicons()
+    elif cmd == "snapshot-crossrefs":
+        cmd_snapshot_crossrefs()
+    elif cmd == "build-crossrefs":
+        cmd_build_crossrefs()
+    elif cmd == "validate-crossrefs":
+        cmd_validate_crossrefs()
     else:
         print(__doc__)
         return 1
