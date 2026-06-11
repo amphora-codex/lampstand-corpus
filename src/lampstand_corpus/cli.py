@@ -53,6 +53,8 @@ from .validate_commentaries import (
     validate_all_commentaries,
 )
 from .validate_confessions import (
+    crosscheck_against_bibles,
+    crosscheck_wcf_prose,
     render_confession_report,
     validate_all_confessions,
 )
@@ -206,7 +208,14 @@ def cmd_validate_confessions() -> None:
 
 def _emit_confession_report(parsed: dict) -> None:
     reports = validate_all_confessions(parsed)
-    text = render_confession_report(reports)
+    crosscheck = crosscheck_against_bibles(parsed, OUTPUT_DIR / "bibles.sqlite")
+    burges = (CONFESSIONS_DIR / "wcf" / "wcf-burges-1646-wikisource.parse.json")
+    wcf_prose = (
+        crosscheck_wcf_prose(parsed["wcf"], burges) if "wcf" in parsed else None
+    )
+    text = render_confession_report(
+        reports, bible_crosscheck=crosscheck, wcf_prose_crosscheck=wcf_prose
+    )
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     rp = REPORTS_DIR / "confessions_validation_p2.txt"
     rp.write_text(text, encoding="utf-8")

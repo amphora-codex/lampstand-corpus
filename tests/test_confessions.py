@@ -8,6 +8,7 @@ when it isn't present (fresh code-only checkout). Run
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -79,40 +80,93 @@ def test_parse_wlc_question_answer():
     assert "fully to enjoy him" in pc.chunks[0].text
 
 
-# --- WCF parser --------------------------------------------------------------
-def test_parse_wcf_original_chapter_mapping_and_skip():
-    content = (
-        "<?xml version='1.0'?><ThML><ThML.body><div1>"
-        "<div2 title='Chapter 1'><h1>Of the Holy Scripture</h1>"
-        "<p>1. Although the light of nature.</p>"
-        "<p>2. Under the name of Holy Scripture.</p></div2>"
-        # A modern-only added chapter (orig 34) must be skipped + flagged.
-        "<div2 title='Chapter 9 (34)'><h1>Of the Holy Spirit</h1>"
-        "<p>1. The Holy Spirit.</p></div2>"
-        "</div1></ThML.body></ThML>"
-    )
+# --- WCF parser (original 1646/47 JSON) --------------------------------------
+def _wcf_json(chapters: list[dict]) -> str:
+    return json.dumps({"languages": {"eng": {"chapters": chapters}}})
+
+
+def test_parse_wcf_sections_and_inline_proofs():
+    content = _wcf_json([
+        {"id": 1, "title": "Of the Holy Scripture", "sections": [
+            {"id": 1, "text": "Although the light of nature (Rom. 2:14; Ps. 19:1)."},
+            {"id": 2, "text": "Under the name of Holy Scripture."},
+        ]},
+        # Single-text chapter (like the real ch. 12, Of Adoption).
+        {"id": 12, "title": "Of Adoption",
+         "text": "All those that are justified (Eph. 1:5)."},
+    ])
     pc = parse_confession(CONFESSION_SOURCES["wcf"], _PROV, content)
     keys = [c.key for c in pc.chunks]
-    assert keys == ["1.1", "1.2"]            # only the original chapter kept
-    assert pc.chunks[0].meta["chapter"] == 1
+    assert keys == ["1.1", "1.2", "12.1"]
     assert pc.chunks[0].meta["chapter_title"] == "Of the Holy Scripture"
-    assert any("Chapter 9 (34)" in f for f in pc.flags)
+    # inline parenthetical proof-texts become VerseRef dicts
+    proofs = pc.chunks[0].meta["proof_texts"]
+    assert {"book": "ROM", "chapter": 2, "verse_start": 14} in proofs
+    # chapter 12's single paragraph becomes section 1
+    assert pc.chunks[2].meta["chapter"] == 12 and pc.chunks[2].meta["section"] == 1
 
 
-def test_parse_wcf_duplicate_section_disambiguated_and_flagged():
-    # "Chapter 21 (19)": the (orig) number 19 is the original WCF chapter — the CCEL
-    # source mislabels its 7th section as a second "6.". Keep both, disambiguate, flag.
-    content = (
-        "<?xml version='1.0'?><ThML><ThML.body><div1>"
-        "<div2 title='Chapter 21 (19)'><h1>Of the Law of God</h1>"
-        "<p>6. Although true believers be not under the law.</p>"
-        "<p>6. Neither are the forementioned uses of the law.</p></div2>"
-        "</div1></ThML.body></ThML>"
-    )
+def test_parse_wcf_marks_1788_amendment_loci():
+    content = _wcf_json([
+        {"id": 23, "title": "Of the Civil Magistrate", "sections": [
+            {"id": 3, "text": "The civil magistrate may not assume to himself."},
+        ]},
+        {"id": 24, "title": "Of Marriage and Divorce", "sections": [
+            {"id": 4, "text": "Marriage ought not to be within the degrees."},
+        ]},
+    ])
     pc = parse_confession(CONFESSION_SOURCES["wcf"], _PROV, content)
+    by_key = {c.key: c for c in pc.chunks}
+    assert "amendment_1788" in by_key["23.3"].meta
+    assert "amendment_1788" in by_key["24.4"].meta
+    # 23 'Of the Civil Magistrate' / 24 'Of Marriage and Divorce' confirmed present
+    assert by_key["23.3"].meta["chapter_title"] == "Of the Civil Magistrate"
+    assert by_key["24.4"].meta["chapter_title"] == "Of Marriage and Divorce"
+
+
+# --- 1689 LBCF parser --------------------------------------------------------
+def test_parse_lbcf_chapters_and_paragraphs():
+    content = json.dumps({
+        "title": "Baptist Confession of Faith of 1689",
+        "chapters": {
+            "1": {"title": "Of the Holy Scriptures",
+                  "paragraphs": {"1": "The Holy Scripture is the only rule.",
+                                 "2": "Under the name of Holy Scripture."}},
+            "26": {"title": "Of the Church",
+                   "paragraphs": {"1": "The catholic or universal church."}},
+        },
+    })
+    pc = parse_confession(CONFESSION_SOURCES["lbcf"], _PROV, content)
     keys = [c.key for c in pc.chunks]
-    assert "19.6" in keys and "19.6#2" in keys  # neither dropped, no key collision
-    assert any("repeated section number 6" in f for f in pc.flags)
+    assert keys == ["1.1", "1.2", "26.1"]
+    assert pc.chunks[0].meta["shortcode"] == "1689"
+    # chapter 26 'Of the Church' present
+    ch26 = [c for c in pc.chunks if c.meta["chapter"] == 26][0]
+    assert ch26.meta["chapter_title"] == "Of the Church"
+
+
+# --- Belgic parser -----------------------------------------------------------
+def _belgic_parse_json(paras_html: str) -> str:
+    return json.dumps({"parse": {"text": f"<div>{paras_html}</div>"}})
+
+
+def test_parse_belgic_articles_roman_to_int():
+    # Article I renders as a bare header + title paragraph; II carries its title
+    # inline (the two real forms in the 1840 RPDC edition).
+    html = (
+        "<p>Article I.</p><p>That there is one only God.</p>"
+        "<p>We all believe with the heart that there is one only God.</p>"
+        "<p>II. By what means God is made known unto us.</p>"
+        "<p>We know him by two means.</p>"
+    )
+    pc = parse_confession(CONFESSION_SOURCES["belgic"], _PROV,
+                          _belgic_parse_json(html))
+    assert [c.key for c in pc.chunks] == ["1", "2"]
+    assert pc.chunks[0].meta["article"] == 1
+    assert pc.chunks[0].meta["article_title"] == "That there is one only God."
+    assert "one only God" in pc.chunks[0].text
+    assert pc.chunks[1].meta["article_title"].startswith("By what means")
+    assert pc.chunks[0].meta["shortcode"] == "BC"
 
 
 # --- Heidelberg parser -------------------------------------------------------
@@ -210,9 +264,10 @@ class TestConfessionsDB:
         yield c
         c.close()
 
-    def test_five_documents_present(self, conn):
+    def test_seven_documents_present(self, conn):
         ids = {r[0] for r in conn.execute("SELECT id FROM document")}
-        assert ids == {"wcf", "wlc", "wsc", "heidelberg", "dort"}
+        assert ids == {"wcf", "wlc", "wsc", "lbcf", "belgic",
+                       "heidelberg", "dort"}
 
     def test_dort_article_and_rejection_counts(self, conn):
         # 59 positive articles + 34 rejection paragraphs + 1 Conclusion = 94 chunks.
@@ -236,13 +291,47 @@ class TestConfessionsDB:
             ).fetchone()[0]
             assert n == expected, doc
 
-    def test_wcf_has_32_recovered_chapters(self, conn):
-        # Original ch 24 is unrecoverable from the CCEL modern edition (flagged),
-        # so 32 of 33 are present — documents the known, flagged gap.
+    def test_wcf_has_all_33_original_chapters(self, conn):
+        # Re-sourced to the original 1646/47: all 33 chapters incl. ch. 23 & 24.
         n = conn.execute(
             "SELECT COUNT(DISTINCT chapter) FROM section WHERE document='wcf'"
         ).fetchone()[0]
+        assert n == 33
+
+    def test_wcf_original_ch23_and_ch24(self, conn):
+        t23 = conn.execute(
+            "SELECT DISTINCT title FROM section WHERE document='wcf' AND chapter=23"
+        ).fetchone()[0]
+        t24 = conn.execute(
+            "SELECT DISTINCT title FROM section WHERE document='wcf' AND chapter=24"
+        ).fetchone()[0]
+        assert t23 == "Of the Civil Magistrate"
+        assert t24 == "Of Marriage and Divorce"
+
+    def test_wcf_1788_amendment_loci_marked(self, conn):
+        keys = {
+            r[0] for r in conn.execute(
+                "SELECT key FROM section WHERE document='wcf' "
+                "AND amendment_1788 IS NOT NULL")
+        }
+        assert keys == {"20.4", "22.3", "23.3", "24.4", "25.6", "31.1", "31.2"}
+
+    def test_lbcf_has_32_chapters_incl_church(self, conn):
+        n = conn.execute(
+            "SELECT COUNT(DISTINCT chapter) FROM section WHERE document='lbcf'"
+        ).fetchone()[0]
         assert n == 32
+        t26 = conn.execute(
+            "SELECT DISTINCT title FROM section WHERE document='lbcf' AND chapter=26"
+        ).fetchone()[0]
+        assert t26 == "Of the Church"
+
+    def test_belgic_has_37_articles(self, conn):
+        nums = sorted(
+            r[0] for r in conn.execute(
+                "SELECT article FROM section WHERE document='belgic'")
+        )
+        assert nums == list(range(1, 38))
 
     def test_wsc_q1_text(self, conn):
         t = conn.execute(
@@ -250,15 +339,32 @@ class TestConfessionsDB:
         ).fetchone()[0]
         assert "chief end of man" in t and "glorify God" in t
 
-    def test_heidelberg_proof_texts_resolve_to_canon(self, conn):
-        import json
-
-        from lampstand_corpus import books
+    def test_proof_texts_resolve_against_bibles(self, conn):
+        # Every proof-text ref must resolve in at least one bundled translation
+        # of bibles.sqlite (the app renders verse text from our own Bibles).
+        bibles = REPO_ROOT / "output" / "bibles.sqlite"
+        if not bibles.exists():
+            pytest.skip("bibles.sqlite not built")
+        b = sqlite3.connect(bibles)
+        translations = [r[0] for r in b.execute("SELECT id FROM translation")]
         rows = conn.execute(
-            "SELECT proof_texts FROM section WHERE document='heidelberg' "
-            "AND proof_texts IS NOT NULL"
-        ).fetchall()
-        assert rows, "expected Heidelberg proof-texts in the DB"
-        for (pt_json,) in rows:
-            for pt in json.loads(pt_json):
-                assert pt["book"] in books.CANON
+            "SELECT document, key, proof_texts FROM section "
+            "WHERE proof_texts IS NOT NULL").fetchall()
+        unresolved = []
+        for did, key, pj in rows:
+            for pt in json.loads(pj):
+                ok = any(
+                    b.execute(
+                        "SELECT 1 FROM verse WHERE translation=? AND book=? "
+                        "AND chapter=? AND verse_start<=? AND verse_end>=? LIMIT 1",
+                        (t, pt["book"], pt["chapter"],
+                         pt["verse_start"], pt["verse_start"])).fetchone()
+                    for t in translations
+                )
+                if not ok:
+                    unresolved.append(f"{did}:{key} {pt['book']} "
+                                      f"{pt['chapter']}:{pt['verse_start']}")
+        b.close()
+        # Exactly the one known source-typo ref (lbcf 5.4 -> PSA 1:21) is allowed
+        # to resolve nowhere; it is FLAGGED in the report for the architect.
+        assert len(unresolved) <= 1, unresolved

@@ -127,9 +127,12 @@ def snapshot_bibles(retrieved: str, *, force: bool = False) -> dict:
 def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
     """Download (if absent) each confession source and write its manifest.
 
-    Idempotent like :func:`snapshot_bibles`. Sources are canonical CCEL ThML
-    (public domain), committed under ``sources/confessions/<id>/`` via git-lfs.
-    Returns the manifest dict and writes ``sources/confessions/manifest.json``.
+    Idempotent like :func:`snapshot_bibles`. Sources are canonical public-domain
+    confession texts (CCEL ThML, the westminster-json MIT repo, the CC0
+    ParticularBaptists 1689 repo, and the Wikisource 1840 Belgic), committed under
+    ``sources/confessions/<id>/`` via git-lfs. The underlying confessions are all
+    PD; the upstream repo license is recorded separately. Returns the manifest
+    dict and writes ``sources/confessions/manifest.json``.
     """
     # Imported here to avoid a circular import (confessions imports SOURCES_DIR).
     from .confessions import CONFESSION_SOURCES, CONFESSIONS_DIR
@@ -140,7 +143,7 @@ def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
             checksum = fetch(src.url, src.dest)
         else:
             checksum = sha256_of(src.dest)
-        manifest["sources"][src.id] = {
+        entry: dict = {
             "name": src.name,
             "shortcode": src.shortcode,
             "url": src.url,
@@ -150,6 +153,31 @@ def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
             "retrieved": retrieved,
             "sha256": checksum,
         }
+        if src.repo_license:
+            entry["repo_license"] = src.repo_license
+        # Auxiliary file (e.g. the 1689 per-paragraph proof-text markdown).
+        aux = src.aux_dest
+        if aux is not None:
+            if force or not aux.exists():
+                aux_checksum = fetch(src.aux_url, aux)
+            else:
+                aux_checksum = sha256_of(aux)
+            entry["aux_file"] = str(aux.relative_to(SOURCES_DIR.parent))
+            entry["aux_url"] = src.aux_url
+            entry["aux_sha256"] = aux_checksum
+        # Validation-only cross-check snapshot (e.g. Wikisource Burges-1646 for the
+        # WCF prose diff) — recorded for provenance, not used as primary text.
+        xref = src.xref_dest
+        if xref is not None:
+            if force or not xref.exists():
+                xref_checksum = fetch(src.xref_url, xref)
+            else:
+                xref_checksum = sha256_of(xref)
+            entry["xref_file"] = str(xref.relative_to(SOURCES_DIR.parent))
+            entry["xref_url"] = src.xref_url
+            entry["xref_sha256"] = xref_checksum
+            entry["xref_note"] = "validation cross-check only; not a primary source"
+        manifest["sources"][src.id] = entry
     manifest_path = CONFESSIONS_DIR / "manifest.json"
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
