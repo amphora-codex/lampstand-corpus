@@ -53,8 +53,11 @@ fix. The pipeline never marks a corpus ship-ready.
 
 ## WCF
   chapters=33/33  sections=172  proof-texts=2465
-  count_ok=True  errors=0  flags=30
-  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (30):
+  count_ok=True  errors=0  flags=34
+  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (34):
+    - wcf 1788: locus 22.3 carries later denominational variant bracket(s) ([PCUS]/[UPCUSA]) in the source; the verbatim text stored is the 1788 BASE reading with those later insertions removed — VERIFY against a printed 1788 American-revision reference; review
+    - wcf 1788: locus 24.4 could NOT be quoted verbatim — this CCEL American edition carries a later DENOMINATIONAL rewrite of the chapter (title='Chapter 24: UPCUSA', sections present=[1, 2]), not the 1788 revision text. The 1788 revision of this locus only DROPPED a clause from the original (see the descriptive amendment_1788 note); a clean 1788 verbatim must be sourced separately or reconstructed by the human from the original minus the dropped clause — NOT fabricated here; review
+    - wcf 1788: locus 25.6 carries later denominational variant bracket(s) ([PCUS]/[UPCUSA]) in the source; the verbatim text stored is the 1788 BASE reading with those later insertions removed — VERIFY against a printed 1788 American-revision reference; review
     - wcf 4.1: proof-text token not resolved -> GEN '1 chap' (part '1 chap') (left out; review — chapter-only / source-typo citations are expected here)
     - wcf 5.1: proof-text token not resolved -> JOB '38–41' (part '38–41') (left out; review — chapter-only / source-typo citations are expected here)
     - wcf 5.5: proof-text token not resolved -> PSA '73' (part '73') (left out; review — chapter-only / source-typo citations are expected here)
@@ -85,6 +88,7 @@ fix. The pipeline never marks a corpus ship-ready.
     - wcf 30.3: proof-text token not resolved -> 1CO '11:27 to the end' (part '11:27 to the end') (left out; review — chapter-only / source-typo citations are expected here)
     - wcf 31.2: proof-text token not resolved -> 2CH '29, 30 chaps' (part '29') (left out; review — chapter-only / source-typo citations are expected here)
     - wcf 31.2: proof-text token not resolved -> 2CH '29, 30 chaps' (part '30 chaps') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 1788: verbatim American-revision text populated on the amended loci (20.4, 22.3, 23.3, 25.6, 31.1, 31.2) alongside the retained original text; 24.4 verbatim is the one justified gap (source ch.24 is a later denominational rewrite) — human-verify the two bracket loci 22.3 & 25.6, and source/reconstruct 24.4 separately
 
 ## WLC
   questions=196/196  proof-texts=0

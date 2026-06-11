@@ -165,6 +165,25 @@ def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
             entry["aux_file"] = str(aux.relative_to(SOURCES_DIR.parent))
             entry["aux_url"] = src.aux_url
             entry["aux_sha256"] = aux_checksum
+        # Amendment source (e.g. the CCEL 1788 American-revision WCF, used to
+        # populate the verbatim revised wording of the six amended loci).
+        amend = src.amend_dest
+        if amend is not None:
+            if force or not amend.exists():
+                amend_checksum = fetch(src.amend_url, amend)
+            else:
+                amend_checksum = sha256_of(amend)
+            entry["amend_file"] = str(amend.relative_to(SOURCES_DIR.parent))
+            entry["amend_url"] = src.amend_url
+            entry["amend_sha256"] = amend_checksum
+            if src.amend_license:
+                entry["amend_license"] = src.amend_license
+            entry["amend_note"] = (
+                "1788 American-revision verbatim text source for the six amended "
+                "loci; original numbering recovered from parenthetical titles; "
+                "later [PCUS]/[UPCUSA] denominational brackets removed for the 1788 "
+                "base reading (flagged)"
+            )
         # Validation-only cross-check snapshot (e.g. Wikisource Burges-1646 for the
         # WCF prose diff) — recorded for provenance, not used as primary text.
         xref = src.xref_dest

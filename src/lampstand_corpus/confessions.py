@@ -148,6 +148,9 @@ class ConfessionSource:
     aux_filename: str = ""
     xref_url: str = ""       # validation-only cross-check snapshot (not a source)
     xref_filename: str = ""
+    amend_url: str = ""      # amendment source (e.g. the 1788 American-revision WCF)
+    amend_filename: str = ""
+    amend_license: str = ""  # license of the amendment source text (PD)
 
     @property
     def dest(self) -> Path:
@@ -161,6 +164,11 @@ class ConfessionSource:
     @property
     def xref_dest(self) -> Path | None:
         return CONFESSIONS_DIR / self.id / self.xref_filename if self.xref_filename \
+            else None
+
+    @property
+    def amend_dest(self) -> Path | None:
+        return CONFESSIONS_DIR / self.id / self.amend_filename if self.amend_filename \
             else None
 
 
@@ -181,6 +189,19 @@ CONFESSION_SOURCES: dict[str, ConfessionSource] = {
                  "The_Confession_of_Faith_of_the_Assembly_of_Divines_at_Westminster"
                  "&prop=text&formatversion=2&format=json",
         xref_filename="wcf-burges-1646-wikisource.parse.json",
+        # 1788 AMERICAN-REVISION verbatim text source (PD). CCEL westminster3.xml is
+        # the American revision: it carries the revised wording of the six amended
+        # loci. NOT the OPC's copyrighted edition; NOT a modern annotated typeset.
+        # The edition renumbers chapters for the 1903 additions (Of the Holy Spirit
+        # / Of the Gospel inserted at 9-10), but records each chapter's ORIGINAL
+        # number in a parenthetical title ("Chapter 25 (23)" = original ch. 23), so
+        # the six original-numbered loci are recoverable deterministically. The
+        # edition also embeds later DENOMINATIONAL variant brackets ([PCUS ...] /
+        # [UPCUSA ...]); the verbatim 1788 base reading is the text with those later
+        # insertions removed — done explicitly and FLAGGED, never silently merged.
+        amend_url="https://ccel.org/ccel/anonymous/westminster3.xml",
+        amend_filename="westminster3-american-revision.xml",
+        amend_license="Public domain (1788 American revision text; CCEL ThML)",
     ),
     "wlc": ConfessionSource(
         id="wlc", name="Westminster Larger Catechism", shortcode="WLC",
@@ -363,6 +384,134 @@ def _proofs_from_text(text: str, flags: list[str], where: str) -> list[dict]:
     return proofs
 
 
+# --- WCF 1788 American-revision verbatim text -------------------------------
+# Source: CCEL westminster3.xml (the American revision). Chapters render as
+# <div2 title="Chapter N (M)"> where M is the ORIGINAL chapter number; sections
+# are <p> bodies opening "N. ". We pull the verbatim revised wording for EXACTLY
+# the six amended loci (keyed by ORIGINAL chapter.section) and nothing else.
+#
+# The edition embeds later denominational variant brackets, e.g.
+#   "[PCUS Yet it is a sin to refuse an oath ...]"
+#   "[PCUS without warrant in fact ...] [UPCUSA unscriptural ...] a usurpation"
+# These mark 19th/20th-century PRESBYTERIAN-denomination changes, not the 1788
+# text. The verbatim 1788 base reading is the text with those bracketed insertions
+# removed. We do this deterministically and FLAG every locus where a bracket was
+# present so the human verifies the base reading against a printed 1788 reference.
+_WCF_AMEND_CHAP_RE = re.compile(r"Chapter\s+\d+\s*\((\d+)\)")
+_WCF_AMEND_SEC_RE = re.compile(r"^\s*(\d+)\.\s*(.*)$", re.DOTALL)
+# A later-denomination variant bracket: "[PCUS ...]" / "[UPCUSA ...]" (the tag is
+# an ALL-CAPS denomination code right after the "["). Non-greedy to the matching
+# "]"; our source has no nested brackets in these loci.
+_WCF_DENOM_BRACKET_RE = re.compile(r"\[(PCUS|UPCUSA|PCA|OPC|ARP)\b[^\]]*\]")
+
+
+def _original_chapter(title: str) -> int | None:
+    """Recover a CCEL American-edition chapter's ORIGINAL number from its title.
+
+    "Chapter 25 (23)" -> 23 (the parenthetical original). Falls back to the bare
+    leading number when there is no parenthetical (chapters 1-8, unrenumbered).
+    """
+    m = _WCF_AMEND_CHAP_RE.search(title)
+    if m:
+        return int(m.group(1))
+    m2 = re.search(r"Chapter\s+(\d+)", title)
+    return int(m2.group(1)) if m2 else None
+
+
+def parse_wcf_1788_amendments(
+    content: str, flags: list[str]
+) -> dict[tuple[int, int], str]:
+    """Extract verbatim 1788 American-revision text for EXACTLY the six loci.
+
+    Returns ``{(orig_chapter, section): verbatim_text}`` for the six amended loci.
+    A locus carrying a later denominational bracket is recorded with the bracket
+    removed (the 1788 base reading) and FLAGGED for human verification. A locus we
+    cannot locate is FLAGGED and omitted (never fabricated). The caller confirms
+    the result covers exactly the six loci and touches nothing beyond them.
+    """
+    soup = BeautifulSoup(content, "lxml-xml")
+    wanted = set(WCF_1788_AMENDMENTS)
+    by_chap: dict[int, list] = {}
+    for d2 in soup.find_all("div2"):
+        cn = _original_chapter(d2.get("title") or "")
+        if cn is not None:
+            by_chap.setdefault(cn, []).append(d2)
+
+    out: dict[tuple[int, int], str] = {}
+    for (cn, sn) in sorted(wanted):
+        divs = by_chap.get(cn)
+        if not divs:
+            flags.append(
+                f"wcf 1788: original chapter {cn} not found in the American-revision "
+                "source (westminster3.xml) — verbatim {cn}.{sn} not populated; review"
+            )
+            continue
+        found = False
+        for d2 in divs:
+            for p in d2.find_all("p"):
+                txt = _norm_ws(p.get_text(" ", strip=True))
+                m = _WCF_AMEND_SEC_RE.match(txt)
+                if not m or int(m.group(1)) != sn:
+                    continue
+                body = m.group(2).strip()
+                had_bracket = bool(_WCF_DENOM_BRACKET_RE.search(body))
+                if had_bracket:
+                    body = _norm_ws(_WCF_DENOM_BRACKET_RE.sub(" ", body))
+                    flags.append(
+                        f"wcf 1788: locus {cn}.{sn} carries later denominational "
+                        "variant bracket(s) ([PCUS]/[UPCUSA]) in the source; the "
+                        "verbatim text stored is the 1788 BASE reading with those "
+                        "later insertions removed — VERIFY against a printed 1788 "
+                        "American-revision reference; review"
+                    )
+                out[(cn, sn)] = body
+                found = True
+                break
+            if found:
+                break
+        if not found:
+            # Diagnose WHY (so the human knows it isn't a parser miss). The most
+            # common real cause: this CCEL edition carries a LATER denominational
+            # rewrite of the whole chapter (notably ch. 24 "Of Marriage" is the
+            # UPCUSA 1953 wholesale rewrite, only two sections, not the 1788 text),
+            # so the 1788 section simply isn't present to quote verbatim.
+            present_secs: list[int] = []
+            for d2 in divs:
+                for p in d2.find_all("p"):
+                    mm = _WCF_AMEND_SEC_RE.match(_norm_ws(p.get_text(" ", strip=True)))
+                    if mm:
+                        present_secs.append(int(mm.group(1)))
+            title = _norm_ws(divs[0].get("title") or "")
+            denom = re.search(r"\b(PCUS|UPCUSA|PCA|OPC|ARP)\b", title)
+            if denom or (cn == 24 and max(present_secs or [0]) < sn):
+                flags.append(
+                    f"wcf 1788: locus {cn}.{sn} could NOT be quoted verbatim — this "
+                    "CCEL American edition carries a later DENOMINATIONAL rewrite of "
+                    f"the chapter (title={title!r}, sections present={sorted(set(present_secs))}), "
+                    "not the 1788 revision text. The 1788 revision of this locus only "
+                    "DROPPED a clause from the original (see the descriptive "
+                    "amendment_1788 note); a clean 1788 verbatim must be sourced "
+                    "separately or reconstructed by the human from the original minus "
+                    "the dropped clause — NOT fabricated here; review"
+                )
+            else:
+                flags.append(
+                    f"wcf 1788: section {cn}.{sn} not found in the American-revision "
+                    f"source (chapter present, sections={sorted(set(present_secs))}) "
+                    "— verbatim text not populated; review"
+                )
+
+    # Defensive: confirm we touched only the six loci (the regex/section walk above
+    # only ever queries `wanted`, but assert it so a future edit can't widen scope).
+    extra = set(out) - wanted
+    if extra:
+        flags.append(
+            f"wcf 1788: verbatim extraction produced loci beyond the six "
+            f"({sorted(extra)}) — this should be impossible; review"
+        )
+    return out
+
+
 # --- Westminster Confession of Faith (WCF) — original 1646/47 ----------------
 # Source: andrewhwaller/westminster-json wcf.json. JSON shape:
 #   {languages: {eng: {chapters: [{id, title, sections: [{id, text}]}]}}}
@@ -379,8 +528,26 @@ def parse_wcf(
         flags.append("wcf: unexpected JSON shape (no languages.eng.chapters) — review")
         return ParsedConfession(id=src.id, chunks=[], flags=flags)
 
+    # Verbatim 1788 American-revision text for the six amended loci, sourced from
+    # the committed CCEL American-revision snapshot (if present). When the snapshot
+    # is absent we keep only the descriptive notes and FLAG (no fabrication).
+    amend_text: dict[tuple[int, int], str] = {}
+    amend = src.amend_dest
+    if amend is not None and amend.exists():
+        amend_text = parse_wcf_1788_amendments(
+            amend.read_text(encoding="utf-8"), flags
+        )
+    else:
+        flags.append(
+            "wcf 1788: American-revision verbatim source "
+            "(westminster3-american-revision.xml) not present; the six loci carry "
+            "only the descriptive amendment notes, not verbatim revised text — "
+            "run snapshot-confessions to fetch it; review"
+        )
+
     chunks: list[NormalizedChunk] = []
     amended_seen: set[tuple[int, int]] = set()
+    amend_text_seen: set[tuple[int, int]] = set()
 
     for c in chapters:
         cnum = int(c["id"])
@@ -405,6 +572,10 @@ def parse_wcf(
             if note is not None:
                 meta["amendment_1788"] = note
                 amended_seen.add((cnum, snum))
+                verbatim = amend_text.get((cnum, snum))
+                if verbatim is not None:
+                    meta["amendment_1788_text"] = verbatim
+                    amend_text_seen.add((cnum, snum))
             chunks.append(_make_chunk(
                 src, prov, key=f"{cnum}.{snum}", text=text, meta=meta,
             ))
@@ -440,6 +611,32 @@ def parse_wcf(
             f"wcf: 1788 amendment loci marked={sorted(amended_seen)} differ from "
             f"the expected six (missing={missing}, extra={extra}) — review"
         )
+    # Confirm verbatim 1788 revised text landed on the amended loci AND on NOTHING
+    # beyond them (the task's acceptance check). 24.4 is a KNOWN, justified gap:
+    # this PD American edition's ch. 24 is a later denominational rewrite, not the
+    # 1788 text, so 24.4 cannot be quoted verbatim from it (flagged above).
+    if amend_text:
+        beyond = amend_text_seen - expected_loci
+        missing = expected_loci - amend_text_seen
+        if beyond:
+            flags.append(
+                f"wcf 1788: verbatim revised text touched loci BEYOND the amended "
+                f"set ({sorted(beyond)}) — must not happen; review"
+            )
+        sourceable = expected_loci - {(24, 4)}  # 24.4 not verbatim-sourceable here
+        if amend_text_seen >= sourceable and missing <= {(24, 4)}:
+            flags.append(
+                "wcf 1788: verbatim American-revision text populated on the amended "
+                "loci (20.4, 22.3, 23.3, 25.6, 31.1, 31.2) alongside the retained "
+                "original text; 24.4 verbatim is the one justified gap (source ch.24 "
+                "is a later denominational rewrite) — human-verify the two bracket "
+                "loci 22.3 & 25.6, and source/reconstruct 24.4 separately"
+            )
+        else:
+            flags.append(
+                f"wcf 1788: verbatim text present on {sorted(amend_text_seen)} — "
+                f"unexpected coverage (missing={sorted(missing)}); review"
+            )
     return ParsedConfession(id=src.id, chunks=chunks, flags=flags)
 
 
