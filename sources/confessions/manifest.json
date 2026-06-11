@@ -1,6 +1,17 @@
 {
   "retrieved": "2026-06-10",
   "sources": {
+    "belgic": {
+      "file": "sources/confessions/belgic/belgic-1840-rpdc.parse.json",
+      "license": "Public domain (PD-old; 1840 translation)",
+      "name": "Belgic Confession",
+      "repo_license": "Wikisource (CC BY-SA wrapper; underlying text PD-old)",
+      "retrieved": "2026-06-10",
+      "sha256": "12830851fff95f6b0cbb4a71a4879a0e7b8cd10041971d4151187b8ef173621c",
+      "shortcode": "BC",
+      "url": "https://en.wikisource.org/w/api.php?action=parse&page=The_Constitution_of_the_Reformed_Dutch_Church_of_North_America/The_Confession_of_Faith&prop=text&formatversion=2&format=json",
+      "version": "1840 RPDC English translation (Wikisource parse snapshot); 37 articles I-XXXVII"
+    },
     "dort": {
       "file": "sources/confessions/dort/canonsofdort.xml",
       "license": "Public domain (CCEL)",
@@ -21,15 +32,34 @@
       "url": "https://ccel.org/ccel/anonymous/heidelberg.xml",
       "version": "CCEL ThML"
     },
-    "wcf": {
-      "file": "sources/confessions/wcf/westminster3.xml",
-      "license": "Public domain (CCEL)",
-      "name": "Westminster Confession of Faith",
+    "lbcf": {
+      "aux_file": "sources/confessions/lbcf/lbcf_with_scripture_refs.md",
+      "aux_sha256": "5940782e930cd05230f240b7568a980f2cf34920629044d16eab8e7086afd301",
+      "aux_url": "https://raw.githubusercontent.com/ParticularBaptists/lbcf-1689/master/lbcf_with_scripture_refs.md",
+      "file": "sources/confessions/lbcf/lbcf.json",
+      "license": "Public domain (1677/89 text)",
+      "name": "Second London Baptist Confession of Faith (1689)",
+      "repo_license": "CC0-1.0 (ParticularBaptists/lbcf-1689)",
       "retrieved": "2026-06-10",
-      "sha256": "f3017e0bac771d64a73586a97af55f843034ade20bdd03265adddb81788a06cc",
+      "sha256": "7898f1dff259ee22d5e29cbcd19dd8374d26e6d138ea73db79c9a337ad071cef",
+      "shortcode": "1689",
+      "url": "https://raw.githubusercontent.com/ParticularBaptists/lbcf-1689/master/lbcf.json",
+      "version": "1677/89 text (ParticularBaptists/lbcf-1689 lbcf.json); 32 chapters"
+    },
+    "wcf": {
+      "file": "sources/confessions/wcf/wcf-original-1646.json",
+      "license": "Public domain (original 1646/47 text)",
+      "name": "Westminster Confession of Faith",
+      "repo_license": "MIT (andrewhwaller/westminster-json)",
+      "retrieved": "2026-06-10",
+      "sha256": "58d43de749e83198a714fe745b87981e675c4b83e78e4d530e4298748ed29344",
       "shortcode": "WCF",
-      "url": "https://ccel.org/ccel/anonymous/westminster3.xml",
-      "version": "CCEL ThML (PCUS/UPCUSA American edition; original 33 chapters recovered)"
+      "url": "https://raw.githubusercontent.com/andrewhwaller/westminster-json/main/wcf.json",
+      "version": "Original 1646/47 text (andrewhwaller/westminster-json wcf.json); 33 chapters incl. original ch. 23 & 24; 1788 loci marked",
+      "xref_file": "sources/confessions/wcf/wcf-burges-1646-wikisource.parse.json",
+      "xref_note": "validation cross-check only; not a primary source",
+      "xref_sha256": "3d2d0e0ab97a64787860e4a6a60aece08a826e1ab1a8f239ca10401637a33fd9",
+      "xref_url": "https://en.wikisource.org/w/api.php?action=parse&page=The_Confession_of_Faith_of_the_Assembly_of_Divines_at_Westminster&prop=text&formatversion=2&format=json"
     },
     "wlc": {
       "file": "sources/confessions/wlc/westminster2.xml",

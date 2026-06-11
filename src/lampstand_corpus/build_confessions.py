@@ -25,9 +25,9 @@ CREATE TABLE meta (
 );
 
 CREATE TABLE document (
-    id          TEXT PRIMARY KEY,   -- 'wcf','wlc','wsc','heidelberg'
+    id          TEXT PRIMARY KEY,   -- wcf/wlc/wsc/lbcf/belgic/heidelberg/dort
     name        TEXT NOT NULL,
-    shortcode   TEXT NOT NULL,      -- citation prefix: WCF / WLC / WSC / HC
+    shortcode   TEXT NOT NULL,      -- citation prefix: WCF/WLC/WSC/1689/BC/HC/Dort
     version     TEXT NOT NULL,
     license     TEXT NOT NULL,
     source_url  TEXT NOT NULL,
@@ -36,16 +36,18 @@ CREATE TABLE document (
 );
 
 CREATE TABLE section (
-    document     TEXT NOT NULL REFERENCES document(id),
-    key          TEXT NOT NULL,     -- 'chapter.section' or question number
-    ord          INTEGER NOT NULL,  -- stable display order within the document
-    chapter      INTEGER,           -- WCF chapter / NULL for catechisms
-    section      INTEGER,           -- WCF section / NULL for catechisms
-    question     INTEGER,           -- catechism question / NULL for WCF
-    lords_day    INTEGER,           -- Heidelberg Lord's Day / NULL otherwise
-    title        TEXT,              -- chapter title where present
-    text         TEXT NOT NULL,
-    proof_texts  TEXT,              -- JSON [{book,chapter,verse_start,...}] or NULL
+    document        TEXT NOT NULL REFERENCES document(id),
+    key             TEXT NOT NULL,     -- 'chapter.section', question, or article no.
+    ord             INTEGER NOT NULL,  -- stable display order within the document
+    chapter         INTEGER,           -- WCF/1689 chapter / NULL otherwise
+    section         INTEGER,           -- WCF/1689 paragraph / NULL otherwise
+    question        INTEGER,           -- catechism question / NULL otherwise
+    article         INTEGER,           -- Belgic article / NULL otherwise
+    lords_day       INTEGER,           -- Heidelberg Lord's Day / NULL otherwise
+    title           TEXT,              -- chapter / article title where present
+    text            TEXT NOT NULL,
+    proof_texts     TEXT,              -- JSON [{book,chapter,verse_start,...}] or NULL
+    amendment_1788  TEXT,              -- WCF 1788 American-revision note / NULL
     PRIMARY KEY (document, key)
 );
 
@@ -88,16 +90,19 @@ def write_confessions(
             for ord_i, ch in enumerate(pc.chunks):
                 m = ch.meta
                 proofs = m.get("proof_texts") or []
+                title = m.get("chapter_title") or m.get("article_title")
                 conn.execute(
-                    "INSERT INTO section VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO section VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         did, ch.key, ord_i,
                         m.get("chapter"), m.get("section"),
-                        m.get("question"), m.get("lords_day"),
-                        m.get("chapter_title"),
+                        m.get("question"), m.get("article"),
+                        m.get("lords_day"),
+                        title,
                         ch.text,
                         json.dumps(proofs, separators=(",", ":"), sort_keys=True)
                         if proofs else None,
+                        m.get("amendment_1788"),
                     ),
                 )
         conn.commit()

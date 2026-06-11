@@ -1,12 +1,19 @@
-LampStand corpus — P2 confessions & catechisms validation report
-Granularity: section / Q&A. Counts checked against known totals.
-Every CCEL structural ambiguity is a FLAG for human review, not a
-silent fix. The pipeline never marks a corpus ship-ready.
+LampStand corpus — M1 confessions & catechisms validation report
+(re-ingest: WCF original 1646/47 + 1788 loci marked; 1689 & Belgic
+added; WLC/WSC/Heidelberg/Dort kept from P2.)
+Granularity: section / Q&A / article. Counts checked vs known totals.
+Every structural ambiguity is a FLAG for human review, not a silent
+fix. The pipeline never marks a corpus ship-ready.
 ========================================================================
 
 ## KNOWN TOTALS (target)
-  WCF=33 chapters  WLC=196 Q  WSC=107 Q  Heidelberg=129 Q / 52 Lord's Days
+  WCF=33 chapters  WLC=196 Q  WSC=107 Q  1689=32 chapters  Belgic=37 articles
+  Heidelberg=129 Q / 52 Lord's Days
   Dort=5 heads of doctrine (59 articles + 34 rejection paragraphs; 3rd & 4th heads combined) + Conclusion
+
+## BELGIC
+  articles=37/37  proof-texts=0
+  count_ok=True  errors=0  flags=0
 
 ## DORT
   head-sections=4/4 (= 5 canonical heads, 3rd & 4th combined)  articles=59  rejections=34  chunks=94 (incl. Conclusion)
@@ -15,21 +22,69 @@ silent fix. The pipeline never marks a corpus ship-ready.
 ## HEIDELBERG
   questions=129/129  Lord's Days=52/52  proof-texts=1645
   count_ok=True  errors=0  flags=1
-  PARSER / CCEL AMBIGUITY FLAGS (review) (1):
+  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (1):
     - heidelberg: Lord's Day marker reads 2 where 29 is expected in sequence (likely a CCEL source typo) — review; advanced the Lord's Day counter without renumbering the source
 
+## LBCF
+  chapters=32/32  sections=160  proof-texts=1121
+  count_ok=True  errors=1  flags=19
+  PROOF-TEXT REFS OUTSIDE CANON (review) (1):
+    - lbcf:5.4 -> PSA 1:21
+  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (19):
+    - lbcf 5.4: proof-text token not resolved -> "PSA '76' (part '76')" (left out; review)
+    - lbcf 5.4: proof-text token not resolved -> '10' (left out; review)
+    - lbcf 6.3: proof-text token not resolved -> "ROM '6:20 Romans 5:12' (part '6:20 Romans 5:12')" (left out; review)
+    - lbcf 7.3: proof-text token not resolved -> 'c' (left out; review)
+    - lbcf 8.2: proof-text token not resolved -> "GAL '4' (part '4')" (left out; review)
+    - lbcf 8.2: proof-text token not resolved -> '4' (left out; review)
+    - lbcf 11.5: proof-text token not resolved -> "PSA '51' (part '51')" (left out; review)
+    - lbcf 15.5: proof-text token not resolved -> "ISA '1:16-18 Isaiah 55:7' (part '1:16-18 Isaiah 55:7')" (left out; review)
+    - lbcf 17.2: proof-text token not resolved -> "ROM '8:30 Romans 9:11, 16' (part '8:30 Romans 9:11')" (left out; review)
+    - lbcf 17.2: proof-text token not resolved -> "ROM '8:30 Romans 9:11, 16' (part '16')" (left out; review)
+    - lbcf 18.3: proof-text token not resolved -> "PSA '88' (part '88')" (left out; review)
+    - lbcf 22.5: proof-text token not resolved -> "PSA '107' (part '107')" (left out; review)
+    - lbcf 23.4: proof-text token not resolved -> "PSA '24:4 ) (Ps. 24:4' (part '24:4 ) (Ps. 24:4')" (left out; review)
+    - lbcf 25.4: proof-text token not resolved -> "LEV '18' (part '18')" (left out; review)
+    - lbcf 26.3: proof-text token not resolved -> "1CO '5' (part '5')" (left out; review)
+    - lbcf 26.3: proof-text token not resolved -> "REV '2' (part '2')" (left out; review)
+    - lbcf 26.3: proof-text token not resolved -> "REV '3' (part '3')" (left out; review)
+    - lbcf 29.1: proof-text token not resolved -> "COL '2' (part '2')" (left out; review)
+    - lbcf 29.1: proof-text token not resolved -> '12' (left out; review)
+
 ## WCF
-  chapters=32/33  sections=164  proof-texts=0
-  count_ok=False  errors=1  flags=7
-  SEQUENCE GAPS (1):
-    - missing original chapter 24
-  PARSER / CCEL AMBIGUITY FLAGS (review) (6):
-    - wcf: CCEL source is the modern American PCUS/UPCUSA edition (renumbered, adds modern chapters Of the Holy Spirit / Of the Gospel and denominational marriage chapters, carries [PCUS…]/[UPCUSA…] variant brackets). Recovered the 33 ORIGINAL chapters via CCEL's own (orig) mapping; brackets preserved verbatim. Architect: confirm whether to re-source the original 1646/1647 WCF (e.g. Schaff Creeds III) before ship.
-    - wcf: skipping modern chapter 'Chapter 9 (34)' (maps to original 34, outside the 33-chapter original) — review
-    - wcf: skipping modern chapter 'Chapter 10 (35)' (maps to original 35, outside the 33-chapter original) — review
-    - wcf: chapter 19 has a repeated section number 6 in the CCEL source (stored as key '19.6#2'); likely a source mislabel of the following section — review
-    - wcf: original chapter(s) [24] not recoverable from this CCEL edition — the modern PCUS/UPCUSA text replaced WCF 24 (Of Marriage and Divorce) with denomination-specific chapters titled 'Chapter 24: UPCUSA' / 'Chapter 26: PCUS', which lack the (orig) mapping. NOT guessed; re-source the original 1646/1647 chapter for ship — review
-    - wcf: recovered 32/33 original chapters — review
+  chapters=33/33  sections=172  proof-texts=2465
+  count_ok=True  errors=0  flags=30
+  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (30):
+    - wcf 4.1: proof-text token not resolved -> GEN '1 chap' (part '1 chap') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 5.1: proof-text token not resolved -> JOB '38–41' (part '38–41') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 5.5: proof-text token not resolved -> PSA '73' (part '73') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 5.5: proof-text token not resolved -> MRK '14:66 to the end' (part '14:66 to the end') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 6.2: proof-text token not resolved -> ROM '3:10 to 19' (part '3:10 to 19') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 7.5: proof-text token not resolved -> HEB '8, 9, 10 chapters' (part '8') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 7.5: proof-text token not resolved -> HEB '8, 9, 10 chapters' (part '9') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 7.5: proof-text token not resolved -> HEB '8, 9, 10 chapters' (part '10 chapters') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 10.3: proof-text token not resolved -> ROM '8:9 compared' (part '8:9 compared') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 15.6: proof-text token not resolved -> PSA '51' (part '51') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 18.3: proof-text token not resolved -> PSA '88' (part '88') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 18.4: proof-text token not resolved -> PSA '88' (part '88') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 18.4: proof-text token not resolved -> PSA '88' (part '88') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 19.3: proof-text token not resolved -> HEB '9 chap' (part '9 chap') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 19.4: proof-text token not resolved -> EXO '21 chap' (part '21 chap') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 21.5: proof-text token not resolved -> 1CO '11:23 to 29' (part '11:23 to 29') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 21.5: proof-text token not resolved -> PSA '107' (part '107') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 23.3: proof-text token not resolved -> 2CH '29, 30' (part '29') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 23.3: proof-text token not resolved -> 2CH '29, 30' (part '30') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 24.4: proof-text token not resolved -> LEV '18' (part '18') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 25.4: proof-text token not resolved -> REV '2, 3' (part '2') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 25.4: proof-text token not resolved -> REV '2, 3' (part '3') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 25.5: proof-text token not resolved -> REV '2, 3' (part '2') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 25.5: proof-text token not resolved -> REV '2, 3' (part '3') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 26.2: proof-text token not resolved -> 2CO '8, 9' (part '8') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 26.2: proof-text token not resolved -> 2CO '8, 9' (part '9') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 30.3: proof-text token not resolved -> 1CO '5 chap' (part '5 chap') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 30.3: proof-text token not resolved -> 1CO '11:27 to the end' (part '11:27 to the end') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 31.2: proof-text token not resolved -> 2CH '29, 30 chaps' (part '29') (left out; review — chapter-only / source-typo citations are expected here)
+    - wcf 31.2: proof-text token not resolved -> 2CH '29, 30 chaps' (part '30 chaps') (left out; review — chapter-only / source-typo citations are expected here)
 
 ## WLC
   questions=196/196  proof-texts=0
@@ -39,11 +94,20 @@ silent fix. The pipeline never marks a corpus ship-ready.
   questions=107/107  proof-texts=0
   count_ok=True  errors=0  flags=0
 
+## WCF PROSE CROSS-CHECK vs Wikisource Burges-1646
+  wcf prose cross-checked vs Wikisource Burges-1646: 14 sampled sections, 0 divergence(s) (incl. forced ch.23.1 & ch.24.1)
+
+## PROOF-TEXT CROSS-CHECK vs bibles.sqlite (refs must resolve in our own Bibles)
+  proof-text refs cross-checked against bibles.sqlite: 5231 refs across translations ['asv', 'bsb', 'kjv', 'web']
+    asv: 1 proof ref(s) do not resolve in this translation
+    bsb: 17 proof ref(s) do not resolve in this translation
+    kjv: 1 proof ref(s) do not resolve in this translation
+    web: 3 proof ref(s) do not resolve in this translation
+  proof refs that resolve in NO bundled translation (1) — these are genuine bad/typo refs to adjudicate (NOT renumbered):
+      - lbcf:5.4 -> PSA 1:21 (resolves in NO bundled translation)
+  NOTE (architect): BSB (the bundled v1 translation) numbers each Psalm's Hebrew superscription as verse 1, so the psalm body begins at verse 2. Confession proof-texts use English/KJV Psalm numbering (body at verse 1), so refs like 'Psalm 19:1' point at the BSB superscription, not the cited line. KJV/ASV/WEB resolve these correctly. DECIDE whether the app applies a Psalm-superscription offset when resolving confession refs against BSB. Not guessed/renumbered here.
+
 ## DOCUMENTS IN SCOPE BUT SKIPPED (flagged for human sourcing)
-  - 1689 London Baptist Confession (32 chapters)
-      CCEL/Schaff (Creeds of Christendom III, 'Baptist Confession of 1688 / Philadelphia Confession') prints only the editorial DIFFERENCES from the Westminster/Savoy text, not the full 32 chapters. No standalone clean full-text 1689 ThML exists on CCEL. Reconstructing it would mean splicing Westminster text with Schaff's noted deltas — guesswork, which CLAUDE.md forbids. ARCHITECT: approve a canonical full-text source before inclusion.
-  - Belgic Confession (37 articles)
-      Present in Schaff Creeds III only as a 2-column French/Latin-English TABLE (54 tables; English in the right cell) whose 37 articles are fragmented mid-sentence across rows/tables with OCR artifacts ('A rt. II.', 'G uy de B rès'). Clean per-article reconstruction needs heuristic stitching + OCR repair — a guess, not a parse. Re-source a clean canonical English Belgic before inclusion.
   - Apostles' / Nicene / Athanasian creeds
       Tentative per spec §6.2. CCEL lists them under the Creeds subject but exposes only rendered HTML (no standalone ThML download), and in Schaff they sit among many historical variant creeds with Greek/Latin parallels. Not cleanly available -> skipped per the 'include only if clean' rule.
 

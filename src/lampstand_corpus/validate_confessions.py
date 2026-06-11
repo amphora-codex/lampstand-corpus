@@ -13,7 +13,10 @@ output ship-ready — the architect's spot-check gates ship.
 
 from __future__ import annotations
 
+import json
+import sqlite3
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from . import books
 from .confessions import (
@@ -29,8 +32,9 @@ from .confessions import (
 class ConfessionReport:
     document: str
     n_chunks: int = 0
-    n_chapters: int = 0          # WCF only
+    n_chapters: int = 0          # WCF / 1689 only
     n_questions: int = 0         # catechisms only
+    n_belgic_articles: int = 0   # Belgic only (37 articles)
     n_lords_days: int = 0        # Heidelberg only
     n_heads: int = 0             # Dort only
     n_articles: int = 0          # Dort only (positive articles)
@@ -68,8 +72,9 @@ def validate_confession(pc: ParsedConfession) -> ConfessionReport:
     rep.parser_flags = list(pc.flags)
     rep.expected = EXPECTED_COUNTS.get(pc.id, 0)
 
-    is_wcf = pc.id == "wcf"
+    is_chaptered = pc.id in ("wcf", "lbcf")  # keyed chapter.section
     is_dort = pc.id == "dort"
+    is_belgic = pc.id == "belgic"            # keyed by article number
     nums: list[int] = []
     for ch in pc.chunks:
         m = ch.meta
@@ -84,8 +89,18 @@ def validate_confession(pc: ParsedConfession) -> ConfessionReport:
                     f"{pc.id}:{ch.key} -> "
                     f"{pt.get('book')} {pt.get('chapter')}:{pt.get('verse_start')}"
                 )
-        if is_wcf:
+            ve = pt.get("verse_end")
+            if ve is not None and not _valid_ref(
+                pt.get("book", ""), pt.get("chapter", 0), ve
+            ):
+                rep.bad_proof_refs.append(
+                    f"{pc.id}:{ch.key} -> {pt.get('book')} "
+                    f"{pt.get('chapter')}:{pt.get('verse_start')}-{ve} (end)"
+                )
+        if is_chaptered:
             nums.append(m["chapter"])
+        elif is_belgic:
+            nums.append(m["article"])
         elif is_dort:
             kind = m.get("kind")
             if kind == "article":
@@ -107,13 +122,21 @@ def validate_confession(pc: ParsedConfession) -> ConfessionReport:
             and rep.n_articles == sum(a for a, _ in DORT_HEAD_COUNTS.values())
             and rep.n_rejections == sum(r for _, r in DORT_HEAD_COUNTS.values())
         )
-    elif is_wcf:
+    elif is_chaptered:
         chapters = sorted(set(nums))
         rep.n_chapters = len(chapters)
         rep.count_ok = rep.n_chapters == rep.expected
         rep.sequence_gaps = [
-            f"missing original chapter {n}"
+            f"missing chapter {n}"
             for n in range(1, rep.expected + 1) if n not in set(chapters)
+        ]
+    elif is_belgic:
+        arts = sorted(set(nums))
+        rep.n_belgic_articles = len(arts)
+        rep.count_ok = rep.n_belgic_articles == rep.expected
+        rep.sequence_gaps = [
+            f"missing article {n}"
+            for n in range(1, rep.expected + 1) if n not in set(arts)
         ]
     else:
         questions = sorted(set(nums))
@@ -139,24 +162,140 @@ def validate_all_confessions(
     return {did: validate_confession(parsed[did]) for did in sorted(parsed)}
 
 
+def crosscheck_against_bibles(
+    parsed: dict[str, ParsedConfession], bibles_db: Path
+) -> list[str]:
+    """Resolve every proof-text VerseRef against the real ``bibles.sqlite``.
+
+    The app renders verse text from our own Bibles, so a proof ref only needs to
+    RESOLVE there. We test each ref against every translation present and report
+    any that resolve in NONE — and separately surface translation-specific gaps
+    (notably BSB's Hebrew-superscription Psalm numbering, where the body starts at
+    verse 2, so confession refs to 'Psalm N:1' English numbering miss). These are
+    FLAGGED for the architect, never silently dropped or renumbered.
+    """
+    flags: list[str] = []
+    if not bibles_db.exists():
+        return [f"bibles.sqlite not found at {bibles_db} — proof-text refs were "
+                "validated only against the versification spine (books.VERSE_COUNTS), "
+                "not the built Bible DB. Build bibles first to cross-check."]
+    conn = sqlite3.connect(bibles_db)
+    try:
+        translations = [r[0] for r in conn.execute(
+            "SELECT id FROM translation ORDER BY id")]
+
+        def resolves(t: str, book: str, ch: int, v: int) -> bool:
+            return conn.execute(
+                "SELECT 1 FROM verse WHERE translation=? AND book=? AND chapter=? "
+                "AND verse_start<=? AND verse_end>=? LIMIT 1",
+                (t, book, ch, v, v)).fetchone() is not None
+
+        none_resolve: list[str] = []
+        per_translation_gaps: dict[str, int] = {t: 0 for t in translations}
+        total = 0
+        for did in sorted(parsed):
+            for ch in parsed[did].chunks:
+                for pt in (ch.meta.get("proof_texts") or []):
+                    total += 1
+                    book, c, vs = pt["book"], pt["chapter"], pt["verse_start"]
+                    ok_any = False
+                    for t in translations:
+                        if resolves(t, book, c, vs):
+                            ok_any = True
+                        else:
+                            per_translation_gaps[t] += 1
+                    if not ok_any:
+                        none_resolve.append(
+                            f"{did}:{ch.key} -> {book} {c}:{vs} "
+                            "(resolves in NO bundled translation)")
+        flags.append(
+            f"proof-text refs cross-checked against bibles.sqlite: {total} refs "
+            f"across translations {translations}")
+        for t in sorted(per_translation_gaps):
+            g = per_translation_gaps[t]
+            if g:
+                flags.append(
+                    f"  {t}: {g} proof ref(s) do not resolve in this translation")
+        if none_resolve:
+            flags.append(
+                f"proof refs that resolve in NO bundled translation ({len(none_resolve)}) "
+                "— these are genuine bad/typo refs to adjudicate (NOT renumbered):")
+            flags.extend(f"    - {x}" for x in none_resolve[:60])
+        # The systemic BSB Psalm-superscription note, if BSB is the gap source.
+        if per_translation_gaps.get("bsb", 0) and not per_translation_gaps.get(
+            "kjv", 0) == per_translation_gaps.get("bsb", 0):
+            flags.append(
+                "NOTE (architect): BSB (the bundled v1 translation) numbers each "
+                "Psalm's Hebrew superscription as verse 1, so the psalm body begins "
+                "at verse 2. Confession proof-texts use English/KJV Psalm numbering "
+                "(body at verse 1), so refs like 'Psalm 19:1' point at the BSB "
+                "superscription, not the cited line. KJV/ASV/WEB resolve these "
+                "correctly. DECIDE whether the app applies a Psalm-superscription "
+                "offset when resolving confession refs against BSB. Not guessed/"
+                "renumbered here.")
+    finally:
+        conn.close()
+    return flags
+
+
+def _prose_key(text: str) -> str:
+    # Drop inline scripture parentheticals, lowercase, keep letters only — so two
+    # editions compare on prose alone (punctuation / proof-text style differences
+    # don't register as divergence).
+    text = __import__("re").sub(r"\([^()]*\d+\s*[:.]\s*\d+[^()]*\)", "", text)
+    return __import__("re").sub(r"[^a-z]+", " ", text.lower()).strip()
+
+
+def crosscheck_wcf_prose(
+    wcf: ParsedConfession, burges_html_path: Path, *, sample: int = 12
+) -> list[str]:
+    """Cross-check the WCF original-1646 prose against the Wikisource Burges-1646
+    edition; FLAG material divergence (task requirement). We confirm each sampled
+    section's opening prose appears verbatim in the Burges text; a miss is flagged
+    for the human to inspect rather than reconciled automatically."""
+    flags: list[str] = []
+    if not burges_html_path.exists():
+        return ["wcf: Burges-1646 cross-check snapshot missing — prose not "
+                "cross-verified against Wikisource; review"]
+    try:
+        from bs4 import BeautifulSoup
+        data = json.loads(burges_html_path.read_text(encoding="utf-8"))
+        burges = _prose_key(BeautifulSoup(data["parse"]["text"], "lxml").get_text(" "))
+    except Exception as exc:  # noqa: BLE001 — surface, don't crash the build
+        return [f"wcf: could not parse Burges-1646 cross-check snapshot ({exc}) — review"]
+
+    chunks = wcf.chunks
+    if not chunks:
+        return flags
+    # Sample evenly across the document (always include the contested ch. 23/24).
+    idxs = sorted({(i * len(chunks)) // sample for i in range(sample)})
+    forced = [i for i, c in enumerate(chunks)
+              if c.meta.get("chapter") in (23, 24) and c.meta.get("section") == 1]
+    checked = 0
+    misses = 0
+    for i in sorted(set(idxs) | set(forced)):
+        c = chunks[i]
+        frag = " ".join(_prose_key(c.text).split()[:14])
+        if not frag:
+            continue
+        checked += 1
+        if frag not in burges:
+            misses += 1
+            flags.append(
+                f"wcf {c.key}: opening prose NOT found verbatim in Wikisource "
+                "Burges-1646 — possible material divergence, review")
+    flags.insert(0,
+                 f"wcf prose cross-checked vs Wikisource Burges-1646: {checked} "
+                 f"sampled sections, {misses} divergence(s) (incl. forced ch.23.1 "
+                 "& ch.24.1)")
+    return flags
+
+
 # Documents in scope that we could not cleanly source from canonical references
-# and therefore SKIPPED (surfaced for human sourcing; never substituted). Each
-# entry: (label, why).
+# and therefore SKIPPED (surfaced for human sourcing; never substituted). The 1689
+# and Belgic were RE-SOURCED in this pass (CC0 / PD respectively) and are no longer
+# skipped. Each entry: (label, why).
 SKIPPED_DOCUMENTS: list[tuple[str, str]] = [
-    ("1689 London Baptist Confession (32 chapters)",
-     "CCEL/Schaff (Creeds of Christendom III, 'Baptist Confession of 1688 / "
-     "Philadelphia Confession') prints only the editorial DIFFERENCES from the "
-     "Westminster/Savoy text, not the full 32 chapters. No standalone clean "
-     "full-text 1689 ThML exists on CCEL. Reconstructing it would mean splicing "
-     "Westminster text with Schaff's noted deltas — guesswork, which CLAUDE.md "
-     "forbids. ARCHITECT: approve a canonical full-text source before inclusion."),
-    ("Belgic Confession (37 articles)",
-     "Present in Schaff Creeds III only as a 2-column French/Latin-English TABLE "
-     "(54 tables; English in the right cell) whose 37 articles are fragmented "
-     "mid-sentence across rows/tables with OCR artifacts ('A rt. II.', "
-     "'G uy de B rès'). Clean per-article reconstruction needs heuristic stitching "
-     "+ OCR repair — a guess, not a parse. Re-source a clean canonical English "
-     "Belgic before inclusion."),
     ("Apostles' / Nicene / Athanasian creeds",
      "Tentative per spec §6.2. CCEL lists them under the Creeds subject but exposes "
      "only rendered HTML (no standalone ThML download), and in Schaff they sit among "
@@ -166,19 +305,24 @@ SKIPPED_DOCUMENTS: list[tuple[str, str]] = [
 
 
 def render_confession_report(
-    reports: dict[str, ConfessionReport]
+    reports: dict[str, ConfessionReport],
+    bible_crosscheck: list[str] | None = None,
+    wcf_prose_crosscheck: list[str] | None = None,
 ) -> str:
     lines: list[str] = []
-    lines.append("LampStand corpus — P2 confessions & catechisms validation report")
-    lines.append("Granularity: section / Q&A. Counts checked against known totals.")
-    lines.append("Every CCEL structural ambiguity is a FLAG for human review, not a")
-    lines.append("silent fix. The pipeline never marks a corpus ship-ready.")
+    lines.append("LampStand corpus — M1 confessions & catechisms validation report")
+    lines.append("(re-ingest: WCF original 1646/47 + 1788 loci marked; 1689 & Belgic")
+    lines.append("added; WLC/WSC/Heidelberg/Dort kept from P2.)")
+    lines.append("Granularity: section / Q&A / article. Counts checked vs known totals.")
+    lines.append("Every structural ambiguity is a FLAG for human review, not a silent")
+    lines.append("fix. The pipeline never marks a corpus ship-ready.")
     lines.append("=" * 72)
 
     lines.append("")
     lines.append("## KNOWN TOTALS (target)")
-    lines.append("  WCF=33 chapters  WLC=196 Q  WSC=107 Q  "
-                 f"Heidelberg=129 Q / {HEIDELBERG_LORDS_DAYS} Lord's Days")
+    lines.append("  WCF=33 chapters  WLC=196 Q  WSC=107 Q  1689=32 chapters  "
+                 "Belgic=37 articles")
+    lines.append(f"  Heidelberg=129 Q / {HEIDELBERG_LORDS_DAYS} Lord's Days")
     _dort_a = sum(a for a, _ in DORT_HEAD_COUNTS.values())
     _dort_r = sum(r for _, r in DORT_HEAD_COUNTS.values())
     lines.append(f"  Dort={DORT_HEADS} heads of doctrine "
@@ -189,9 +333,12 @@ def render_confession_report(
         r = reports[did]
         lines.append("")
         lines.append(f"## {did.upper()}")
-        if did == "wcf":
+        if did in ("wcf", "lbcf"):
             lines.append(f"  chapters={r.n_chapters}/{r.expected}  "
                          f"sections={r.n_chunks}  proof-texts={r.n_proof_texts}")
+        elif did == "belgic":
+            lines.append(f"  articles={r.n_belgic_articles}/{r.expected}  "
+                         f"proof-texts={r.n_proof_texts}")
         elif did == "dort":
             lines.append(f"  head-sections={r.n_heads}/{len(DORT_HEAD_COUNTS)} "
                          f"(= {r.expected} canonical heads, 3rd & 4th combined)  "
@@ -219,7 +366,20 @@ def render_confession_report(
         block("SEQUENCE GAPS", r.sequence_gaps)
         block("EMPTY SECTIONS", r.empty_sections)
         block("PROOF-TEXT REFS OUTSIDE CANON (review)", r.bad_proof_refs)
-        block("PARSER / CCEL AMBIGUITY FLAGS (review)", r.parser_flags)
+        block("PARSER / PROOF-TEXT AMBIGUITY FLAGS (review)", r.parser_flags, cap=80)
+
+    if wcf_prose_crosscheck:
+        lines.append("")
+        lines.append("## WCF PROSE CROSS-CHECK vs Wikisource Burges-1646")
+        for ln in wcf_prose_crosscheck:
+            lines.append(f"  {ln}")
+
+    if bible_crosscheck:
+        lines.append("")
+        lines.append("## PROOF-TEXT CROSS-CHECK vs bibles.sqlite "
+                     "(refs must resolve in our own Bibles)")
+        for ln in bible_crosscheck:
+            lines.append(f"  {ln}")
 
     lines.append("")
     lines.append("## DOCUMENTS IN SCOPE BUT SKIPPED (flagged for human sourcing)")

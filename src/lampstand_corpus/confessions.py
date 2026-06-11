@@ -1,64 +1,48 @@
-"""P2 — Confessions & catechisms ingestion (CCEL ThML → NormalizedChunk).
+"""M1 — Confessions & catechisms ingestion → NormalizedChunk.
 
-Canonical sources only (CLAUDE.md §Sources of record). The documents converge on
-the normalized schema at **section / Q&A granularity**: one chunk per confession
-section (``chapter.section``) or per catechism question (the question number).
+Canonical, public-domain sources only (CLAUDE.md §Sources of record). The
+documents converge on the normalized schema at **section / Q&A / article
+granularity**: one chunk per confession section (``chapter.section``), catechism
+question (the question number), or confession article (the article number).
 Scripture proof-texts the source provides are captured as :class:`VerseRef`s in
-each chunk's ``meta``.
+each chunk's ``meta`` and re-validated against the verse spine downstream.
 
-Sourcing decisions (every CCEL structural ambiguity is FLAGGED for human review,
+Sourcing decisions (every structural ambiguity is FLAGGED for human review,
 never silently resolved — CLAUDE.md):
 
-* **WSC** (CCEL ``westminster1.xml``) and **WLC** (``westminster2.xml``) — clean
-  per-question ThML; the original Q/A text. No embedded proof-texts in this CCEL
-  edition (left empty, not fabricated).
-* **WCF** (CCEL ``westminster3.xml``) — this CCEL edition is the **modern American
-  PCUS/UPCUSA text**, whose chapters are RENUMBERED and which adds two modern
-  chapters (Of the Holy Spirit, Of the Gospel) plus denomination-specific marriage
-  chapters and inline ``[PCUS …] [UPCUSA …]`` variant brackets. We recover the
-  **33 original chapters** using CCEL's own ``Chapter N (orig)`` mapping, skip the
-  two added modern chapters and the duplicate denominational marriage chapter, and
-  preserve any variant brackets verbatim in the text (never guessing which reading
-  to keep). The edition mismatch is flagged: the architect must decide whether to
-  re-source the original 1646/1647 WCF (e.g. Schaff) before ship.
-* **Heidelberg** (CCEL ``heidelberg.xml``) — 129 Q across 52 Lord's Days, with
-  machine-readable ``<scripRef osisRef=…>`` proof-texts we capture as VerseRefs.
-* **Canons of Dort** (CCEL ``canonsofdort.xml``) — a clean, dedicated ENGLISH ThML
-  edition (not the Schaff bilingual table). ``div1 type="section"`` per Head of
-  Doctrine; ``div2 type="subsection"`` splitting each head's positive Articles from
-  its "Rejection of Errors"; bodies marked ``ARTICLE N`` / ``PARAGRAPH N`` (both
-  restart per head). We key positive articles ``headN.aM`` and rejection paragraphs
-  ``headN.rM`` so every chunk maps to (head, kind, number) without collision.
-
-Flagged-and-SKIPPED (genuinely not cleanly available from a canonical source —
-surfaced for human sourcing, never substituted with a non-canonical text):
-
-* **1689 London Baptist Confession** — CCEL/Schaff (*Creeds of Christendom* III,
-  "Baptist Confession of 1688 / Philadelphia Confession") prints only the *editorial
-  differences* from the Westminster/Savoy text, not the full 32 chapters (its body
-  is prose paragraphs that read "It is a slight modification of the Westminster
-  Confession… In Chapter XX… In the Chapter Of the Church…"). No standalone clean
-  full-text 1689 ThML exists on CCEL. Reconstructing the 32 chapters would mean
-  splicing Westminster text with Schaff's noted deltas — that is guesswork, which
-  CLAUDE.md forbids. FLAGGED for the architect to approve a canonical full-text
-  source (e.g. the official 1689 text via the Westminster-Standards-style repo)
-  before inclusion.
-* **Belgic Confession** — present in Schaff Creeds III only as a 2-column
-  French/Latin–English TABLE (54 tables, English in the right cell) whose 37
-  articles are fragmented mid-sentence across rows/tables with OCR artifacts
-  ("A rt. II.", "G uy de B rès"). Positionally the English column is isolable but
-  clean per-article reconstruction needs heuristic stitching + OCR repair — a guess,
-  not a parse. FLAGGED; re-source a clean canonical English Belgic before inclusion.
-* **Apostles'/Nicene/Athanasian creeds** — tentative per spec §6.2. CCEL lists them
-  under the Creeds subject but exposes only rendered HTML pages (no standalone
-  ThML download; the ``/ccel/anonymous/{apostles,nicene,athanasian}.xml`` endpoints
-  return the HTML viewer, not ThML), and in Schaff they sit amid many historical
-  variant creeds with Greek/Latin parallels. Not cleanly available → skipped per
-  the "include only if clean" rule.
+* **WCF — RE-SOURCED to the original 1646/47 text** (``andrewhwaller/
+  westminster-json`` ``wcf.json``; MIT repo, public-domain text). This REPLACES
+  the earlier CCEL ``westminster3.xml``, which was the modern American
+  PCUS/UPCUSA edition (renumbered, modern chapters added, ch. 24 unrecoverable).
+  The new source carries all **33 original chapters** including the pre-American
+  ch. 23 (*Of the Civil Magistrate*) and ch. 24 (*Of Marriage and Divorce*).
+  Proof-texts are inline parentheticals we parse to VerseRefs. The six loci the
+  **1788 American revision** amended (20.4, 22.3, 23.3, 24.4, 25.6, 31.1-2) are
+  marked with an ``amendment_1788`` note on those sections so the app can show
+  "original, with the American revision marked"; a diff that finds amended loci
+  beyond those six is FLAGGED, not absorbed.
+* **WSC** (CCEL ``westminster1.xml``) and **WLC** (``westminster2.xml``) — KEPT
+  from P2: clean per-question ThML, the original Q/A text. Unchanged here.
+* **1689 London Baptist Confession — ADDED** (``ParticularBaptists/lbcf-1689``;
+  CC0). The 1677/89 text, all **32 chapters** incl. ch. 26 (*Of the Church*).
+  ``lbcf.json`` is the authoritative chapter/paragraph text; per-paragraph proof
+  refs come from the same repo's ``lbcf_with_scripture_refs.md`` (cross-checked
+  paragraph-for-paragraph against the JSON; any divergence is FLAGGED).
+* **Belgic Confession — ADDED** (Wikisource, the 1840 RPDC public-domain English
+  translation). All **37 articles** (I-XXXVII), Roman numerals normalized to
+  integers. The 1840 edition carries only occasional inline scripture mentions,
+  not a structured proof-text apparatus, so article proof_texts are empty (not
+  fabricated).
+* **Heidelberg** (CCEL ``heidelberg.xml``) — KEPT from P2: 129 Q across 52 Lord's
+  Days, machine-readable ``<scripRef osisRef=…>`` proof-texts. Unchanged.
+* **Canons of Dort** (CCEL ``canonsofdort.xml``) — KEPT from P2: a clean English
+  ThML edition, 5 heads (3rd & 4th combined), positive Articles + Rejection of
+  Errors per head. Unchanged.
 """
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,6 +50,7 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 
 from .schema import NormalizedChunk, Provenance, ResourceType, VerseRef
+from .scripref import parse_proof_block
 from .sources import SOURCES_DIR
 
 CONFESSIONS_DIR = SOURCES_DIR / "confessions"
@@ -77,10 +62,40 @@ EXPECTED_COUNTS: dict[str, int] = {
     "wcf": 33,    # chapters
     "wlc": 196,   # questions
     "wsc": 107,   # questions
+    "lbcf": 32,   # chapters (1689 London Baptist Confession)
+    "belgic": 37,  # articles
     "heidelberg": 129,  # questions
     "dort": 5,    # heads of doctrine (the validation spine for Dort)
 }
 HEIDELBERG_LORDS_DAYS = 52
+
+# The six loci amended by the 1788 American revision of the WCF (CLAUDE.md / task
+# spec). Keyed (chapter, section) -> a short, factual note of the change. The note
+# records THAT the locus was revised and the nature of the change (matters of
+# public record); the verbatim 1788 replacement text is NOT invented here — a
+# canonical public-domain American-revision text must be sourced to populate it
+# (FLAGGED). Storing the loci now lets the app mark "original with the American
+# revision marked" and lets the validator confirm exactly these six and no others.
+WCF_1788_AMENDMENTS: dict[tuple[int, int], str] = {
+    (20, 4): "1788 American revision: removed the clause empowering the civil "
+             "magistrate to proceed against those who publish opinions or "
+             "practices contrary to the light of nature or the church's peace.",
+    (22, 3): "1788 American revision: softened the obligation to take a lawful "
+             "oath when imposed by lawful authority.",
+    (23, 3): "1788 American revision: replaced the magistrate's authority over "
+             "the church (calling synods, suppressing heresy) with a duty to "
+             "protect the church of our common Lord without preference to any "
+             "denomination.",
+    (24, 4): "1788 American revision: dropped the clause forbidding marriage "
+             "within the degrees of consanguinity/affinity forbidden in the Word "
+             "and the reference to the wife's kindred.",
+    (25, 6): "1788 American revision: removed the identification of the Pope as "
+             "the Antichrist / 'that man of sin'.",
+    (31, 1): "1788 American revision: synods and councils are convened by the "
+             "ministers and officers of the church, not at the magistrate's call.",
+    (31, 2): "1788 American revision (cont.): removed the magistrate's role in "
+             "convening synods, consistent with 31.1.",
+}
 
 # Canons of Dort: the canonical text presents FIVE heads of doctrine, but the
 # third and fourth are published as a single combined head ("Third and Fourth
@@ -128,20 +143,44 @@ class ConfessionSource:
     filename: str
     version: str
     license: str
+    repo_license: str = ""   # license of the upstream REPO (text itself is PD)
+    aux_url: str = ""        # secondary source file (e.g. the 1689 proof-text md)
+    aux_filename: str = ""
+    xref_url: str = ""       # validation-only cross-check snapshot (not a source)
+    xref_filename: str = ""
 
     @property
     def dest(self) -> Path:
         return CONFESSIONS_DIR / self.id / self.filename
 
+    @property
+    def aux_dest(self) -> Path | None:
+        return CONFESSIONS_DIR / self.id / self.aux_filename if self.aux_filename \
+            else None
 
-# CCEL ThML, public-domain. Committed under sources/confessions/<id>/ via git-lfs.
+    @property
+    def xref_dest(self) -> Path | None:
+        return CONFESSIONS_DIR / self.id / self.xref_filename if self.xref_filename \
+            else None
+
+
+# Public-domain confession texts. Committed under sources/confessions/<id>/ via
+# git-lfs (repo licenses recorded per source; the underlying confessions are PD).
 CONFESSION_SOURCES: dict[str, ConfessionSource] = {
+    # RE-SOURCED: original 1646/47 WCF (replaces the bad CCEL American edition).
     "wcf": ConfessionSource(
         id="wcf", name="Westminster Confession of Faith", shortcode="WCF",
-        url="https://ccel.org/ccel/anonymous/westminster3.xml",
-        filename="westminster3.xml",
-        version="CCEL ThML (PCUS/UPCUSA American edition; original 33 chapters recovered)",
-        license="Public domain (CCEL)",
+        url="https://raw.githubusercontent.com/andrewhwaller/westminster-json/"
+            "main/wcf.json",
+        filename="wcf-original-1646.json",
+        version="Original 1646/47 text (andrewhwaller/westminster-json wcf.json); "
+                "33 chapters incl. original ch. 23 & 24; 1788 loci marked",
+        license="Public domain (original 1646/47 text)",
+        repo_license="MIT (andrewhwaller/westminster-json)",
+        xref_url="https://en.wikisource.org/w/api.php?action=parse&page="
+                 "The_Confession_of_Faith_of_the_Assembly_of_Divines_at_Westminster"
+                 "&prop=text&formatversion=2&format=json",
+        xref_filename="wcf-burges-1646-wikisource.parse.json",
     ),
     "wlc": ConfessionSource(
         id="wlc", name="Westminster Larger Catechism", shortcode="WLC",
@@ -156,6 +195,32 @@ CONFESSION_SOURCES: dict[str, ConfessionSource] = {
         filename="westminster1.xml",
         version="CCEL ThML (1674)",
         license="Public domain (CCEL)",
+    ),
+    # ADDED: 1689 London Baptist Confession (original 1677/89, 32 chapters).
+    "lbcf": ConfessionSource(
+        id="lbcf", name="Second London Baptist Confession of Faith (1689)",
+        shortcode="1689",
+        url="https://raw.githubusercontent.com/ParticularBaptists/lbcf-1689/"
+            "master/lbcf.json",
+        filename="lbcf.json",
+        version="1677/89 text (ParticularBaptists/lbcf-1689 lbcf.json); 32 chapters",
+        license="Public domain (1677/89 text)",
+        repo_license="CC0-1.0 (ParticularBaptists/lbcf-1689)",
+        aux_url="https://raw.githubusercontent.com/ParticularBaptists/lbcf-1689/"
+                "master/lbcf_with_scripture_refs.md",
+        aux_filename="lbcf_with_scripture_refs.md",
+    ),
+    # ADDED: Belgic Confession (1840 RPDC public-domain English translation).
+    "belgic": ConfessionSource(
+        id="belgic", name="Belgic Confession", shortcode="BC",
+        url="https://en.wikisource.org/w/api.php?action=parse&page="
+            "The_Constitution_of_the_Reformed_Dutch_Church_of_North_America/"
+            "The_Confession_of_Faith&prop=text&formatversion=2&format=json",
+        filename="belgic-1840-rpdc.parse.json",
+        version="1840 RPDC English translation (Wikisource parse snapshot); "
+                "37 articles I-XXXVII",
+        license="Public domain (PD-old; 1840 translation)",
+        repo_license="Wikisource (CC BY-SA wrapper; underlying text PD-old)",
     ),
     "heidelberg": ConfessionSource(
         id="heidelberg", name="Heidelberg Catechism", shortcode="HC",
@@ -273,105 +338,353 @@ def parse_westminster_catechism(
     return ParsedConfession(id=src.id, chunks=chunks, flags=flags)
 
 
-# --- Westminster Confession of Faith (WCF) -----------------------------------
-# CCEL westminster3.xml: div2 per chapter, title="Chapter N" or "Chapter N (orig)"
-# where orig is the ORIGINAL 1646 chapter number. <h1> = chapter heading; section
-# bodies are <p> starting "N. ". We recover only the 33 originals via the mapping.
-_WCF_TITLE_RE = re.compile(r"^Chapter\s+(\d+)(?:\s+\((\d+)\))?$")
-_WCF_SECTION_RE = re.compile(r"^(\d+)\.\s+(.*)$", re.DOTALL)
+# --- proof-text helper -------------------------------------------------------
+def _proofs_from_text(text: str, flags: list[str], where: str) -> list[dict]:
+    """Extract VerseRef dicts from the parenthetical scripture citations in
+    ``text`` (the WCF inlines proof-texts in parentheses). Unparsable citation
+    tokens are FLAGGED (with ``where`` context), never guessed."""
+    proofs: list[dict] = []
+    seen: set[tuple] = set()
+    for grp in re.findall(r"\(([^()]+)\)", text):
+        if not re.search(r"\d+\s*[:.]\s*\d+", grp):
+            continue  # not a scripture citation group (no chapter:verse)
+        res = parse_proof_block(grp)
+        for vr in res.refs:
+            k = (vr.book, vr.chapter, vr.verse_start, vr.verse_end)
+            if k not in seen:
+                seen.add(k)
+                proofs.append(vr.model_dump(exclude_none=True))
+        for tok in res.unparsed:
+            flags.append(
+                f"{where}: proof-text token not resolved -> {tok} "
+                "(left out; review — chapter-only / source-typo citations are "
+                "expected here)"
+            )
+    return proofs
 
 
+# --- Westminster Confession of Faith (WCF) — original 1646/47 ----------------
+# Source: andrewhwaller/westminster-json wcf.json. JSON shape:
+#   {languages: {eng: {chapters: [{id, title, sections: [{id, text}]}]}}}
+# Chapter 12 (Of Adoption) is a single-text chapter: {id, title, text} with no
+# `sections` list. Proof-texts are inline parentheticals in each section's text.
 def parse_wcf(
     src: ConfessionSource, prov: Provenance, content: str
 ) -> ParsedConfession:
-    soup = BeautifulSoup(content, "lxml-xml")
+    data = json.loads(content)
     flags: list[str] = []
-    flags.append(
-        "wcf: CCEL source is the modern American PCUS/UPCUSA edition (renumbered, "
-        "adds modern chapters Of the Holy Spirit / Of the Gospel and denominational "
-        "marriage chapters, carries [PCUS…]/[UPCUSA…] variant brackets). Recovered "
-        "the 33 ORIGINAL chapters via CCEL's own (orig) mapping; brackets preserved "
-        "verbatim. Architect: confirm whether to re-source the original 1646/1647 "
-        "WCF (e.g. Schaff Creeds III) before ship."
-    )
+    try:
+        chapters = data["languages"]["eng"]["chapters"]
+    except (KeyError, TypeError):
+        flags.append("wcf: unexpected JSON shape (no languages.eng.chapters) — review")
+        return ParsedConfession(id=src.id, chunks=[], flags=flags)
+
     chunks: list[NormalizedChunk] = []
-    seen_orig: set[int] = set()
+    amended_seen: set[tuple[int, int]] = set()
 
-    for d2 in soup.find_all("div2"):
-        title = (d2.get("title") or "").strip()
-        m = _WCF_TITLE_RE.match(title)
-        if not m:
-            # Skip non-chapter divs (Note, Declaratory Statement, denominational
-            # marriage chapters titled e.g. "Chapter 24: UPCUSA").
+    for c in chapters:
+        cnum = int(c["id"])
+        title = _norm_ws(str(c.get("title", "")))
+        # Normalize the two chapter shapes to a list of (section_id, text).
+        if "sections" in c:
+            sections = [(int(s["id"]), s["text"]) for s in c["sections"]]
+        elif "text" in c:
+            sections = [(1, c["text"])]  # single-paragraph chapter (ch. 12)
+        else:
+            flags.append(f"wcf: chapter {cnum} has neither sections nor text — review")
             continue
-        modern = int(m.group(1))
-        orig = int(m.group(2)) if m.group(2) else modern
-        if not (1 <= orig <= 33):
-            # Modern-only additions (orig 34/35: Holy Spirit, Gospel) — skip + flag.
-            flags.append(
-                f"wcf: skipping modern chapter {title!r} (maps to original {orig}, "
-                "outside the 33-chapter original) — review"
-            )
-            continue
-        if orig in seen_orig:
-            flags.append(
-                f"wcf: original chapter {orig} appears twice ({title!r}); kept first, "
-                "skipped duplicate (likely a denominational variant) — review"
-            )
-            continue
-        seen_orig.add(orig)
 
-        h1 = d2.find("h1")
-        heading = _norm_ws(h1.get_text(" ", strip=True)) if h1 else ""
-
-        # Sections: <p> bodies starting "N. ". Skip the parallel-column chapter
-        # headers (PCUS/UPCUSA label tables) and the BOK paragraph-number <h5>s.
-        seen_sec: set[int] = set()
-        for p in d2.find_all("p"):
-            ptext = _norm_ws(p.get_text(" ", strip=True))
-            sm = _WCF_SECTION_RE.match(ptext)
-            if not sm:
-                continue
-            sec_num = int(sm.group(1))
-            sec_text = sm.group(2).strip()
-            key = f"{orig}.{sec_num}"
-            if sec_num in seen_sec:
-                # The CCEL source mislabels WCF 19's 7th section as "6." (a source
-                # numbering error). Don't silently renumber to 7 — keep the source's
-                # number, give the row a deterministic disambiguated key, and FLAG.
-                suffix = sum(1 for c in chunks
-                             if c.meta["chapter"] == orig
-                             and c.meta["section"] == sec_num) + 1
-                key = f"{orig}.{sec_num}#{suffix}"
-                flags.append(
-                    f"wcf: chapter {orig} has a repeated section number {sec_num} in "
-                    f"the CCEL source (stored as key {key!r}); likely a source "
-                    "mislabel of the following section — review"
-                )
-            seen_sec.add(sec_num)
+        for snum, raw in sections:
+            text = _norm_ws(raw)
+            proofs = _proofs_from_text(text, flags, f"wcf {cnum}.{snum}")
+            meta: dict = {
+                "chapter": cnum, "section": snum,
+                "chapter_title": title, "proof_texts": proofs,
+            }
+            note = WCF_1788_AMENDMENTS.get((cnum, snum))
+            if note is not None:
+                meta["amendment_1788"] = note
+                amended_seen.add((cnum, snum))
             chunks.append(_make_chunk(
-                src, prov, key=key,
-                text=sec_text,
-                meta={"chapter": orig, "section": sec_num,
-                      "chapter_title": heading, "proof_texts": []},
+                src, prov, key=f"{cnum}.{snum}", text=text, meta=meta,
             ))
 
     chunks.sort(key=lambda c: (c.meta["chapter"], c.meta["section"]))
+
+    # Structural confirmations the task asks for, surfaced as informational flags.
     present = {c.meta["chapter"] for c in chunks}
-    missing = [n for n in range(1, EXPECTED_COUNTS["wcf"] + 1) if n not in present]
+    n_chapters = len(present)
+    if n_chapters != EXPECTED_COUNTS["wcf"]:
+        flags.append(
+            f"wcf: parsed {n_chapters}/{EXPECTED_COUNTS['wcf']} chapters — review"
+        )
+    ch23 = next((c for c in chunks if c.meta["chapter"] == 23), None)
+    ch24 = next((c for c in chunks if c.meta["chapter"] == 24), None)
+    if not (ch23 and "Civil Magistrate" in ch23.meta["chapter_title"]):
+        flags.append(
+            "wcf: original chapter 23 'Of the Civil Magistrate' not found as "
+            "expected — review"
+        )
+    if not (ch24 and "Marriage" in ch24.meta["chapter_title"]):
+        flags.append(
+            "wcf: original chapter 24 'Of Marriage and Divorce' not found as "
+            "expected — review"
+        )
+    # Confirm exactly the six known 1788 loci were marked (seven sections, since
+    # 31 splits into .1 and .2). Anything missing is a real problem to flag.
+    expected_loci = set(WCF_1788_AMENDMENTS)
+    if amended_seen != expected_loci:
+        missing = sorted(expected_loci - amended_seen)
+        extra = sorted(amended_seen - expected_loci)
+        flags.append(
+            f"wcf: 1788 amendment loci marked={sorted(amended_seen)} differ from "
+            f"the expected six (missing={missing}, extra={extra}) — review"
+        )
+    return ParsedConfession(id=src.id, chunks=chunks, flags=flags)
+
+
+# --- 1689 London Baptist Confession ------------------------------------------
+# Source: ParticularBaptists/lbcf-1689 lbcf.json — {title, chapters: {"N":
+# {title, paragraphs: {"M": text}}}}. Per-paragraph proof refs come from the same
+# repo's lbcf_with_scripture_refs.md (chapter headers "## CHAPTER N: TITLE", each
+# paragraph "M. text" then a "( refs )" line). We cross-check the two file's
+# paragraph maps and FLAG any divergence rather than trusting one blindly.
+_LBCF_CHAP_RE = re.compile(r"^##\s*CHAPTER\s+(\d+):\s*(.+)$")
+_LBCF_PARA_RE = re.compile(r"^\s*(\d+)\.\s+(.+)$")
+_LBCF_REFS_RE = re.compile(r"^\s*\((.+)\)\s*$")
+
+
+def _parse_lbcf_proof_md(md: str) -> dict[tuple[int, int], str]:
+    """Map (chapter, paragraph) -> raw proof-ref block string from the 1689 md.
+
+    The md's chapter 12 (Of Adoption) is a single UNNUMBERED paragraph; it is
+    attributed to paragraph 1 deterministically (the JSON keys it the same way).
+    """
+    out: dict[tuple[int, int], str] = {}
+    cur_chap: int | None = None
+    cur_para: int | None = None
+    saw_numbered_para = False
+    for line in md.splitlines():
+        cm = _LBCF_CHAP_RE.match(line)
+        if cm:
+            cur_chap = int(cm.group(1))
+            cur_para = None
+            saw_numbered_para = False
+            continue
+        if cur_chap is None:
+            continue
+        pm = _LBCF_PARA_RE.match(line)
+        if pm and not _LBCF_REFS_RE.match(line):
+            cur_para = int(pm.group(1))
+            saw_numbered_para = True
+            continue
+        rm = _LBCF_REFS_RE.match(line)
+        if rm:
+            # A single-paragraph chapter has no "M." marker before its refs.
+            para = cur_para if cur_para is not None else (
+                1 if not saw_numbered_para else None
+            )
+            if para is not None and cur_chap is not None:
+                out[(cur_chap, para)] = rm.group(1)
+    return out
+
+
+def parse_lbcf(
+    src: ConfessionSource, prov: Provenance, content: str
+) -> ParsedConfession:
+    data = json.loads(content)
+    flags: list[str] = []
+    chapters = data.get("chapters")
+    if not isinstance(chapters, dict):
+        flags.append("lbcf: unexpected JSON shape (no chapters dict) — review")
+        return ParsedConfession(id=src.id, chunks=[], flags=flags)
+
+    # Proof refs from the auxiliary md (same CC0 repo), if snapshotted.
+    proof_md: dict[tuple[int, int], str] = {}
+    aux = src.aux_dest
+    if aux is not None and aux.exists():
+        proof_md = _parse_lbcf_proof_md(aux.read_text(encoding="utf-8"))
+    else:
+        flags.append(
+            "lbcf: proof-text md (lbcf_with_scripture_refs.md) not present; "
+            "chapters ingested without proof-texts — review"
+        )
+
+    chunks: list[NormalizedChunk] = []
+    for cnum_s in sorted(chapters, key=int):
+        cnum = int(cnum_s)
+        chap = chapters[cnum_s]
+        title = _norm_ws(str(chap.get("title", "")))
+        paras = chap.get("paragraphs", {})
+        for pnum_s in sorted(paras, key=int):
+            pnum = int(pnum_s)
+            text = _norm_ws(str(paras[pnum_s]))
+            proofs: list[dict] = []
+            block = proof_md.get((cnum, pnum))
+            if block is not None:
+                proofs = _proofs_from_block(block, flags, f"lbcf {cnum}.{pnum}")
+            elif proof_md:
+                flags.append(
+                    f"lbcf: no proof-text block found in the md for {cnum}.{pnum} "
+                    "(JSON has the paragraph but the md cross-reference is missing) "
+                    "— review"
+                )
+            chunks.append(_make_chunk(
+                src, prov, key=f"{cnum}.{pnum}", text=text,
+                meta={"chapter": cnum, "section": pnum,
+                      "chapter_title": title, "proof_texts": proofs},
+            ))
+
+    # Cross-check: every md (chapter, para) should have a matching JSON paragraph.
+    json_keys = {(int(c), int(p)) for c in chapters for p in chapters[c].get(
+        "paragraphs", {})}
+    for key in sorted(proof_md):
+        if key not in json_keys:
+            flags.append(
+                f"lbcf: proof-md has {key} but the JSON text has no such paragraph "
+                "— md/JSON divergence, review"
+            )
+
+    chunks.sort(key=lambda c: (c.meta["chapter"], c.meta["section"]))
+    present = {c.meta["chapter"] for c in chunks}
+    if len(present) != EXPECTED_COUNTS["lbcf"]:
+        flags.append(
+            f"lbcf: parsed {len(present)}/{EXPECTED_COUNTS['lbcf']} chapters — review"
+        )
+    ch26 = next((c for c in chunks if c.meta["chapter"] == 26), None)
+    if not (ch26 and "Church" in ch26.meta["chapter_title"]):
+        flags.append(
+            "lbcf: chapter 26 'Of the Church' not found as expected — review"
+        )
+    return ParsedConfession(id=src.id, chunks=chunks, flags=flags)
+
+
+def _proofs_from_block(block: str, flags: list[str], where: str) -> list[dict]:
+    """Resolve a ``;``-separated proof block (1689 md) to VerseRef dicts; flag the
+    unresolved tokens (chapter-only / source typos) for review."""
+    res = parse_proof_block(block)
+    proofs: list[dict] = []
+    seen: set[tuple] = set()
+    for vr in res.refs:
+        k = (vr.book, vr.chapter, vr.verse_start, vr.verse_end)
+        if k not in seen:
+            seen.add(k)
+            proofs.append(vr.model_dump(exclude_none=True))
+    for tok in res.unparsed:
+        flags.append(
+            f"{where}: proof-text token not resolved -> {tok!r} (left out; review)"
+        )
+    return proofs
+
+
+# --- Belgic Confession — 1840 RPDC English translation -----------------------
+# Source: Wikisource parse-API JSON ({parse: {text: "<rendered html>"}}). Article
+# boundaries render two ways in this edition: Article I appears as a bare header
+# "Article I." with its title on the next paragraph; Articles II-XXXVII render as
+# one paragraph that begins with the Roman numeral and carries the title inline
+# ("II. By what means God is made known unto us."). The body follows in later
+# paragraph(s) until the next header. Roman numerals I-XXXVII -> integers.
+_ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100}
+# A header paragraph: optional "Article", a Roman numeral, a period, then either
+# nothing (Article I form) or the inline article title (II-XXXVII form).
+_BELGIC_HEAD_RE = re.compile(
+    r"^(?:Article\s+)?([IVXLC]+)\.\s*(.*)$"
+)
+
+
+def _roman_to_int(s: str) -> int | None:
+    total = 0
+    prev = 0
+    for ch in reversed(s.upper()):
+        v = _ROMAN_VALUES.get(ch)
+        if v is None:
+            return None
+        if v < prev:
+            total -= v
+        else:
+            total += v
+            prev = v
+    return total
+
+
+def _belgic_paragraphs(html: str) -> list[str]:
+    """Flatten the rendered Belgic HTML into ordered paragraph strings, keeping
+    italic boundaries collapsed into plain text (titles read inline)."""
+    soup = BeautifulSoup(html, "lxml")
+    paras: list[str] = []
+    for p in soup.find_all("p"):
+        txt = _norm_ws(p.get_text(" ", strip=True))
+        if txt:
+            paras.append(txt)
+    return paras
+
+
+def parse_belgic(
+    src: ConfessionSource, prov: Provenance, content: str
+) -> ParsedConfession:
+    flags: list[str] = []
+    try:
+        html = json.loads(content)["parse"]["text"]
+    except (KeyError, TypeError, ValueError):
+        flags.append("belgic: unexpected parse-API JSON shape — review")
+        return ParsedConfession(id=src.id, chunks=[], flags=flags)
+
+    paras = _belgic_paragraphs(html)
+
+    # Walk paragraphs: a header paragraph ("II." / "Article I.") opens an article;
+    # its title is the next short italic-style paragraph; the rest is body text
+    # until the next header.
+    chunks: list[NormalizedChunk] = []
+    cur_num: int | None = None
+    cur_title: str | None = None
+    cur_body: list[str] = []
+    prev_num = 0
+
+    def flush() -> None:
+        nonlocal cur_num, cur_title, cur_body
+        if cur_num is None:
+            return
+        body = _norm_ws(" ".join(cur_body))
+        title = cur_title or ""
+        chunks.append(_make_chunk(
+            src, prov, key=str(cur_num), text=body,
+            meta={"article": cur_num, "article_title": title, "proof_texts": []},
+        ))
+        cur_num, cur_title, cur_body = None, None, []
+
+    for para in paras:
+        hm = _BELGIC_HEAD_RE.match(para)
+        # A header only if the leading token is a valid Roman numeral that is the
+        # NEXT article in sequence — this avoids misreading a body paragraph that
+        # happens to begin "I." and keeps us from guessing across a real gap.
+        num = _roman_to_int(hm.group(1)) if hm else None
+        if num is not None and num == prev_num + 1:
+            flush()
+            prev_num = num
+            cur_num = num
+            inline_title = _norm_ws(hm.group(2))
+            cur_title = inline_title or None  # None -> title is the next paragraph
+            cur_body = []
+            continue
+        if cur_num is None:
+            continue  # front-matter before Article I
+        if cur_title is None:
+            # Article I form: the first paragraph after the bare header is the title.
+            cur_title = para
+        else:
+            cur_body.append(para)
+    flush()
+
+    chunks.sort(key=lambda c: c.meta["article"])
+    n = len(chunks)
+    if n != EXPECTED_COUNTS["belgic"]:
+        flags.append(
+            f"belgic: parsed {n}/{EXPECTED_COUNTS['belgic']} articles — review"
+        )
+    nums = [c.meta["article"] for c in chunks]
+    missing = [i for i in range(1, EXPECTED_COUNTS["belgic"] + 1) if i not in nums]
     if missing:
-        flags.append(
-            f"wcf: original chapter(s) {missing} not recoverable from this CCEL "
-            "edition — the modern PCUS/UPCUSA text replaced WCF 24 (Of Marriage and "
-            "Divorce) with denomination-specific chapters titled 'Chapter 24: UPCUSA' "
-            "/ 'Chapter 26: PCUS', which lack the (orig) mapping. NOT guessed; "
-            "re-source the original 1646/1647 chapter for ship — review"
-        )
-    if len(present) != EXPECTED_COUNTS["wcf"]:
-        flags.append(
-            f"wcf: recovered {len(present)}/{EXPECTED_COUNTS['wcf']} original chapters "
-            "— review"
-        )
+        flags.append(f"belgic: missing article(s) {missing} — review")
     return ParsedConfession(id=src.id, chunks=chunks, flags=flags)
 
 
@@ -596,6 +909,10 @@ def parse_confession(
         return parse_westminster_catechism(src, prov, content, larger=True)
     if src.id == "wcf":
         return parse_wcf(src, prov, content)
+    if src.id == "lbcf":
+        return parse_lbcf(src, prov, content)
+    if src.id == "belgic":
+        return parse_belgic(src, prov, content)
     if src.id == "heidelberg":
         return parse_heidelberg(src, prov, content)
     if src.id == "dort":
