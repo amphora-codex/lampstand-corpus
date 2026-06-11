@@ -32,7 +32,7 @@ not silent fixes. Pipeline never marks a corpus ship-ready.
     - ROM 16:24
 
 ## BSB
-  books=66/66  chapters=1189  verses=30969  red-letter verses=609  bridges=0
+  books=66/66  chapters=1189  verses=31086  red-letter verses=609  bridges=0
   omitted (critical-text) rows=16  (with source_note=16, injected=16)
   errors=0  flags=0
   OMITTED VERSES (critical-text, omitted=1) (16):

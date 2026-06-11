@@ -59,6 +59,7 @@ CREATE TABLE verse (
     wj_spans     TEXT,              -- JSON [[start,end],...] or NULL
     omitted      INTEGER NOT NULL DEFAULT 0,  -- 0/1: critical-text omission, empty body
     source_note  TEXT,              -- textual footnote on an omitted verse, or NULL
+    superscription TEXT,            -- Hebrew Psalm superscription (\d) on this verse, or NULL
     PRIMARY KEY (translation, book, chapter, verse_start)
 );
 
@@ -145,7 +146,7 @@ def write_bibles(
                         tid, book_id, v.chapter, v.verse_start, v.verse_end,
                         v.text, 1 if spans else 0,
                         json.dumps(spans, separators=(",", ":")) if spans else None,
-                        omitted, v.source_note,
+                        omitted, v.source_note, v.superscription,
                     ))
 
                 # Inject omitted=1 empty rows for variants this translation dropped
@@ -156,13 +157,14 @@ def write_bibles(
                 # and the validator flags it for human review.
                 injected = [
                     (tid, b, ch, vs, vs, "", 0, None, 1,
-                     pb.omission_notes.get((ch, vs)))
+                     pb.omission_notes.get((ch, vs)), None)
                     for (b, ch, vs) in books.OMITTED_VARIANTS
                     if b == book_id and (b, ch, vs) not in present_variants
                 ]
                 rows.extend(injected)
                 rows.sort(key=lambda r: (r[2], r[3]))  # (chapter, verse_start)
-                conn.executemany("INSERT INTO verse VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
+                conn.executemany(
+                    "INSERT INTO verse VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
         conn.commit()
     finally:
         conn.close()
