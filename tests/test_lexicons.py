@@ -16,14 +16,19 @@ import pytest
 
 from lampstand_corpus.lexicons import (
     LEXICON_SOURCES,
+    STEPBIBLE_BOOK_TO_USFM,
     THAYERS_FLAG,
     _extract_js_object,
+    _normalize_greek_dstrong,
     _normalize_strongs_key,
     _oshb_lemma_strongs,
     _oshb_osis_to_ref,
     _parse_lexical_index,
+    _tagnt_surface,
     parse_bdb,
     parse_strongs,
+    parse_tagnt,
+    parse_tbesg,
 )
 from lampstand_corpus.schema import Provenance
 from lampstand_corpus.validate_lexicons import (
@@ -157,8 +162,103 @@ def test_validate_orphans_detects_missing_dict_entry():
     assert "H1" in orphans.from_bdb and "H3" in orphans.from_bdb
 
 
-def test_thayers_is_flagged_not_fabricated():
-    assert "Thayer" in THAYERS_FLAG and "OMITTED" in THAYERS_FLAG
+def test_thayers_substitute_is_tbesg_not_fabricated():
+    # Thayer's is now superseded by the ingested TBESG substitute (not fabricated).
+    assert "Thayer" in THAYERS_FLAG and "TBESG" in THAYERS_FLAG
+
+
+# --- P4b STEPBible Greek: dStrong normalization ------------------------------
+def test_normalize_greek_dstrong_strips_zeros_keeps_suffix():
+    assert _normalize_greek_dstrong("G0976") == "G976"
+    assert _normalize_greek_dstrong("G2424G") == "G2424G"
+    assert _normalize_greek_dstrong("G0007H") == "G7H"
+    assert _normalize_greek_dstrong("nonsense") is None
+
+
+def test_tagnt_surface_drops_transliteration():
+    assert _tagnt_surface("Βίβλος (Biblos)") == "Βίβλος"
+    assert _tagnt_surface("λόγος, (logos)") == "λόγος,"
+
+
+def test_stepbible_book_map_covers_27_nt_books():
+    assert len(set(STEPBIBLE_BOOK_TO_USFM.values())) == 27
+    assert STEPBIBLE_BOOK_TO_USFM["Jhn"] == "JHN"
+    assert STEPBIBLE_BOOK_TO_USFM["1Co"] == "1CO"
+
+
+# --- P4b TBESG parser --------------------------------------------------------
+_TBESG_FIXTURE = "\t".join(
+    ["eStrong", "dStrong", "uStrong", "Greek", "Transliteration", "Morph",
+     "Gloss", "AS-def"]
+) + "\n" + "\n".join([
+    "\t".join(["G0026", "G0026 =", "G0026", "ἀγάπη", "agapē", "G:N-F", "love",
+               " <b>ἀγάπη</b>, -ης, ἡ love, goodwill (AS)"]),
+    "\t".join(["G2424", "G2424G = the Greek of", "H3091", "Ἰησοῦς", "Iēsous",
+               "N:N-M-P", "Jesus", " <b>Ἰησοῦς</b> Jesus (AS)"]),
+])
+
+
+def test_parse_tbesg_keys_by_extended_strongs():
+    pl = parse_tbesg(_PROV, _TBESG_FIXTURE)
+    keys = {e.strongs for e in pl.entries}
+    assert keys == {"G26", "G2424G"}
+    agape = next(e for e in pl.entries if e.strongs == "G26")
+    assert agape.lemma == "ἀγάπη" and "love" in (agape.definition or "")
+    assert agape.kjv_def == "love"  # short gloss preserved
+    jesus = next(e for e in pl.entries if e.strongs == "G2424G")
+    assert jesus.raw_key == "G2424G"  # source-native dStrong recorded
+
+
+# --- P4b TAGNT parser --------------------------------------------------------
+_TAGNT_FIXTURE = "\t".join(
+    ["Word & Type", "Greek", "English", "dStrongs = Grammar",
+     "Dictionary form = Gloss", "editions"]
+) + "\n" + "\n".join([
+    "\t".join(["Jhn.1.1#01=NKO", "Ἐν (En)", "In", "G1722=PREP", "ἐν=in/on/among",
+               "NA28+NA27+Tyn+SBL+WH+Treg+TR+Byz"]),
+    "\t".join(["Jhn.1.1#03=NKO", "ἦν (ēn)", "was", "G1510=V-IAI-3S", "εἰμί=to be",
+               "NA28+NA27+Tyn+SBL+WH+Treg+TR+Byz"]),
+    "\t".join(["Mat.1.1#03=NKO", "Ἰησοῦ (Iēsou)", "of Jesus", "G2424G=N-GSM-P",
+               "Ἰησοῦς=Jesus/Joshua", "NA28+NA27+Tyn+SBL+WH+Treg+TR+Byz"]),
+])
+
+
+def test_parse_tagnt_per_word_rows():
+    pt = parse_tagnt(_PROV, {"f": _TAGNT_FIXTURE})
+    assert pt.language == "greek"
+    assert pt.books_seen == {"JHN", "MAT"}
+    w = next(x for x in pt.words if x.ref.book == "JHN" and x.position == 1)
+    assert w.surface == "Ἐν" and w.strongs == ["G1722"]
+    assert w.morph == "PREP" and w.lemma == "ἐν" and w.gloss == "in/on/among"
+    assert "NA28" in (w.editions or "")
+    jesus = next(x for x in pt.words if x.ref.book == "MAT")
+    assert jesus.strongs == ["G2424G"]  # extended Strong's preserved
+
+
+def test_tagnt_strongs_resolve_to_tbesg_no_orphans():
+    """Every TAGNT Strong's must resolve to a TBESG (or Strong's-Greek) entry."""
+    from lampstand_corpus.lexicons import ParsedTaggedText
+
+    tbesg = parse_tbesg(_PROV, _TBESG_FIXTURE)        # has G1722? no -> add base
+    # Build a Greek Strong's dict covering the base numbers the fixture needs.
+    greek_js = (
+        'var d = {"G1722":{"lemma":"ἐν","strongs_def":"in"},'
+        '"G1510":{"lemma":"εἰμί","strongs_def":"to be"}};'
+    )
+    greek = parse_strongs(LEXICON_SOURCES["strongs-greek"], _PROV, greek_js)
+    pt = parse_tagnt(_PROV, {"f": _TAGNT_FIXTURE})
+    assert isinstance(pt, ParsedTaggedText)
+    orphans = validate_orphans({"strongs-greek": greek, "tbesg": tbesg},
+                               {"tagnt": pt})
+    # G1722, G1510 resolve via Strong's-Greek base; G2424G resolves via TBESG.
+    assert orphans.from_greek == []
+
+
+def test_tagnt_orphan_detected_when_unresolvable():
+    pt = parse_tagnt(_PROV, {"f": _TAGNT_FIXTURE})
+    # No dictionaries at all -> every Greek Strong's is an orphan.
+    orphans = validate_orphans({}, {"tagnt": pt})
+    assert "G2424G" in orphans.from_greek and "G1722" in orphans.from_greek
 
 
 # --- built-DB spot checks ----------------------------------------------------
@@ -206,3 +306,53 @@ class TestBuiltLexicons:
             "SELECT id, text_license FROM lexicon").fetchall()
         assert all(tl for _, tl in rows)
         assert any("public domain" in tl.lower() for _, tl in rows)
+
+    def test_tbesg_greek_lexicon_present(self, conn):
+        n = conn.execute(
+            "SELECT COUNT(*) FROM entry WHERE lexicon='tbesg'").fetchone()[0]
+        assert n > 9000  # Abbott-Smith-based extended-Strong's Greek lexicon
+
+    def test_tbesg_known_lemma_agape(self, conn):
+        row = conn.execute(
+            "SELECT lemma, definition FROM entry "
+            "WHERE lexicon='tbesg' AND strongs='G26'").fetchone()
+        assert row and "love" in (row[1] or "").lower()
+
+    def test_tagnt_covers_27_nt_books(self, conn):
+        n = conn.execute(
+            "SELECT COUNT(DISTINCT book) FROM tagged_word "
+            "WHERE source='tagnt'").fetchone()[0]
+        assert n == 27
+
+    def test_tagnt_john_1_1_first_word(self, conn):
+        row = conn.execute(
+            "SELECT surface, strongs, lemma FROM tagged_word "
+            "WHERE source='tagnt' AND book='JHN' AND chapter=1 AND verse=1 "
+            "AND position=1").fetchone()
+        assert row and row[1] == '["G1722"]' and row[2] == "ἐν"
+
+    def test_every_tagnt_strongs_resolves(self, conn):
+        # Every distinct Greek Strong's used by TAGNT must resolve to a lexicon
+        # entry (TBESG by extended key, or Strong's-Greek by base number).
+        import json as _json
+
+        used = set()
+        for (s,) in conn.execute(
+                "SELECT DISTINCT strongs FROM tagged_word WHERE source='tagnt'"):
+            used.update(_json.loads(s))
+        tbesg = {r[0] for r in conn.execute(
+            "SELECT strongs FROM entry WHERE lexicon='tbesg'")}
+        greek = {r[0] for r in conn.execute(
+            "SELECT strongs FROM entry WHERE lexicon='strongs-greek'")}
+
+        def base(k):
+            return k[:-1] if k and k[-1].isalpha() else k
+
+        orphans = [k for k in used
+                   if k and k not in tbesg and base(k) not in greek]
+        assert orphans == []
+
+    def test_step_attribution_recorded(self, conn):
+        row = conn.execute(
+            "SELECT attribution FROM tagged_source WHERE id='tagnt'").fetchone()
+        assert row and "STEPBible.org" in row[0]

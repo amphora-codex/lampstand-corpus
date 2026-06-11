@@ -430,4 +430,54 @@ def snapshot_tagged_text(retrieved: str, *, force: bool = False) -> dict:
     return manifest
 
 
+def snapshot_stepbible(retrieved: str, *, force: bool = False) -> dict:
+    """Download (if absent) the STEPBible TAGNT + TBESG Greek sources (P4b).
+
+    Source: github.com/STEPBible/STEPBible-Data, CC-BY 4.0. The required
+    attribution ("STEP Bible, www.STEPBible.org") and the license are recorded in
+    ``sources/lexicons/stepbible/manifest.json``. Two TAGNT data files (Mat-Jhn,
+    Act-Rev — split only for GitHub size limits) cover the 27 NT books; one TBESG
+    file is the Greek lexicon. Snapshots commit under
+    ``sources/lexicons/stepbible/<id>/`` via git-lfs. Idempotent.
+    """
+    from .lexicons import (
+        STEPBIBLE_ATTRIBUTION,
+        STEPBIBLE_DIR,
+        STEPBIBLE_LICENSE,
+        STEPBIBLE_SOURCES,
+        STEPBIBLE_VERSION,
+    )
+
+    manifest: dict = {
+        "retrieved": retrieved,
+        "license": STEPBIBLE_LICENSE,
+        "attribution": STEPBIBLE_ATTRIBUTION,
+        "version": STEPBIBLE_VERSION,
+        "sources": {},
+    }
+    for src in STEPBIBLE_SOURCES.values():
+        files: dict = {}
+        for fname in src.files:
+            dest = src.dest(fname)
+            if force or not dest.exists():
+                checksum = fetch(src.url(fname), dest, timeout=300)
+            else:
+                checksum = sha256_of(dest)
+            files[fname] = {
+                "url": src.url(fname),
+                "file": str(dest.relative_to(SOURCES_DIR.parent)),
+                "sha256": checksum,
+            }
+        manifest["sources"][src.id] = {
+            "name": src.name,
+            "files": files,
+        }
+    manifest_path = STEPBIBLE_DIR / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
+
+
 # TODO(P5+): TSK cross-ref snapshot definitions land in a later phase.

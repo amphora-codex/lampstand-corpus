@@ -24,12 +24,14 @@ three CCEL commentators build without it.
 Usage (P4 lexicons):
     python -m lampstand_corpus.cli snapshot-lexicons   # Strong's G/H + BDB sources
     python -m lampstand_corpus.cli snapshot-tagged      # OSHB Hebrew + SBLGNT (flag)
+    python -m lampstand_corpus.cli snapshot-stepbible   # STEPBible TAGNT + TBESG (Greek)
     python -m lampstand_corpus.cli build-lexicons       # build lexicons.sqlite
     python -m lampstand_corpus.cli validate-lexicons    # write report (no DB)
 
 ``build-lexicons`` / ``validate-lexicons`` automatically include the OSHB
-Strong's-tagged Hebrew text when its snapshots are present (run ``snapshot-tagged``
-first); otherwise the dictionaries build without the tagged-word table.
+Strong's-tagged Hebrew text and the STEPBible Greek TAGNT/TBESG when their
+snapshots are present (run ``snapshot-tagged`` + ``snapshot-stepbible`` first);
+otherwise the dictionaries build without the missing tables.
 
 Reads committed snapshots from sources/, writes output/*.sqlite (gitignored) and
 reports/*.txt.
@@ -59,6 +61,10 @@ from .lexicons import (
     FLAGGED_TEXT_SOURCES,
     LEXICON_SOURCES,
     LEXICONS_DIR,
+    STEPBIBLE_DIR,
+    STEPBIBLE_LICENSE,
+    STEPBIBLE_SOURCES,
+    STEPBIBLE_VERSION,
     TAGGED_TEXT_SOURCES,
     THAYERS_FLAG,
     ParsedLexicon,
@@ -66,6 +72,8 @@ from .lexicons import (
     parse_bdb,
     parse_oshb,
     parse_strongs,
+    parse_tagnt,
+    parse_tbesg,
 )
 from .schema import Provenance
 from .sources import (
@@ -76,6 +84,7 @@ from .sources import (
     snapshot_confessions,
     snapshot_lexicons,
     snapshot_spurgeon,
+    snapshot_stepbible,
     snapshot_tagged_text,
 )
 from .spurgeon import (
@@ -424,7 +433,53 @@ def normalize_lexicons() -> dict[str, ParsedLexicon]:
             pl = parse_bdb(src, prov, content, index_xml)
         parsed[lid] = pl
         print(f"  {lid}: {len(pl.entries)} entries, {len(pl.flags)} flag(s)")
+
+    # TBESG (STEPBible Greek lexicon) — added when its snapshot is present.
+    tbesg = normalize_tbesg()
+    if tbesg is not None:
+        parsed["tbesg"] = tbesg
+        print(f"  tbesg: {len(tbesg.entries)} entries, {len(tbesg.flags)} flag(s)")
     return parsed
+
+
+def _stepbible_manifest() -> dict | None:
+    manifest_path = STEPBIBLE_DIR / "manifest.json"
+    if not manifest_path.exists():
+        return None
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def _stepbible_provenance(source_id: str, src) -> Provenance:
+    """Build a single combined provenance for a STEPBible source (TAGNT/TBESG)."""
+    manifest = _stepbible_manifest()
+    assert manifest is not None
+    files = manifest["sources"][source_id]["files"]
+    file_sums = sorted(f["sha256"] for f in files.values())
+    combined = hashlib.sha256("".join(file_sums).encode()).hexdigest()
+    # url points at the repo subdir (per-file urls are in the manifest).
+    first_url = next(iter(files.values()))["url"]
+    return Provenance(
+        source=f"stepbible:{source_id}",
+        version=STEPBIBLE_VERSION,
+        license=STEPBIBLE_LICENSE,
+        retrieved=manifest["retrieved"],
+        url=first_url,
+        checksum=combined,
+    )
+
+
+def normalize_tbesg() -> ParsedLexicon | None:
+    """Parse the committed TBESG Greek-lexicon snapshot, if present."""
+    manifest = _stepbible_manifest()
+    if manifest is None or "tbesg" not in manifest["sources"]:
+        print("  tbesg: no STEPBible snapshot — run `snapshot-stepbible` to "
+              "include the TBESG Greek lexicon.")
+        return None
+    src = STEPBIBLE_SOURCES["tbesg"]
+    prov = _stepbible_provenance("tbesg", src)
+    fname = src.files[0]
+    content = src.dest(fname).read_text(encoding="utf-8")
+    return parse_tbesg(prov, content)
 
 
 def normalize_tagged() -> dict[str, ParsedTaggedText]:
@@ -464,7 +519,29 @@ def normalize_tagged() -> dict[str, ParsedTaggedText]:
         parsed[sid] = pt
         print(f"  {sid}: {len(pt.words)} tagged words across "
               f"{len(pt.books_seen)} books, {len(pt.flags)} flag(s)")
+
+    # TAGNT (STEPBible Greek NT tagging) — added when its snapshot is present.
+    tagnt = normalize_tagnt()
+    if tagnt is not None:
+        parsed["tagnt"] = tagnt
+        print(f"  tagnt: {len(tagnt.words)} tagged words across "
+              f"{len(tagnt.books_seen)} books, {len(tagnt.flags)} flag(s)")
     return parsed
+
+
+def normalize_tagnt() -> ParsedTaggedText | None:
+    """Parse the committed TAGNT Strong's-tagged Greek-NT snapshot, if present."""
+    manifest = _stepbible_manifest()
+    if manifest is None or "tagnt" not in manifest["sources"]:
+        print("  tagnt: no STEPBible snapshot — run `snapshot-stepbible` to "
+              "include the TAGNT Greek-NT tagging.")
+        return None
+    src = STEPBIBLE_SOURCES["tagnt"]
+    prov = _stepbible_provenance("tagnt", src)
+    content_by_file = {
+        fname: src.dest(fname).read_text(encoding="utf-8") for fname in src.files
+    }
+    return parse_tagnt(prov, content_by_file)
 
 
 def cmd_snapshot_lexicons() -> None:
@@ -486,6 +563,17 @@ def cmd_snapshot_tagged() -> None:
         print(f"  FLAGGED  {sid}: {len(e['files'])} file(s) "
               f"snapshotted for provenance only")
         print(f"     {e['flag']}")
+
+
+def cmd_snapshot_stepbible() -> None:
+    print("Snapshotting STEPBible TAGNT + TBESG -> sources/lexicons/stepbible/")
+    manifest = snapshot_stepbible(RETRIEVED)
+    print(f"  license: {manifest['license']}  attribution: "
+          f"{manifest['attribution']}")
+    for sid, e in sorted(manifest["sources"].items()):
+        print(f"  {sid}: {len(e['files'])} file(s) [{e['name']}]")
+        for _f, fe in sorted(e["files"].items()):
+            print(f"     {fe['sha256']}  {fe['file']}")
 
 
 def cmd_build_lexicons() -> None:
@@ -529,8 +617,8 @@ def _emit_lexicon_report(
     for sid, r in sorted(tagged_reports.items()):
         print(f"  {sid}: words={r.n_words} books={r.n_books} "
               f"errors={r.error_total} flags={r.flag_total}")
-    print(f"  orphan Strong's: tagged={len(orphans.from_tagged)} "
-          f"bdb={len(orphans.from_bdb)}")
+    print(f"  orphan Strong's: hebrew-tagged={len(orphans.from_tagged)} "
+          f"greek-tagged={len(orphans.from_greek)} bdb={len(orphans.from_bdb)}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -564,6 +652,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_snapshot_lexicons()
     elif cmd == "snapshot-tagged":
         cmd_snapshot_tagged()
+    elif cmd == "snapshot-stepbible":
+        cmd_snapshot_stepbible()
     elif cmd == "build-lexicons":
         cmd_build_lexicons()
     elif cmd == "validate-lexicons":

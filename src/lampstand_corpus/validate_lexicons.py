@@ -17,6 +17,7 @@ output ship-ready — the architect's spot-check gates ship.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from . import books
@@ -80,14 +81,15 @@ class TaggedReport:
 
 @dataclass
 class OrphanReport:
-    """Strong's numbers referenced but missing a Strong's-dictionary entry."""
+    """Strong's numbers referenced but missing a lexicon entry."""
 
-    from_tagged: list[str] = field(default_factory=list)
+    from_tagged: list[str] = field(default_factory=list)   # OSHB Hebrew -> Strong's
+    from_greek: list[str] = field(default_factory=list)    # TAGNT Greek -> TBESG
     from_bdb: list[str] = field(default_factory=list)
 
     @property
     def error_total(self) -> int:
-        return len(self.from_tagged) + len(self.from_bdb)
+        return len(self.from_tagged) + len(self.from_greek) + len(self.from_bdb)
 
 
 def _gaps(present: set[int], max_n: int, prefix: str, *, limit: int = 40) -> list[str]:
@@ -202,8 +204,9 @@ def validate_tagged(pt: ParsedTaggedText) -> TaggedReport:
         sample = ", ".join(
             f"{b} {c}:{v}" for b, c, v in sorted(divergent)[:10]
         )
+        scheme = "Masoretic" if pt.language == "hebrew" else "NRSV"
         rep.masoretic_divergences = [
-            f"{pt.id}: {len(divergent)} distinct verses use Masoretic numbering "
+            f"{pt.id}: {len(divergent)} distinct verses use {scheme} numbering "
             f"that diverges from the English/KJV spine (expected — reconciled by "
             f"the P5 canonical versification map; e.g. {sample})"
         ]
@@ -214,30 +217,64 @@ def validate_orphans(
     lexicons: dict[str, ParsedLexicon],
     tagged: dict[str, ParsedTaggedText],
 ) -> OrphanReport:
-    """Every Strong's number REFERENCED must have a Strong's-dictionary entry."""
+    """Every Strong's number REFERENCED must resolve to a lexicon entry.
+
+    Resolution targets differ by language:
+      * Hebrew (OSHB) refs a base Strong's H-number -> the Strong's-Hebrew dict.
+      * Greek (TAGNT) refs a *disambiguated/extended* Strong's (e.g. G2424G) ->
+        the TBESG lexicon, which is keyed by exactly that extended Strong's. A
+        TAGNT word whose extended key is not in TBESG, AND whose base Strong's
+        (letter stripped) is not in Strong's-Greek either, is a true orphan.
+    """
     rep = OrphanReport()
-    # The set of Strong's keys that DO have a dictionary entry.
-    have: set[str] = set()
+    # Strong's-dictionary keys (base numbers; Greek + Hebrew).
+    have_strongs: set[str] = set()
     for pl in lexicons.values():
         if pl.lexicon == "strongs":
-            have |= {e.strongs for e in pl.entries if e.strongs}
+            have_strongs |= {e.strongs for e in pl.entries if e.strongs}
+    # TBESG keys (extended/disambiguated Greek Strong's) — the Greek resolution set.
+    have_tbesg: set[str] = set()
+    for pl in lexicons.values():
+        if pl.lexicon == "tbesg":
+            have_tbesg |= {e.strongs for e in pl.entries if e.strongs}
 
-    # Referenced by the tagged text (OSHB Hebrew words).
-    referenced_tagged: set[str] = set()
+    # Referenced by the tagged text. Hebrew (OSHB) keys resolve against the
+    # Strong's dictionaries; Greek (TAGNT) extended keys resolve against TBESG
+    # (falling back to the base Strong's-Greek dictionary if the extended sense is
+    # absent but the base number exists).
+    orphan_tagged: set[str] = set()
+    orphan_greek: set[str] = set()
     for pt in tagged.values():
         for w in pt.words:
-            referenced_tagged.update(w.strongs)
-    rep.from_tagged = sorted(
-        referenced_tagged - have, key=_strongs_num
-    )
+            for key in w.strongs:
+                if pt.language == "greek":
+                    if key in have_tbesg:
+                        continue
+                    if _base_strongs(key) in have_strongs:
+                        continue
+                    orphan_greek.add(key)
+                else:
+                    if key not in have_strongs:
+                        orphan_tagged.add(key)
+    rep.from_tagged = sorted(orphan_tagged, key=_strongs_num)
+    rep.from_greek = sorted(orphan_greek, key=_strongs_num)
 
     # Referenced by BDB's Strong's links.
     referenced_bdb: set[str] = set()
     for pl in lexicons.values():
         if pl.lexicon == "bdb":
             referenced_bdb |= {e.strongs for e in pl.entries if e.strongs}
-    rep.from_bdb = sorted(referenced_bdb - have, key=_strongs_num)
+    rep.from_bdb = sorted(referenced_bdb - have_strongs, key=_strongs_num)
     return rep
+
+
+def _base_strongs(key: str) -> str:
+    """Strip a trailing disambiguation letter from a Greek extended Strong's.
+
+    ``G2424G`` -> ``G2424``; ``G976`` -> ``G976``.
+    """
+    m = re.fullmatch(r"(G\d+)[A-Za-z]?", key)
+    return m.group(1) if m else key
 
 
 def _strongs_num(s: str) -> tuple[int, str]:
@@ -324,12 +361,18 @@ def render_lexicon_report(
         lines.append("")
 
     if orphans:
-        lines.append("ORPHAN STRONG'S (referenced, no dictionary entry)")
+        lines.append("ORPHAN STRONG'S (referenced, no lexicon entry)")
         lines.append("-" * 64)
-        lines.append(f"  from tagged text: {len(orphans.from_tagged)}")
+        lines.append(f"  from OSHB Hebrew text (-> Strong's-Hebrew): "
+                     f"{len(orphans.from_tagged)}")
         if orphans.from_tagged:
             lines.append("    " + ", ".join(orphans.from_tagged[:40]))
-        lines.append(f"  from BDB links:   {len(orphans.from_bdb)}")
+        lines.append(f"  from TAGNT Greek text (-> TBESG/Strong's-Greek): "
+                     f"{len(orphans.from_greek)}")
+        if orphans.from_greek:
+            lines.append("    " + ", ".join(orphans.from_greek[:40]))
+        lines.append(f"  from BDB links (-> Strong's-Hebrew): "
+                     f"{len(orphans.from_bdb)}")
         if orphans.from_bdb:
             lines.append("    " + ", ".join(orphans.from_bdb[:40]))
         lines.append("")

@@ -343,14 +343,23 @@ OSHB_FILE_TO_USFM: dict[str, str] = {
 
 @dataclass
 class TaggedWord:
-    """One Strong's-tagged original-language word, anchored to a VerseRef."""
+    """One Strong's-tagged original-language word, anchored to a VerseRef.
+
+    Shared by the OSHB Hebrew tagging (P4b) and the STEPBible TAGNT Greek tagging
+    (P4b). The Greek-only fields (``lemma``, ``gloss``, ``editions``) are left None
+    for Hebrew rows, which carry their meaning through the Strong's dictionary +
+    OSHB ``morph`` instead.
+    """
 
     ref: VerseRef
     position: int          # 1-based word index within the verse
-    surface: str           # the pointed Hebrew word as written
-    strongs: list[str]     # one or more H-numbers (prefix segments contribute none)
-    morph: str | None      # OSHB morphology code
-    lemma_raw: str         # the raw lemma attr (e.g. 'c/1961', '6965 b')
+    surface: str           # the pointed Hebrew / accented Greek word as written
+    strongs: list[str]     # one or more Strong's keys (prefix segments contribute none)
+    morph: str | None      # OSHB / TAGNT morphology code
+    lemma_raw: str         # the raw lemma/source token (e.g. 'c/1961', '6965 b')
+    lemma: str | None = None      # TAGNT dictionary form (Greek)
+    gloss: str | None = None      # TAGNT brief gloss (Greek)
+    editions: str | None = None   # TAGNT edition membership flags (e.g. 'NKO')
 
 
 @dataclass
@@ -363,6 +372,10 @@ class ParsedTaggedText:
     words: list[TaggedWord] = field(default_factory=list)
     books_seen: set[str] = field(default_factory=set)
     flags: list[str] = field(default_factory=list)
+    # Source-display metadata, set during normalization so the builder doesn't have
+    # to know which source registry a given tagged text came from (OSHB vs TAGNT).
+    name: str = ""
+    attribution: str = ""
 
 
 _OSHB_STRONGS_RE = re.compile(r"(\d+)")
@@ -384,7 +397,8 @@ def parse_oshb(
     src: TaggedTextSource, prov: Provenance, content_by_book: dict[str, str]
 ) -> ParsedTaggedText:
     """Parse the OSHB ``wlc/*.xml`` files into per-word Strong's-tagged rows."""
-    pt = ParsedTaggedText(id=src.id, language=HEBREW, provenance=prov)
+    pt = ParsedTaggedText(id=src.id, language=HEBREW, provenance=prov,
+                          name=src.name, attribution=src.attribution)
     for stem in sorted(content_by_book):
         usfm = OSHB_FILE_TO_USFM.get(stem)
         if usfm is None:
@@ -516,17 +530,266 @@ FLAGGED_TEXT_SOURCES: dict[str, FlaggedTextSource] = {
              "so it cannot supply the verse->Strong's link word-study needs "
              "without an out-of-corpus lemma->Strong's bridge; AND the SBLGNT text "
              "is under the SBLGNT EULA (not pure PD — bundling is an architect "
-             "decision). Snapshotted for provenance; NOT ingested this run.",
+             "decision). NOT ingested: the Greek NT tagging is now supplied by the "
+             "STEPBible TAGNT (CC-BY 4.0), which DOES carry disambiguated Strong's. "
+             "SBLGNT remains snapshotted for provenance only. (OpenGNT was also "
+             "considered and REJECTED: CC-BY-SA, a copyleft term we avoid bundling.)",
     ),
 }
 
 
-# Thayer's — recorded as a not-found flag so the report surfaces it every run.
+# Thayer's — superseded by the STEPBible TBESG (P4b). Kept as a recorded note so
+# the report shows the sourcing decision: no clean canonical PD Thayer's dataset
+# exists in a source of record; the approved substitute is the Tyndale Brief
+# lexicon (TBESG, Abbott-Smith-based), now ingested.
 THAYERS_FLAG = (
     "Thayer's Greek-English lexicon: no clean, canonical, machine-readable "
-    "public-domain dataset found in a source of record (OpenScriptures ships "
-    "Strong's + BDB, not Thayer's; a GitHub survey found only GPL-incompatible or "
-    "non-canonical aggregator copies). OMITTED, not fabricated (CLAUDE.md). "
-    "Strong's Greek glosses cover the basic need; a canonical Thayer's source "
-    "needs architect + theological-advisor approval before ingestion."
+    "public-domain dataset found in a source of record. SUBSTITUTE INGESTED — the "
+    "STEPBible TBESG (Tyndale Brief lexicon of Extended Strong's for Greek, "
+    "Abbott-Smith-based, CC-BY 4.0) is the architect-approved stand-in for "
+    "Thayer's and is now in lexicons.sqlite. A canonical Thayer's proper would "
+    "still need architect + theological-advisor approval before ingestion."
 )
+
+
+# =============================================================================
+# P4b — STEPBible Greek: TAGNT (tagged Greek NT) + TBESG (Greek lexicon)
+# =============================================================================
+# Source: github.com/STEPBible/STEPBible-Data, CC-BY 4.0. The required
+# attribution string is "STEP Bible, www.STEPBible.org" (recorded in provenance
+# and surfaced in the manifest). TAGNT is the Strong's-tagged amalgamated Greek
+# NT (each word flags which editions — NA28/NA27/SBL/Treg/WH/TR/Byz/Tyn — contain
+# it); TBESG is the Greek lexicon keyed by extended/disambiguated Strong's.
+STEPBIBLE_DIR = LEXICONS_DIR / "stepbible"
+
+STEPBIBLE_ATTRIBUTION = "STEP Bible, www.STEPBible.org"
+STEPBIBLE_LICENSE = "CC-BY-4.0 (STEPBible; Tyndale House Cambridge)"
+STEPBIBLE_VERSION = "STEPBible-Data TAGNT/TBESG (snapshot 2026-06-11)"
+
+# STEPBible 3-letter book abbreviation -> canonical USFM id. STEPBible uses the
+# NRSV-style abbreviations seen in the TAGNT reference column (Mat, Mrk, Luk, Jhn,
+# Act, Rom, 1Co, ... Rev). Mapped explicitly, never guessed.
+STEPBIBLE_BOOK_TO_USFM: dict[str, str] = {
+    "Mat": "MAT", "Mrk": "MRK", "Luk": "LUK", "Jhn": "JHN", "Act": "ACT",
+    "Rom": "ROM", "1Co": "1CO", "2Co": "2CO", "Gal": "GAL", "Eph": "EPH",
+    "Php": "PHP", "Col": "COL", "1Th": "1TH", "2Th": "2TH", "1Ti": "1TI",
+    "2Ti": "2TI", "Tit": "TIT", "Phm": "PHM", "Heb": "HEB", "Jas": "JAS",
+    "1Pe": "1PE", "2Pe": "2PE", "1Jn": "1JN", "2Jn": "2JN", "3Jn": "3JN",
+    "Jud": "JUD", "Rev": "REV",
+}
+
+# The two TAGNT data files (split only because one file is too large for GitHub).
+# Together they cover all 27 NT books, Matthew through Revelation.
+_TAGNT_FILES: tuple[str, ...] = (
+    "TAGNT Mat-Jhn - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+    "TAGNT Act-Rev - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+)
+_TBESG_FILE = (
+    "TBESG - Translators Brief lexicon of Extended Strongs for Greek - "
+    "STEPBible.org CC BY.txt"
+)
+
+_STEPBIBLE_RAW_BASE = (
+    "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/"
+)
+
+
+@dataclass(frozen=True)
+class StepBibleSource:
+    """A STEPBible TAGNT / TBESG snapshot definition (P4b, CC-BY 4.0)."""
+
+    id: str                # 'tagnt' | 'tbesg'
+    name: str
+    repo_subdir: str       # url-path subdir within the repo
+    files: tuple[str, ...]
+
+    def url(self, fname: str) -> str:
+        from urllib.parse import quote
+
+        return _STEPBIBLE_RAW_BASE + quote(f"{self.repo_subdir}/{fname}")
+
+    def dest(self, fname: str) -> Path:
+        return STEPBIBLE_DIR / self.id / fname
+
+
+STEPBIBLE_SOURCES: dict[str, StepBibleSource] = {
+    "tagnt": StepBibleSource(
+        id="tagnt",
+        name="Translators Amalgamated Greek New Testament (TAGNT)",
+        repo_subdir="Translators Amalgamated OT+NT",
+        files=_TAGNT_FILES,
+    ),
+    "tbesg": StepBibleSource(
+        id="tbesg",
+        name="Tyndale Brief lexicon of Extended Strong's for Greek (TBESG)",
+        repo_subdir="Lexicons",
+        files=(_TBESG_FILE,),
+    ),
+}
+
+
+def _normalize_greek_dstrong(raw: str) -> str | None:
+    """Normalize a STEPBible Greek dStrong to ``G<int><suffix?>``.
+
+    STEPBible disambiguated Strong's are zero-padded with an optional homograph
+    letter: ``G0976`` -> ``G976``; ``G2424G`` -> ``G2424G``; ``G0007H`` -> ``G7H``.
+    The leading zeros are stripped (to match the existing ``G####`` key style) but
+    the extended letter is PRESERVED — it is the disambiguation that links a TAGNT
+    word to its specific TBESG sense, so collapsing it would lose information.
+    Returns None for an unparseable token (caller flags it).
+    """
+    m = re.fullmatch(r"G0*(\d+)([A-Za-z]?)", raw.strip())
+    if not m:
+        return None
+    return f"G{int(m.group(1))}{m.group(2)}"
+
+
+# --- TBESG (Greek lexicon, keyed by extended/disambiguated Strong's) ----------
+# Main lexicon rows are tab-separated:
+#   eStrong | dStrong | uStrong | Greek | Transliteration | Morph | Gloss | AS-def
+# The dStrong column carries a trailing " =" plus an optional linking note
+# (" = the Greek of\tHxxxx"); we take only the leading G-token. The TAGNT word
+# rows reference dStrong, so TBESG is keyed by dStrong here.
+_TBESG_ROW_RE = re.compile(r"^G\d{4}")
+
+
+def parse_tbesg(prov: Provenance, content: str) -> ParsedLexicon:
+    """Parse the TBESG Greek lexicon into LexEntries keyed by extended Strong's."""
+    pl = ParsedLexicon(id="tbesg", language=GREEK, lexicon="tbesg", provenance=prov)
+    seen: set[str] = set()
+    for line in content.splitlines():
+        if not _TBESG_ROW_RE.match(line):
+            continue
+        cols = line.rstrip("\n").split("\t")
+        if len(cols) < 7:
+            pl.flags.append(f"tbesg: short row (<7 cols) skipped: {line[:40]!r}")
+            continue
+        dstrong_raw = cols[1].split("=", 1)[0].strip()
+        key = _normalize_greek_dstrong(dstrong_raw)
+        if key is None:
+            pl.flags.append(f"tbesg: unparseable dStrong {dstrong_raw!r} (skipped)")
+            continue
+        if key in seen:
+            # Genuine duplicate dStrong is unexpected; surface, keep the first.
+            pl.flags.append(f"tbesg: duplicate dStrong {key} (kept first)")
+            continue
+        seen.add(key)
+        greek = _clean(cols[3])
+        translit = _clean(cols[4])
+        morph = _clean(cols[5])
+        gloss = _clean(cols[6])
+        full_def = _clean(cols[7]) if len(cols) > 7 else None
+        # Definition = the brief gloss + the Abbott-Smith entry where present.
+        definition = full_def or gloss
+        pl.entries.append(
+            LexEntry(
+                strongs=key,
+                language=GREEK,
+                lexicon="tbesg",
+                lemma=greek,
+                translit=translit,
+                pronunciation=None,
+                definition=definition,
+                derivation=morph,     # TBESG part-of-speech tag (e.g. 'G:N-F')
+                kjv_def=gloss,        # the short gloss, kept in the kjv_def slot
+                raw_key=dstrong_raw,  # the source-native dStrong (zero-padded)
+            )
+        )
+    pl.flags.append(
+        f"tbesg: parsed {len(pl.entries)} Greek lexicon entries keyed by extended "
+        f"(disambiguated) Strong's; substitute for Thayer's (Abbott-Smith-based)"
+    )
+    return pl
+
+
+# --- TAGNT (Strong's-tagged amalgamated Greek NT) ----------------------------
+# A word row starts with the reference+position+word-type token, e.g.
+#   Mat.1.1#01=NKO  <tab>  Βίβλος (Biblos)  <tab>  ...  <tab>  G0976=N-NSF  ...
+# Header/intro/per-verse-comment lines do not match this anchor and are skipped.
+_TAGNT_ROW_RE = re.compile(
+    r"^([1-3]?[A-Za-z]+)\.(\d+)\.(\d+)#(\d+)=(\S+)\t"
+)
+
+
+def _tagnt_surface(greek_col: str) -> str:
+    """The accented Greek surface form, dropping the parenthetical transliteration.
+
+    The Greek column is ``Βίβλος (Biblos)``; we keep ``Βίβλος`` (the first token
+    before the space-paren), preserving punctuation attached to the word.
+    """
+    s = greek_col.strip()
+    # Drop a trailing " (translit)" group if present.
+    s = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()
+    return s
+
+
+def parse_tagnt(
+    prov: Provenance, content_by_file: dict[str, str]
+) -> ParsedTaggedText:
+    """Parse the STEPBible TAGNT into per-word Strong's-tagged Greek rows.
+
+    Each row yields a :class:`TaggedWord` anchored to a canonical VerseRef with its
+    disambiguated Strong's (``strongs``), morphology (``morph``), lemma + gloss, and
+    the edition-membership flags (``editions``). Verse-position numbering restarts
+    per verse from the source ``#NN`` field. Unknown book abbreviations and
+    malformed rows are FLAGGED, never guessed.
+    """
+    pt = ParsedTaggedText(
+        id="tagnt", language=GREEK, provenance=prov,
+        name=STEPBIBLE_SOURCES["tagnt"].name, attribution=STEPBIBLE_ATTRIBUTION,
+    )
+    unknown_books: set[str] = set()
+    for fname in sorted(content_by_file):
+        for line in content_by_file[fname].splitlines():
+            m = _TAGNT_ROW_RE.match(line)
+            if not m:
+                continue
+            book_abbr, chap, verse, pos, wordtype = m.groups()
+            usfm = STEPBIBLE_BOOK_TO_USFM.get(book_abbr)
+            if usfm is None:
+                unknown_books.add(book_abbr)
+                continue
+            cols = line.rstrip("\n").split("\t")
+            if len(cols) < 5:
+                pt.flags.append(
+                    f"tagnt: short row at {book_abbr}.{chap}.{verse}#{pos} "
+                    f"(<5 cols, skipped)"
+                )
+                continue
+            surface = _tagnt_surface(cols[1])
+            dstrong_raw, _, morph = cols[3].partition("=")
+            key = _normalize_greek_dstrong(dstrong_raw)
+            strongs = [key] if key is not None else []
+            if key is None and dstrong_raw.strip():
+                pt.flags.append(
+                    f"tagnt: unparseable dStrong {dstrong_raw!r} at "
+                    f"{book_abbr}.{chap}.{verse}#{pos} (no Strong's recorded)"
+                )
+            lemma_field = cols[4] if len(cols) > 4 else ""
+            lemma, _, gloss = lemma_field.partition("=")
+            ref = VerseRef(book=usfm, chapter=int(chap), verse_start=int(verse))
+            pt.books_seen.add(usfm)
+            pt.words.append(
+                TaggedWord(
+                    ref=ref,
+                    position=int(pos),
+                    surface=surface,
+                    strongs=strongs,
+                    morph=_clean(morph) or None,
+                    lemma_raw=cols[0],
+                    lemma=_clean(lemma) or None,
+                    gloss=_clean(gloss) or None,
+                    editions=_clean(cols[5]) if len(cols) > 5 else None,
+                )
+            )
+    if unknown_books:
+        pt.flags.append(
+            f"tagnt: unknown book abbreviations skipped: "
+            f"{', '.join(sorted(unknown_books))}"
+        )
+    pt.flags.append(
+        "tagnt: edition membership captured per word in the 'editions' column "
+        "(e.g. NA28+NA27+Tyn+SBL+WH+Treg+TR+Byz); the word-type prefix (NKO etc.) "
+        "is retained on the 'lemma_raw' source token"
+    )
+    return pt
