@@ -33,17 +33,17 @@ canonical 66-book spine, comment blocks that don't sit under a recognizable
 verse anchor, and statistical anomalies (an unusually long single block — e.g.
 Calvin on a long Psalm — is surfaced, not "fixed").
 
-SPURGEON — *Treasury of David* — FLAGGED-AND-SKIPPED for v1
-----------------------------------------------------------
-The architect-locked scope lists Spurgeon's *Treasury of David*, but the only
-CCEL edition (spurgeon/treasury1-6) is a **page-image scan**: every volume's
-body is nothing but ``<img>`` references to PNG page scans (≈2900 images total)
-with no machine-readable commentary text — the sole extractable text is the
-print-page-number index. Ingesting it would require OCR, which is a guess, not a
-parse, and CLAUDE.md forbids substituting a non-canonical/derived text. So
-Spurgeon is SKIPPED and surfaced for the architect to approve a clean
-full-text source (e.g. a text-bearing public-domain Treasury edition) before
-inclusion. This mirrors the P2 handling of the 1689 and Belgic confessions.
+SPURGEON — *Treasury of David* — INGESTED from Internet Archive OCR
+-------------------------------------------------------------------
+The CCEL edition (spurgeon/treasury1-6) is a page-image scan with no machine
+text, so the architect approved the Google-digitized ``*spurgoog`` DjVu scans on
+archive.org instead. That ingestion is a separate path (substantial OCR cleaning,
+not CCEL ThML parsing) and lives in the sibling ``spurgeon`` module. Spurgeon is
+therefore NOT in ``COMMENTARY_SOURCES`` (which the CCEL snapshot/normalize loops
+iterate); it joins ``all_commentary_sources()`` — the registry the shared build
+resolves by id. The Treasury is a CANDIDATE only: it is OCR, the volume covering
+Psalms 104-118 is absent from the scan set (flagged), and the architect's
+spot-check decides v1-vs-v1.1. See ``spurgeon.py`` for the full account.
 """
 
 from __future__ import annotations
@@ -191,6 +191,25 @@ COMMENTARY_SOURCES: dict[str, CommentarySource] = {
         license="Public domain (CCEL)",
     ),
 }
+
+
+# Spurgeon's *Treasury of David* is no longer flagged-and-skipped: the architect
+# approved the Internet Archive Google-OCR scans (the CCEL edition is image-only).
+# Its source descriptor + parser live in the sibling ``spurgeon`` module (the OCR
+# cleaning is substantial and kept separate from the CCEL ThML path). It is NOT in
+# COMMENTARY_SOURCES (which the CCEL snapshot/normalize loops iterate) — instead it
+# joins ALL_COMMENTARY_SOURCES, the registry the shared build resolves by id.
+def all_commentary_sources() -> dict:
+    """CCEL commentators + Spurgeon, keyed by id, for the shared build/writer.
+
+    Lazy import of the Spurgeon source avoids a circular import (spurgeon imports
+    schema + sources, not commentaries).
+    """
+    from .spurgeon import SPURGEON_SOURCE
+
+    combined: dict = dict(COMMENTARY_SOURCES)
+    combined[SPURGEON_SOURCE.id] = SPURGEON_SOURCE
+    return combined
 
 
 @dataclass

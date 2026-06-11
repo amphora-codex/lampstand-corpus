@@ -229,5 +229,63 @@ def snapshot_commentaries(retrieved: str, *, force: bool = False) -> dict:
     return manifest
 
 
+def snapshot_spurgeon(retrieved: str, *, force: bool = False) -> dict:
+    """Download (if absent) each available Treasury-of-David volume's djvu OCR.
+
+    Source is the architect-approved Internet Archive ``*spurgoog`` Google scans
+    (public domain). Six of the seven physical volumes are available; Psalms
+    104-118 is missing from the scan set (see spurgeon.MISSING_VOLUME) and is
+    surfaced in the manifest, not silently dropped. Snapshots are committed under
+    ``sources/commentaries/spurgeon/`` via git-lfs. Returns the manifest dict and
+    writes ``sources/commentaries/spurgeon/manifest.json``.
+    """
+    from .spurgeon import (
+        MISSING_VOLUME,
+        REJECTED_DUPLICATES,
+        SPURGEON_DIR,
+        SPURGEON_SOURCE,
+        SPURGEON_VOLUMES,
+    )
+
+    vols: dict = {}
+    for v in SPURGEON_VOLUMES:
+        if force or not v.dest.exists():
+            checksum = fetch(v.url, v.dest, timeout=300)
+        else:
+            checksum = sha256_of(v.dest)
+        vols[v.stem] = {
+            "identifier": v.identifier,
+            "url": v.url,
+            "file": str(v.dest.relative_to(SOURCES_DIR.parent)),
+            "psalm_first": v.psalm_first,
+            "psalm_last": v.psalm_last,
+            "sha256": checksum,
+        }
+    lo, hi, why = MISSING_VOLUME
+    manifest: dict = {
+        "retrieved": retrieved,
+        "sources": {
+            SPURGEON_SOURCE.id: {
+                "name": SPURGEON_SOURCE.name,
+                "shortcode": SPURGEON_SOURCE.shortcode,
+                "author": SPURGEON_SOURCE.author,
+                "work": SPURGEON_SOURCE.work,
+                "version": SPURGEON_SOURCE.version,
+                "license": SPURGEON_SOURCE.license,
+                "retrieved": retrieved,
+                "volumes": vols,
+                "missing_volume": {"psalm_first": lo, "psalm_last": hi, "note": why},
+                "rejected_duplicates": REJECTED_DUPLICATES,
+            }
+        },
+    }
+    manifest_path = SPURGEON_DIR / "manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return manifest
+
+
 # TODO(P4+): lexicon (OpenScriptures), TSK cross-ref snapshot definitions land in
 # later phases.

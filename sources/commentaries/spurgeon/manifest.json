@@ -1,0 +1,77 @@
+{
+  "retrieved": "2026-06-10",
+  "sources": {
+    "spurgeon": {
+      "author": "Charles Haddon Spurgeon",
+      "license": "Public domain (Spurgeon d.1892; Treasury completed 1885)",
+      "missing_volume": {
+        "note": "No *spurgoog Google scan on archive.org covers Psalms 104-118 (all twelve candidate items were probed; none contains Psalm 104-118 header or body text). The Treasury volume for this range is absent from the approved scan set. ARCHITECT: source a clean public-domain scan of Treasury of David vol. covering Psalms 104-118 before this ships; do NOT substitute a non-approved text to fill it.",
+        "psalm_first": 104,
+        "psalm_last": 118
+      },
+      "name": "Charles H. Spurgeon \u2014 The Treasury of David",
+      "rejected_duplicates": {
+        "treasurydavid00spurgoog": "Ps 79-103 dup of tod4 (treasurydavidco01): 408 vs 11 watermark tokens; tod4 also more complete",
+        "treasurydavidco04spurgoog": "Ps 125-150 dup of tod7 (treasurydavidco00): smaller scan (1.64M vs 2.37M chars), less complete",
+        "treasurydavidco06spurgoog": "Ps 79-103 dup of tod4 (treasurydavidco01): smaller, 98 watermark tokens, lower vowel ratio",
+        "treasurydavidco08spurgoog": "Ps 1-26 dup of tod1 (treasurydavidco02): 166 vs 11 residual Google-watermark tokens",
+        "treasurydavidvo00spurgoog": "Ps 119-124 dup of tod6 (treasurydavidco07): near-equal OCR; tod6 marginally more complete",
+        "treasurydavidvo01spurgoog": "Ps 53-78 dup of tod3 (treasurydavidco03): 514 vs 11 watermark tokens"
+      },
+      "retrieved": "2026-06-10",
+      "shortcode": "CHS",
+      "version": "Internet Archive Google-digitized DjVu OCR (six of seven volumes; Psalms 104-118 volume missing from the *spurgoog scan set \u2014 flagged)",
+      "volumes": {
+        "tod1": {
+          "file": "sources/commentaries/spurgeon/tod1.txt",
+          "identifier": "treasurydavidco02spurgoog",
+          "psalm_first": 1,
+          "psalm_last": 26,
+          "sha256": "e32a51fdf0e692e15d8963dac0a709106c4a86ae816c894e4e91e6dd8f7d441f",
+          "url": "https://archive.org/download/treasurydavidco02spurgoog/treasurydavidco02spurgoog_djvu.txt"
+        },
+        "tod2": {
+          "file": "sources/commentaries/spurgeon/tod2.txt",
+          "identifier": "treasurydavidco05spurgoog",
+          "psalm_first": 27,
+          "psalm_last": 52,
+          "sha256": "c3c9139c23c5746af5179245e2c4ba1beb9d1af911a925531cb6a6b96027fc9c",
+          "url": "https://archive.org/download/treasurydavidco05spurgoog/treasurydavidco05spurgoog_djvu.txt"
+        },
+        "tod3": {
+          "file": "sources/commentaries/spurgeon/tod3.txt",
+          "identifier": "treasurydavidco03spurgoog",
+          "psalm_first": 53,
+          "psalm_last": 78,
+          "sha256": "d11535db3259ab0e819f055606c1eb43449820af4123ccdbe9c800823211ceea",
+          "url": "https://archive.org/download/treasurydavidco03spurgoog/treasurydavidco03spurgoog_djvu.txt"
+        },
+        "tod4": {
+          "file": "sources/commentaries/spurgeon/tod4.txt",
+          "identifier": "treasurydavidco01spurgoog",
+          "psalm_first": 79,
+          "psalm_last": 103,
+          "sha256": "840ae001f0aedd6694067cb0e371e5acee2e67f4c7615d5ae6d5c837ec4c577e",
+          "url": "https://archive.org/download/treasurydavidco01spurgoog/treasurydavidco01spurgoog_djvu.txt"
+        },
+        "tod6": {
+          "file": "sources/commentaries/spurgeon/tod6.txt",
+          "identifier": "treasurydavidco07spurgoog",
+          "psalm_first": 119,
+          "psalm_last": 124,
+          "sha256": "5a7c4e93961137f14158c288993fc97b76f6e51d6a4dafbc044da46e88982505",
+          "url": "https://archive.org/download/treasurydavidco07spurgoog/treasurydavidco07spurgoog_djvu.txt"
+        },
+        "tod7": {
+          "file": "sources/commentaries/spurgeon/tod7.txt",
+          "identifier": "treasurydavidco00spurgoog",
+          "psalm_first": 125,
+          "psalm_last": 150,
+          "sha256": "c2fd812c06d11ede130091fe7b2d12dc0529b588ca6a33e656c100c8b9cb6086",
+          "url": "https://archive.org/download/treasurydavidco00spurgoog/treasurydavidco00spurgoog_djvu.txt"
+        }
+      },
+      "work": "The Treasury of David (an exposition of the Psalms)"
+    }
+  }
+}

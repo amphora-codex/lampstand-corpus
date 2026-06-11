@@ -17,7 +17,7 @@ import sqlite3
 from pathlib import Path
 
 from . import books
-from .commentaries import COMMENTARY_SOURCES, ParsedCommentary
+from .commentaries import ParsedCommentary, all_commentary_sources
 
 SCHEMA = """
 CREATE TABLE meta (
@@ -48,7 +48,9 @@ CREATE TABLE comment (
     chapter_level INTEGER NOT NULL DEFAULT 0,  -- 1 = chapter-introduction note
     para_index    INTEGER NOT NULL, -- paragraph ordinal within the verse anchor
     passage       TEXT,             -- CCEL's human-readable passage label
-    volume        TEXT NOT NULL,    -- CCEL source volume stem
+    component     TEXT,             -- Spurgeon Treasury section (exposition/notes/
+                                    -- hints/works/title); NULL for CCEL commentators
+    volume        TEXT NOT NULL,    -- source volume stem (CCEL stem or Treasury vol)
     text          TEXT NOT NULL,
     checksum      TEXT NOT NULL,    -- SHA-256 of the volume snapshot this came from
     PRIMARY KEY (commentator, key)
@@ -78,6 +80,7 @@ def write_commentaries(
     parsed: dict[str, ParsedCommentary], out_path: Path
 ) -> None:
     """Write all parsed commentaries to ``out_path`` (deterministic order)."""
+    sources = all_commentary_sources()
     conn = _connect(out_path)
     try:
         conn.executemany(
@@ -96,7 +99,7 @@ def write_commentaries(
             pc = parsed[cid]
             if not pc.chunks:
                 continue
-            src = COMMENTARY_SOURCES[cid]
+            src = sources[cid]
             # All chunks of a commentator share name/license; provenance varies by
             # volume (different checksum). Pull stable fields from the first chunk.
             first = pc.chunks[0]
@@ -111,7 +114,7 @@ def write_commentaries(
                 r = ch.ref
                 m = ch.meta
                 conn.execute(
-                    "INSERT INTO comment VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO comment VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         cid, ch.key, ord_i,
                         r.book, r.chapter, r.verse_start,
@@ -119,6 +122,7 @@ def write_commentaries(
                         1 if m.get("chapter_level") else 0,
                         m.get("para_index", 0),
                         m.get("passage"),
+                        m.get("component"),
                         m.get("volume", ""),
                         ch.text,
                         ch.provenance.checksum,

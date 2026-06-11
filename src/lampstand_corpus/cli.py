@@ -13,8 +13,13 @@ Usage (P2 confessions & catechisms):
 
 Usage (P3 commentaries):
     python -m lampstand_corpus.cli snapshot-commentaries # download CCEL ThML volumes
+    python -m lampstand_corpus.cli snapshot-spurgeon     # download Treasury OCR (IA)
     python -m lampstand_corpus.cli build-commentaries    # build commentaries.sqlite
     python -m lampstand_corpus.cli validate-commentaries # write report (no DB)
+
+``build-commentaries`` / ``validate-commentaries`` automatically include Spurgeon
+when its snapshots are present (run ``snapshot-spurgeon`` first); otherwise the
+three CCEL commentators build without it.
 
 Reads committed snapshots from sources/, writes output/*.sqlite (gitignored) and
 reports/*.txt.
@@ -45,6 +50,13 @@ from .sources import (
     snapshot_bibles,
     snapshot_commentaries,
     snapshot_confessions,
+    snapshot_spurgeon,
+)
+from .spurgeon import (
+    SPURGEON_DIR,
+    SPURGEON_SOURCE,
+    ParsedSpurgeon,
+    parse_spurgeon,
 )
 from .usfm import ParsedBook, parse_usfm
 from .validate import render_report, validate_all
@@ -255,7 +267,44 @@ def normalize_commentaries() -> dict:
         parsed[cid] = pc
         print(f"  {cid}: {len(pc.chunks)} chunks across {len(pc.coverage)} books, "
               f"{len(pc.flags)} flag(s)")
+
+    sp = normalize_spurgeon()
+    if sp is not None:
+        parsed[sp.id] = sp
+        print(f"  {sp.id}: {len(sp.chunks)} chunks across "
+              f"{len(sp.psalms_seen)} psalms, {len(sp.flags)} flag(s)")
     return parsed
+
+
+def normalize_spurgeon() -> ParsedSpurgeon | None:
+    """Parse the committed Treasury-of-David OCR snapshots, if present.
+
+    Returns None (with a note) when the Spurgeon snapshots haven't been fetched —
+    the CCEL commentators still build without it.
+    """
+    manifest_path = SPURGEON_DIR / "manifest.json"
+    if not manifest_path.exists():
+        print("  spurgeon: no snapshot manifest — run `snapshot-spurgeon` to "
+              "include the Treasury of David.")
+        return None
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = manifest["sources"][SPURGEON_SOURCE.id]
+    prov_by_volume: dict[str, Provenance] = {}
+    content_by_volume: dict[str, str] = {}
+    for stem in SPURGEON_SOURCE.volumes:
+        ventry = entry["volumes"][stem]
+        prov_by_volume[stem] = Provenance(
+            source=f"ia:spurgeon:{stem}",
+            version=SPURGEON_SOURCE.version,
+            license=SPURGEON_SOURCE.license,
+            retrieved=entry["retrieved"],
+            url=ventry["url"],
+            checksum=ventry["sha256"],
+        )
+        content_by_volume[stem] = SPURGEON_SOURCE.dest(stem).read_text(
+            encoding="utf-8"
+        )
+    return parse_spurgeon(SPURGEON_SOURCE, prov_by_volume, content_by_volume)
 
 
 def cmd_snapshot_commentaries() -> None:
@@ -266,6 +315,18 @@ def cmd_snapshot_commentaries() -> None:
         print(f"  {cid}: {nvol} volume(s)")
         for _v, ve in sorted(e["volumes"].items()):
             print(f"     {ve['sha256']}  {ve['file']}")
+
+
+def cmd_snapshot_spurgeon() -> None:
+    print("Snapshotting Treasury-of-David OCR -> sources/commentaries/spurgeon/")
+    manifest = snapshot_spurgeon(RETRIEVED)
+    entry = manifest["sources"]["spurgeon"]
+    for stem, ve in sorted(entry["volumes"].items()):
+        print(f"  {stem} ({ve['identifier']}) Ps {ve['psalm_first']}-"
+              f"{ve['psalm_last']}: {ve['sha256']}")
+    mv = entry["missing_volume"]
+    print(f"  MISSING from the *spurgoog set: Psalms {mv['psalm_first']}-"
+          f"{mv['psalm_last']} (flagged for the architect)")
 
 
 def cmd_build_commentaries() -> None:
@@ -286,7 +347,8 @@ def cmd_validate_commentaries() -> None:
 
 def _emit_commentary_report(parsed: dict) -> None:
     reports = validate_all_commentaries(parsed)
-    text = render_commentary_report(reports)
+    spurgeon = parsed.get(SPURGEON_SOURCE.id)
+    text = render_commentary_report(reports, spurgeon=spurgeon)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     rp = REPORTS_DIR / "commentaries_validation_p3.txt"
     rp.write_text(text, encoding="utf-8")
@@ -317,6 +379,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_validate_confessions()
     elif cmd == "snapshot-commentaries":
         cmd_snapshot_commentaries()
+    elif cmd == "snapshot-spurgeon":
+        cmd_snapshot_spurgeon()
     elif cmd == "build-commentaries":
         cmd_build_commentaries()
     elif cmd == "validate-commentaries":
