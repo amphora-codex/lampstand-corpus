@@ -38,6 +38,17 @@ Usage (P5 cross-references):
     python -m lampstand_corpus.cli build-crossrefs     # build crossrefs.sqlite
     python -m lampstand_corpus.cli validate-crossrefs  # write report (no DB)
 
+Usage (P6 embeddings + BM25):
+    python -m lampstand_corpus.cli snapshot-model      # download BGE-small (pinned)
+    python -m lampstand_corpus.cli build-embeddings    # build embeddings.sqlite + report
+    python -m lampstand_corpus.cli validate-embeddings # rebuild report from chunks only
+
+``build-embeddings`` chunks the *built* per-resource DBs, encodes them with
+BGE-small on CPU (deterministic), writes embeddings.sqlite (gitignored), and emits
+the P6 validation report (chunk counts, BM25 stats, retrieval smoke test, and the
+bit-for-bit determinism outcome). Requires the ``[embeddings]`` extra
+(sentence-transformers + torch) and a one-time ``snapshot-model``.
+
 Reads committed snapshots from sources/, writes output/*.sqlite (gitignored) and
 reports/*.txt.
 """
@@ -46,6 +57,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sys
 import zipfile
@@ -702,6 +714,222 @@ def _emit_crossref_report(parsed: ParsedCrossRefs) -> None:
           f"target={rep.n_nonresolving_target}")
 
 
+# --- P6 embeddings + BM25 ----------------------------------------------------
+# Canonical retrieval smoke queries (spec: task validation). Each carries a
+# predicate over the dense top-k that a human can also eyeball in the report.
+_SMOKE_QUERIES: list[tuple[str, str, object]] = [
+    (
+        "justification by faith",
+        "Romans 3-5 / Galatians (and Reformed confessions on justification)",
+        lambda n: (
+            (n.book in {"ROM", "GAL"})
+            or (n.resource_type == "confession")
+            or ("justif" in n.text.lower())
+        ),
+    ),
+    (
+        "the LORD is my shepherd",
+        "Psalm 23",
+        lambda n: (n.book == "PSA" and n.chapter == 23),
+    ),
+    (
+        "in the beginning God created the heavens and the earth",
+        "Genesis 1",
+        lambda n: (n.book == "GEN" and n.chapter == 1),
+    ),
+]
+
+
+def cmd_snapshot_model() -> None:
+    print("Snapshotting embedding model -> models/ (gitignored)")
+    try:
+        from huggingface_hub import snapshot_download
+    except ImportError:
+        print("  huggingface_hub not installed — run `pip install -e \".[embeddings]\"`",
+              file=sys.stderr)
+        sys.exit(2)
+    from .embeddings import MODEL_NAME, MODEL_REVISION
+    from .encode import MODEL_CACHE, model_provenance
+
+    MODEL_CACHE.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
+    path = snapshot_download(MODEL_NAME, revision=MODEL_REVISION,
+                             cache_dir=str(MODEL_CACHE))
+    print(f"  model:    {MODEL_NAME}")
+    print(f"  revision: {MODEL_REVISION}")
+    print(f"  path:     {path}")
+    prov = model_provenance()
+    print(f"  combined sha256: {prov['combined_sha256']}")
+    print(f"  files hashed:    {len(prov['files'])}")
+
+
+def cmd_build_embeddings() -> None:
+    import time
+
+    import numpy as np
+
+    from .embeddings import extract_all
+    from .encode import MODEL_CACHE, encode_chunks, model_provenance
+
+    os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
+
+    print("Extracting chunks from built DBs...")
+    ec = extract_all(OUTPUT_DIR)
+    print(f"  {len(ec.chunks)} chunks "
+          f"({', '.join(f'{k}={v}' for k, v in sorted(ec.by_type().items()))})")
+    for rt, items in sorted(ec.skipped.items()):
+        if items:
+            print(f"  skipped {rt}: {len(items)} (flagged, not dropped)")
+
+    prov = model_provenance()
+    print(f"Encoding with {prov['name']} @ {prov['revision'][:12]} on CPU "
+          f"(deterministic)...")
+    t0 = time.perf_counter()
+    vectors = encode_chunks(ec.chunks, device="cpu")
+    wall = time.perf_counter() - t0
+    print(f"  encoded {vectors.shape[0]} vectors dim={vectors.shape[1]} "
+          f"in {wall:.1f}s")
+
+    # Determinism: encode a deterministic sample twice on CPU; require bit-for-bit.
+    det = _check_determinism(ec.chunks, vectors)
+
+    out = OUTPUT_DIR / "embeddings.sqlite"
+    print(f"Building {out} ...")
+    from .build_embeddings import write_embeddings
+    stats = write_embeddings(
+        ec.chunks, vectors, out, model_provenance=prov, skipped=ec.skipped)
+    print(f"  wrote {out} ({out.stat().st_size:,} bytes)")
+
+    _emit_embedding_report(ec, prov, stats, det, wall, np)
+
+
+def _check_determinism(chunks, vectors):
+    """Re-encode a deterministic sample on CPU and compare bit-for-bit.
+
+    Encoding the full corpus twice is slow; we re-encode a fixed deterministic
+    sample (every Nth chunk, capped) and require an exact byte match. If the bytes
+    ever differ we fall back to cosine-within-tolerance and FLAG it.
+    """
+    import numpy as np
+
+    from .encode import encode_chunks
+    from .validate_embeddings import DeterminismResult
+
+    if not chunks:
+        return DeterminismResult(method="bit-for-bit", identical=True,
+                                 note="no chunks")
+    # Fixed, deterministic sample (no RNG): stride through the corpus, cap at 400.
+    n = len(chunks)
+    stride = max(1, n // 400)
+    sample_idx = list(range(0, n, stride))[:400]
+    sample = [chunks[i] for i in sample_idx]
+    first = vectors[sample_idx]
+    second = encode_chunks(sample, device="cpu")
+    if first.tobytes() == second.tobytes():
+        return DeterminismResult(
+            method="bit-for-bit", identical=True,
+            note=f"verified on a {len(sample)}-chunk CPU re-encode sample")
+    # Not bit-for-bit — record tolerance + flag.
+    diff = float(np.max(np.abs(first - second)))
+    cos = float(np.min(np.sum(first * second, axis=1)
+                       / (np.linalg.norm(first, axis=1)
+                          * np.linalg.norm(second, axis=1) + 1e-12)))
+    return DeterminismResult(
+        method="cosine-tolerance", identical=False,
+        max_abs_diff=diff, min_cosine=cos,
+        note=f"{len(sample)}-chunk CPU re-encode differed in bytes; "
+             f"FLAGGED for architect (CLAUDE.md rule 6)")
+
+
+def cmd_validate_embeddings() -> None:
+    """Rebuild the chunk-level report sections without re-encoding.
+
+    Reads the existing embeddings.sqlite for BM25 stats + provenance and re-runs
+    the retrieval smoke test against the stored vectors. Does not re-encode the
+    corpus or re-check determinism (that's part of build).
+    """
+    import numpy as np
+
+    from .embeddings import extract_all
+    from .encode import MODEL_CACHE
+
+    os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
+    out = OUTPUT_DIR / "embeddings.sqlite"
+    if not out.exists():
+        print("No output/embeddings.sqlite — run `build-embeddings` first.",
+              file=sys.stderr)
+        sys.exit(2)
+    ec = extract_all(OUTPUT_DIR)
+    conn = __import__("sqlite3").connect(out)
+    meta = dict(conn.execute("SELECT key, value FROM meta").fetchall())
+    bstats = dict(conn.execute("SELECT key, value FROM bm25_stats").fetchall())
+    n_postings = conn.execute("SELECT count(*) FROM bm25_posting").fetchone()[0]
+    conn.close()
+    prov = {
+        "name": meta.get("model_name", ""),
+        "revision": meta.get("model_revision", ""),
+        "combined_sha256": meta.get("model_combined_sha256", ""),
+    }
+    stats = {
+        "vocab_size": int(bstats.get("vocab_size", 0)),
+        "n_postings": n_postings,
+        "avgdl": bstats.get("avgdl", 0.0),
+    }
+    _emit_embedding_report(ec, prov, stats, None, 0.0, np)
+
+
+def _run_smoke(out_path, np):
+    """Encode the smoke queries + return SmokeQuery results against the artifact."""
+    from .encode import load_model
+    from .retrieve import encode_query, load_matrix, topk
+    from .validate_embeddings import SmokeHit, SmokeQuery
+
+    matrix, meta = load_matrix(out_path)
+    model = load_model(device="cpu")
+    results: list[SmokeQuery] = []
+    for query, expect, predicate in _SMOKE_QUERIES:
+        qvec = encode_query(model, query)
+        neighbors = topk(matrix, meta, qvec, k=5)
+        sq = SmokeQuery(query=query, expect=expect)
+        for i, nb in enumerate(neighbors, start=1):
+            preview = nb.text[:70].replace("\n", " ")
+            sq.hits.append(SmokeHit(
+                rank=i, score=nb.score, resource_type=nb.resource_type,
+                source=nb.source, anchor=nb.anchor, preview=preview))
+        sq.passed = any(predicate(nb) for nb in neighbors)
+        results.append(sq)
+    return results
+
+
+def _emit_embedding_report(ec, prov, stats, det, wall, np):
+    from .validate_embeddings import render_embedding_report, summarize_extract
+
+    rep = summarize_extract(ec)
+    rep.model_name = prov["name"]
+    rep.model_revision = prov["revision"]
+    rep.model_combined_sha256 = prov["combined_sha256"]
+    rep.vocab_size = stats["vocab_size"]
+    rep.n_postings = stats["n_postings"]
+    rep.avgdl = float(stats["avgdl"])
+    rep.determinism = det
+    rep.wall_seconds = wall
+
+    out = OUTPUT_DIR / "embeddings.sqlite"
+    print("Running retrieval smoke test...")
+    rep.smoke = _run_smoke(out, np)
+    for sq in rep.smoke:
+        print(f"  [{'PASS' if sq.passed else 'REVIEW'}] {sq.query!r}")
+
+    text = render_embedding_report(rep)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    rp = REPORTS_DIR / "embeddings_validation_p6.txt"
+    rp.write_text(text, encoding="utf-8")
+    print(f"  wrote {rp}")
+    print(f"  chunks={rep.n_chunks} dim={rep.embedding_dim} "
+          f"vocab={rep.vocab_size} postings={rep.n_postings} "
+          f"errors={rep.error_total} flags={rep.flag_total}")
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     cmd = argv[0] if argv else "all"
@@ -745,6 +973,12 @@ def main(argv: list[str] | None = None) -> int:
         cmd_build_crossrefs()
     elif cmd == "validate-crossrefs":
         cmd_validate_crossrefs()
+    elif cmd == "snapshot-model":
+        cmd_snapshot_model()
+    elif cmd == "build-embeddings":
+        cmd_build_embeddings()
+    elif cmd == "validate-embeddings":
+        cmd_validate_embeddings()
     else:
         print(__doc__)
         return 1

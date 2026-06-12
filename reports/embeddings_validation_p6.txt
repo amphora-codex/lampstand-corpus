@@ -1,0 +1,144 @@
+LampStand corpus — embeddings + BM25 validation report (M1-P6)
+================================================================
+
+CANDIDATE ONLY. Not ship-ready: the architect's 23-point spot-check gates ship (CLAUDE.md §Human spot-check).
+
+EMBEDDING MODEL (provenance)
+----------------------------------------------------------------
+  model:        BAAI/bge-small-en-v1.5
+  revision:     5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+  combined sha: f6a428ffdb6afebc801a94fd3454aec2705f198ad710434a7919faa2a41b361b
+  dim:          384
+  vectors:      L2-normalized float32 (little-endian)
+  weights are gitignored (models/); never committed.
+
+ERROR / FLAG SUMMARY
+----------------------------------------------------------------
+  total errors: 1
+  total flags:  4517
+
+CHUNKS EMBEDDED
+----------------------------------------------------------------
+  total chunks: 175442
+  by resource type:
+    commentary   128885
+    confession   895
+    lexicon      32561
+    scripture    13101
+  by source:
+    commentary/calvin          41694
+    commentary/henry           31347
+    commentary/jfb             44452
+    commentary/spurgeon        11392
+    confession/belgic          37
+    confession/dort            94
+    confession/heidelberg      129
+    confession/lbcf            160
+    confession/wcf             172
+    confession/wlc             196
+    confession/wsc             107
+    lexicon/bdb                7329
+    lexicon/strongs-greek      5523
+    lexicon/strongs-hebrew     8674
+    lexicon/tbesg              11035
+    scripture/asv              3275
+    scripture/bsb              3275
+    scripture/kjv              3275
+    scripture/web              3276
+
+SKIPPED CHUNKS (flagged, NOT dropped from their source DB)
+----------------------------------------------------------------
+  lexicon: 4516
+    bdb:a.aa.ab (no English definition; lemma-only stub)
+    bdb:a.ab.ad (no English definition; lemma-only stub)
+    bdb:a.ac.ad (no English definition; lemma-only stub)
+    bdb:a.ae.bd (no English definition; lemma-only stub)
+    bdb:a.ag.ac (no English definition; lemma-only stub)
+    bdb:a.ag.ad (no English definition; lemma-only stub)
+    bdb:a.ag.ae (no English definition; lemma-only stub)
+    bdb:a.ag.af (no English definition; lemma-only stub)
+    bdb:a.ag.ag (no English definition; lemma-only stub)
+    bdb:a.ag.ah (no English definition; lemma-only stub)
+    bdb:a.ag.ai (no English definition; lemma-only stub)
+    bdb:a.ag.aj (no English definition; lemma-only stub)
+    bdb:a.ag.ak (no English definition; lemma-only stub)
+    bdb:a.ai.ac (no English definition; lemma-only stub)
+    bdb:a.al.ac (no English definition; lemma-only stub)
+    bdb:a.am.ac (no English definition; lemma-only stub)
+    bdb:a.am.ad (no English definition; lemma-only stub)
+    bdb:a.am.ae (no English definition; lemma-only stub)
+    bdb:a.an.ad (no English definition; lemma-only stub)
+    bdb:a.ao.aa (no English definition; lemma-only stub)
+    ... (+4496 more)
+
+  hard-truncated at char cap: 485
+    calvin:GEN.1.1#p8#70
+    calvin:GEN.1.6#p1#105
+    calvin:GEN.2.4#p1#244
+    calvin:GEN.4.23#p1#629
+    calvin:GEN.10.1#p1#1122
+    calvin:GEN.14.18#p6#1460
+    calvin:GEN.17.7#p1#1699
+    calvin:GEN.25.1#p1#2526
+    calvin:GEN.25.23#p3#2554
+    calvin:GEN.45.8#p1#4455
+    calvin:GEN.49.1#p1#4778
+    calvin:GEN.49.10#p9#4816
+    calvin:PSA.11.6#p5#5441
+    calvin:PSA.39.10#p3#6848
+    calvin:PSA.49.14#p1#7240
+    calvin:PSA.51.4#p5#7342
+    calvin:PSA.52.8#p3#7403
+    calvin:PSA.60.8#p1#7638
+    calvin:PSA.68.4#p1#7868
+    calvin:PSA.68.13#p1#7892
+    ... (+465 more)
+
+BM25 KEYWORD INDEX
+----------------------------------------------------------------
+  tokenizer:     NFKC + casefold + [a-z0-9']+ ; no stemming
+  vocabulary:    145558 terms
+  postings:      10834008
+  avg doc len:   112.48 tokens
+
+RETRIEVAL SMOKE TEST (dense top-k; eyeball only)
+----------------------------------------------------------------
+  [PASS] "justification by faith"
+          expect: Romans 3-5 / Galatians (and Reformed confessions on justification)
+    1. (0.835) commentary/jfb jfb:ROM.4.16#p1#33718 — 16, 17. Therefore, &c.—A general summary: "Thus justification is by fa
+    2. (0.829) commentary/jfb jfb:GAL.2.16#p4#36870 — justified by the faith of Christ —that is, by Christ, the object of fa
+    3. (0.826) commentary/henry henry:ROM.3.19-31#p2#27888 — From all this Paul infers that it is in vain to look for justification
+    4. (0.826) confession/wlc WLC 72 — Q72. What is justifying faith? A72. Justifying faith is a saving grace
+    5. (0.825) confession/wcf WCF 11.2 — Of Justification Faith, thus receiving and resting on Christ and His r
+
+  [PASS] "the LORD is my shepherd"
+          expect: Psalm 23
+    1. (0.816) scripture/bsb bsb:PSA 23:1-6 — The LORD is my shepherd; I shall not want. He makes me lie down in gre
+    2. (0.805) commentary/spurgeon spurgeon:PSA.23.0#expo1#1463 — EXPOSITION. THE Lord is my shepherd ; I shall not want, 2 He maketh me
+    3. (0.804) commentary/spurgeon spurgeon:PSA.23.1#expo1#1472 — 1. " The Lord is my shepherd,** What condescension is this, that the I
+    4. (0.803) commentary/spurgeon spurgeon:PSA.23.1#work3#1480 — Verse 1. — " The Lord is my shepherd.^* Now the reasons of this resemb
+    5. (0.802) scripture/kjv kjv:PSA 23:1-6 — The LORD is my shepherd; I shall not want. He maketh me to lie down in
+
+  [PASS] "in the beginning God created the heavens and the earth"
+          expect: Genesis 1
+    1. (0.919) commentary/calvin calvin:GEN.1.0#p2#1 — 1. In the beginning God created the heaven and the earth.
+    2. (0.916) commentary/calvin calvin:JHN.1.1#p6#17118 — in the beginning God created the heaven and the earth, ( Genesis 1:1 )
+    3. (0.867) scripture/web web:GEN 1:1-10 — In the beginning, God created the heavens and the earth. The earth was
+    4. (0.864) scripture/asv asv:GEN 1:1-10 — In the beginning God created the heavens and the earth. And the earth 
+    5. (0.860) scripture/bsb bsb:GEN 1:1-10 — In the beginning God created the heavens and the earth. Now the earth 
+
+DETERMINISM
+----------------------------------------------------------------
+  method:   cosine-tolerance
+  identical: False
+  max abs diff: 1.490e-07
+  min cosine:   0.99999988
+  note: 400-chunk CPU re-encode differed in bytes; FLAGGED for architect (CLAUDE.md rule 6)
+  encode wall-time: 14646.5s (CPU, deterministic)
+
+FLAGGED FOR HUMAN REVIEW
+----------------------------------------------------------------
+  1. 4516 lexicon entries skipped from embedding — BDB lemma-only stubs with no English definition (a bare Hebrew lemma is noise to an English encoder). They remain in lexicons.sqlite; confirm none of these should instead be merged into a linked Strong's entry.
+  2. 485 chunks exceeded the character cap and were truncated before encoding (the encoder also truncates at 512 tokens). Confirm no long commentary block lost material it needed for retrieval.
+  3. Embeddings were NOT bit-for-bit reproducible across two CPU runs (min cosine 0.99999988, max abs diff 1.490e-07). Recorded as within-tolerance and flagged for the architect per CLAUDE.md rule 6 — do not accept silently.
+
