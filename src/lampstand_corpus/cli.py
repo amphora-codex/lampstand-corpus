@@ -39,15 +39,20 @@ Usage (P5 cross-references):
     python -m lampstand_corpus.cli validate-crossrefs  # write report (no DB)
 
 Usage (P6 embeddings + BM25):
-    python -m lampstand_corpus.cli snapshot-model      # download BGE-small (pinned)
-    python -m lampstand_corpus.cli build-embeddings    # build embeddings.sqlite + report
-    python -m lampstand_corpus.cli validate-embeddings # rebuild report from chunks only
+    python -m lampstand_corpus.cli snapshot-model       # download BGE-small (pinned)
+    python -m lampstand_corpus.cli build-embeddings     # INCREMENTAL build + report
+    python -m lampstand_corpus.cli build-embeddings full # force full re-encode
+    python -m lampstand_corpus.cli validate-embeddings  # rebuild report from chunks only
 
 ``build-embeddings`` chunks the *built* per-resource DBs, encodes them with
 BGE-small on CPU (deterministic), writes embeddings.sqlite (gitignored), and emits
-the P6 validation report (chunk counts, BM25 stats, retrieval smoke test, and the
-bit-for-bit determinism outcome). Requires the ``[embeddings]`` extra
-(sentence-transformers + torch) and a one-time ``snapshot-model``.
+the P6 validation report (chunk counts, BM25 stats, retrieval smoke test, the
+incremental reuse accounting, and the determinism outcome). By default it is
+INCREMENTAL — vectors whose content-addressed chunk id is unchanged are reused from
+the existing embeddings.sqlite and only changed/new chunks are re-encoded (the
+BM25 index is rebuilt over the full new chunk set). ``build-embeddings full`` forces
+a from-scratch re-encode. Requires the ``[embeddings]`` extra (sentence-transformers
++ torch) and a one-time ``snapshot-model``.
 
 Reads committed snapshots from sources/, writes output/*.sqlite (gitignored) and
 reports/*.txt.
@@ -774,13 +779,26 @@ def cmd_snapshot_model() -> None:
     print(f"  files hashed:    {len(prov['files'])}")
 
 
-def cmd_build_embeddings() -> None:
+def cmd_build_embeddings(*, full: bool = False) -> None:
+    """Build embeddings.sqlite, reusing unchanged vectors from a prior build.
+
+    By default this is INCREMENTAL: chunks whose content-addressed id already has a
+    vector in ``output/embeddings.sqlite`` (built under the same model revision) are
+    reused verbatim, and only changed/new chunks are encoded. Pass ``full=True`` to
+    force a from-scratch re-encode of every chunk. The BM25 index is rebuilt over
+    the full new chunk set either way (it's cheap and order-stable).
+    """
     import time
 
     import numpy as np
 
     from .embeddings import extract_all
-    from .encode import MODEL_CACHE, encode_chunks, model_provenance
+    from .encode import (
+        MODEL_CACHE,
+        encode_chunks,
+        encode_chunks_incremental,
+        model_provenance,
+    )
 
     os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
 
@@ -793,25 +811,37 @@ def cmd_build_embeddings() -> None:
             print(f"  skipped {rt}: {len(items)} (flagged, not dropped)")
 
     prov = model_provenance()
-    print(f"Encoding with {prov['name']} @ {prov['revision'][:12]} on CPU "
-          f"(deterministic)...")
+    out = OUTPUT_DIR / "embeddings.sqlite"
+    inc = None
     t0 = time.perf_counter()
-    vectors = encode_chunks(ec.chunks, device="cpu")
+    if full or not out.exists():
+        mode = "full re-encode" if full else "full encode (no prior DB)"
+        print(f"Encoding with {prov['name']} @ {prov['revision'][:12]} on CPU "
+              f"(deterministic, {mode})...")
+        vectors = encode_chunks(ec.chunks, device="cpu")
+    else:
+        print(f"Incremental encode with {prov['name']} @ {prov['revision'][:12]} "
+              f"on CPU (reusing unchanged vectors from {out.name})...")
+        inc = encode_chunks_incremental(ec.chunks, out, device="cpu")
+        vectors = inc.vectors
+        for note in inc.notes:
+            print(f"  note: {note}")
+        print(f"  reused={inc.n_reused} encoded={inc.n_encoded} "
+              f"dropped={inc.n_dropped} of {inc.n_total} total")
     wall = time.perf_counter() - t0
-    print(f"  encoded {vectors.shape[0]} vectors dim={vectors.shape[1]} "
-          f"in {wall:.1f}s")
+    print(f"  {vectors.shape[0]} vectors dim={vectors.shape[1]} ready in {wall:.1f}s")
 
-    # Determinism: encode a deterministic sample twice on CPU; require bit-for-bit.
+    # Determinism (Option A): re-encode a deterministic sample on CPU and accept
+    # within cosine-tolerance, locked by model revision + input checksums.
     det = _check_determinism(ec.chunks, vectors)
 
-    out = OUTPUT_DIR / "embeddings.sqlite"
     print(f"Building {out} ...")
     from .build_embeddings import write_embeddings
     stats = write_embeddings(
         ec.chunks, vectors, out, model_provenance=prov, skipped=ec.skipped)
     print(f"  wrote {out} ({out.stat().st_size:,} bytes)")
 
-    _emit_embedding_report(ec, prov, stats, det, wall, np)
+    _emit_embedding_report(ec, prov, stats, det, wall, np, incremental=inc)
 
 
 def _check_determinism(chunks, vectors):
@@ -912,8 +942,12 @@ def _run_smoke(out_path, np):
     return results
 
 
-def _emit_embedding_report(ec, prov, stats, det, wall, np):
-    from .validate_embeddings import render_embedding_report, summarize_extract
+def _emit_embedding_report(ec, prov, stats, det, wall, np, *, incremental=None):
+    from .validate_embeddings import (
+        IncrementalStats,
+        render_embedding_report,
+        summarize_extract,
+    )
 
     rep = summarize_extract(ec)
     rep.model_name = prov["name"]
@@ -924,6 +958,16 @@ def _emit_embedding_report(ec, prov, stats, det, wall, np):
     rep.avgdl = float(stats["avgdl"])
     rep.determinism = det
     rep.wall_seconds = wall
+    if incremental is not None:
+        rep.incremental = IncrementalStats(
+            n_total=incremental.n_total,
+            n_reused=incremental.n_reused,
+            n_encoded=incremental.n_encoded,
+            n_dropped=incremental.n_dropped,
+            prior_model_revision=incremental.prior_model_revision,
+            full_reencode=incremental.full_reencode,
+            notes=list(incremental.notes),
+        )
 
     out = OUTPUT_DIR / "embeddings.sqlite"
     print("Running retrieval smoke test...")
@@ -987,7 +1031,9 @@ def main(argv: list[str] | None = None) -> int:
     elif cmd == "snapshot-model":
         cmd_snapshot_model()
     elif cmd == "build-embeddings":
-        cmd_build_embeddings()
+        # `build-embeddings full` forces a from-scratch re-encode; default is the
+        # incremental path (reuse unchanged vectors from the prior DB).
+        cmd_build_embeddings(full=("full" in argv[1:]))
     elif cmd == "validate-embeddings":
         cmd_validate_embeddings()
     else:

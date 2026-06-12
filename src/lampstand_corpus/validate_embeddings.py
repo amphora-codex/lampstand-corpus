@@ -52,6 +52,19 @@ class DeterminismResult:
 
 
 @dataclass
+class IncrementalStats:
+    """Incremental re-encode accounting (corpus-update path)."""
+
+    n_total: int = 0
+    n_reused: int = 0       # vectors copied verbatim from the prior DB
+    n_encoded: int = 0      # changed/new chunks re-encoded this run
+    n_dropped: int = 0      # prior chunk ids absent from the new set (vectors gone)
+    prior_model_revision: str = ""
+    full_reencode: bool = False
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass
 class EmbeddingReport:
     embedding_dim: int = EMBED_DIM
     n_chunks: int = 0
@@ -71,6 +84,7 @@ class EmbeddingReport:
 
     smoke: list[SmokeQuery] = field(default_factory=list)
     determinism: DeterminismResult | None = None
+    incremental: IncrementalStats | None = None
     wall_seconds: float = 0.0
 
     @property
@@ -183,6 +197,31 @@ def render_embedding_report(rep: EmbeddingReport) -> str:
             )
         lines.append("")
 
+    lines.append("INCREMENTAL RE-ENCODE")
+    lines.append("-" * 64)
+    if rep.incremental is None:
+        lines.append("  (full encode — no prior-vector reuse recorded this run)")
+    else:
+        inc = rep.incremental
+        if inc.full_reencode:
+            lines.append("  mode: FULL re-encode (reuse unavailable)")
+        else:
+            lines.append("  mode: incremental (reused unchanged vectors)")
+        lines.append(f"  total chunks:  {inc.n_total}")
+        lines.append(f"  reused:        {inc.n_reused}  "
+                     f"(vectors copied verbatim from prior DB)")
+        lines.append(f"  re-encoded:    {inc.n_encoded}  (changed / new chunks)")
+        lines.append(f"  dropped:       {inc.n_dropped}  "
+                     f"(prior chunk ids no longer present)")
+        if inc.prior_model_revision:
+            lines.append(f"  prior model revision: {inc.prior_model_revision}")
+        lines.append("  reuse key: content-addressed chunk id "
+                     "(resource_type+source+anchor+text_checksum); an id match "
+                     "guarantees byte-identical text under the pinned model.")
+        for note in inc.notes:
+            lines.append(f"  note: {note}")
+    lines.append("")
+
     lines.append("DETERMINISM")
     lines.append("-" * 64)
     if rep.determinism is None:
@@ -202,15 +241,32 @@ def render_embedding_report(rep: EmbeddingReport) -> str:
     lines.append("FLAGGED FOR HUMAN REVIEW")
     lines.append("-" * 64)
     n = 1
-    bdb = rep.skipped.get("lexicon", [])
-    if bdb:
-        lines.append(
-            f"  {n}. {len(bdb)} lexicon entries skipped from embedding — BDB "
-            f"lemma-only stubs with no English definition (a bare Hebrew lemma is "
-            f"noise to an English encoder). They remain in lexicons.sqlite; confirm "
-            f"none of these should instead be merged into a linked Strong's entry."
-        )
-        n += 1
+    lex_skips = rep.skipped.get("lexicon", [])
+    if lex_skips:
+        # Split the two distinct reasons so the flag is honest: BDB lemma-only
+        # stubs vs. Strong's "Not Used" placeholders (the CC0 Greek edition ships
+        # explicit placeholders for skipped Strong's numbers; they carry no English
+        # to embed, correctly skipped).
+        bdb = [s for s in lex_skips if s.startswith("bdb:")]
+        strongs_nu = [s for s in lex_skips if s.startswith(("strongs-greek:",
+                                                            "strongs-hebrew:"))]
+        if bdb:
+            lines.append(
+                f"  {n}. {len(bdb)} BDB lexicon entries skipped from embedding — "
+                f"lemma-only stubs with no English definition (a bare Hebrew lemma "
+                f"is noise to an English encoder). They remain in lexicons.sqlite; "
+                f"confirm none should instead be merged into a linked Strong's entry."
+            )
+            n += 1
+        if strongs_nu:
+            lines.append(
+                f"  {n}. {len(strongs_nu)} Strong's entries skipped from embedding — "
+                f"'Not Used' placeholder numbers (Strong assigned but never "
+                f"populated; the new CC0 Greek edition ships them explicitly where "
+                f"the prior CC-BY-SA edition omitted them). No English text to embed; "
+                f"kept in lexicons.sqlite so the coverage span is explicit."
+            )
+            n += 1
     scr = rep.skipped.get("scripture", [])
     if scr:
         lines.append(

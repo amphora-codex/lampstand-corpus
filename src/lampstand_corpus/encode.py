@@ -10,12 +10,29 @@ trial runs but the validation report must reflect the CPU build. We verify
 bit-for-bit reproducibility by encoding twice; if that ever fails we fall back to
 asserting cosine-identity within tolerance and FLAG the deviation rather than
 silently accepting it.
+
+Incremental re-encode (P6, corpus-update path)
+----------------------------------------------
+A full corpus re-encode is ~4h on CPU, but most corpus updates touch a small
+fraction of chunks (the Strong's CC0/PD swap, for instance, re-texts only the
+~14k Strong's lexicon chunks). :func:`encode_chunks_incremental` reuses existing
+vectors out of a prior ``embeddings.sqlite`` wherever a chunk is *unchanged*, and
+re-encodes only the changed/new chunks. Unchanged is decided by the chunk **id**,
+which is content-addressed over ``(resource_type, source, anchor, text_checksum)``
+— so a reused vector is provably the embedding of byte-identical text under the
+same model revision (Determinism policy: architect-decided Option A —
+cosine-tolerance acceptance, locked by model revision + input checksums + artifact
+SHA). Removed chunks are simply absent from the new chunk list, so their vectors
+never carry forward. Reuse is gated on the model revision recorded in the prior
+DB matching the pinned :data:`MODEL_REVISION`; a mismatch forces a full re-encode.
 """
 
 from __future__ import annotations
 
 import hashlib
 import os
+import sqlite3
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -132,3 +149,107 @@ def encode_chunks(
     if not texts:
         return np.empty((0, EMBED_DIM), dtype=np.float32)
     return encode_texts(model, texts, batch_size=batch_size)
+
+
+# --- Incremental re-encode ---------------------------------------------------
+@dataclass
+class IncrementalResult:
+    """Outcome of an incremental encode: vectors (aligned to ``chunks``) + stats."""
+
+    vectors: np.ndarray
+    n_total: int = 0
+    n_reused: int = 0
+    n_encoded: int = 0
+    n_dropped: int = 0          # chunk ids in the prior DB not in the new set
+    prior_model_revision: str = ""
+    full_reencode: bool = False  # True if reuse was impossible (no prior / mismatch)
+    notes: list[str] = field(default_factory=list)
+
+
+def _load_prior_vectors(db: Path) -> tuple[dict[str, bytes], str]:
+    """Read ``{chunk_id: vector_blob}`` + the model revision from a prior DB.
+
+    Returns ``({}, "")`` when the DB is absent or unreadable. The blobs are kept as
+    raw little-endian float32 bytes so a reused vector is byte-identical to what was
+    written before (no decode/re-encode round-trip that could perturb the artifact).
+    """
+    if not db.exists():
+        return {}, ""
+    conn = sqlite3.connect(db)
+    try:
+        try:
+            meta = dict(conn.execute("SELECT key, value FROM meta").fetchall())
+        except sqlite3.Error:
+            meta = {}
+        revision = meta.get("model_revision", "")
+        vectors: dict[str, bytes] = {}
+        for cid, dim, blob in conn.execute(
+                "SELECT chunk_id, dim, vector FROM embedding"):
+            if dim == EMBED_DIM and isinstance(blob, (bytes, bytearray)):
+                vectors[cid] = bytes(blob)
+        return vectors, revision
+    except sqlite3.Error:
+        return {}, ""
+    finally:
+        conn.close()
+
+
+def encode_chunks_incremental(
+    chunks: list[Chunk],
+    prior_db: Path,
+    *,
+    device: str = "cpu",
+    batch_size: int = BATCH_SIZE,
+) -> IncrementalResult:
+    """Encode ``chunks`` reusing unchanged vectors from ``prior_db``.
+
+    A chunk is *unchanged* iff its content-addressed ``id`` is present in the prior
+    embeddings DB (the id folds in the text checksum, so an id match guarantees the
+    text is byte-identical). Such vectors are copied verbatim; only the changed/new
+    chunks are sent to the encoder. Returns vectors aligned to ``chunks`` (row i is
+    chunks[i]'s vector) plus reuse/encode/drop counts for the report.
+
+    Reuse is disabled (full re-encode) when the prior DB is missing or its recorded
+    model revision differs from the pinned :data:`MODEL_REVISION` — a different
+    model means the old vectors live in a different space and must not be mixed in.
+    """
+    n = len(chunks)
+    out = np.empty((n, EMBED_DIM), dtype=np.float32)
+    res = IncrementalResult(vectors=out, n_total=n)
+
+    prior, prior_rev = _load_prior_vectors(prior_db)
+    res.prior_model_revision = prior_rev
+
+    reuse_ok = bool(prior) and prior_rev == MODEL_REVISION
+    if prior and not reuse_ok:
+        res.full_reencode = True
+        res.notes.append(
+            f"prior embeddings model revision {prior_rev!r} != pinned "
+            f"{MODEL_REVISION!r}; reuse disabled, full re-encode"
+        )
+    elif not prior:
+        res.full_reencode = True
+        res.notes.append("no prior embeddings.sqlite to reuse; full encode")
+
+    new_ids = {c.id for c in chunks}
+    if reuse_ok:
+        res.n_dropped = sum(1 for cid in prior if cid not in new_ids)
+
+    # Partition: reuse where the id is in the prior DB; encode the rest.
+    to_encode_idx: list[int] = []
+    for i, c in enumerate(chunks):
+        blob = prior.get(c.id) if reuse_ok else None
+        if blob is not None:
+            out[i] = np.frombuffer(blob, dtype="<f4")
+            res.n_reused += 1
+        else:
+            to_encode_idx.append(i)
+
+    res.n_encoded = len(to_encode_idx)
+    if to_encode_idx:
+        model = load_model(device=device)
+        texts = [chunks[i].text for i in to_encode_idx]
+        encoded = encode_texts(model, texts, batch_size=batch_size)
+        for row, i in enumerate(to_encode_idx):
+            out[i] = encoded[row]
+    return res

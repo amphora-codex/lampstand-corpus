@@ -15,7 +15,7 @@ EMBEDDING MODEL (provenance)
 ERROR / FLAG SUMMARY
 ----------------------------------------------------------------
   total errors: 1
-  total flags:  4517
+  total flags:  4618
 
 CHUNKS EMBEDDED
 ----------------------------------------------------------------
@@ -48,7 +48,7 @@ CHUNKS EMBEDDED
 
 SKIPPED CHUNKS (flagged, NOT dropped from their source DB)
 ----------------------------------------------------------------
-  lexicon: 4516
+  lexicon: 4617
     bdb:a.aa.ab (no English definition; lemma-only stub)
     bdb:a.ab.ad (no English definition; lemma-only stub)
     bdb:a.ac.ad (no English definition; lemma-only stub)
@@ -69,7 +69,7 @@ SKIPPED CHUNKS (flagged, NOT dropped from their source DB)
     bdb:a.am.ae (no English definition; lemma-only stub)
     bdb:a.an.ad (no English definition; lemma-only stub)
     bdb:a.ao.aa (no English definition; lemma-only stub)
-    ... (+4496 more)
+    ... (+4597 more)
 
   hard-truncated at char cap: 485
     calvin:GEN.1.1#p8#70
@@ -97,9 +97,9 @@ SKIPPED CHUNKS (flagged, NOT dropped from their source DB)
 BM25 KEYWORD INDEX
 ----------------------------------------------------------------
   tokenizer:     NFKC + casefold + [a-z0-9']+ ; no stemming
-  vocabulary:    145558 terms
-  postings:      10834008
-  avg doc len:   112.48 tokens
+  vocabulary:    145281 terms
+  postings:      10831300
+  avg doc len:   112.46 tokens
 
 RETRIEVAL SMOKE TEST (dense top-k; eyeball only)
 ----------------------------------------------------------------
@@ -127,18 +127,29 @@ RETRIEVAL SMOKE TEST (dense top-k; eyeball only)
     4. (0.864) scripture/asv asv:GEN 1:1-10 — In the beginning God created the heavens and the earth. And the earth 
     5. (0.860) scripture/bsb bsb:GEN 1:1-10 — In the beginning God created the heavens and the earth. Now the earth 
 
+INCREMENTAL RE-ENCODE
+----------------------------------------------------------------
+  mode: incremental (reused unchanged vectors)
+  total chunks:  175442
+  reused:        162917  (vectors copied verbatim from prior DB)
+  re-encoded:    12525  (changed / new chunks)
+  dropped:       12525  (prior chunk ids no longer present)
+  prior model revision: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+  reuse key: content-addressed chunk id (resource_type+source+anchor+text_checksum); an id match guarantees byte-identical text under the pinned model.
+
 DETERMINISM
 ----------------------------------------------------------------
   method:   cosine-tolerance
   identical: False
   max abs diff: 1.490e-07
-  min cosine:   0.99999988
+  min cosine:   1.00000000
   note: 400-chunk CPU re-encode differed in bytes; FLAGGED for architect (CLAUDE.md rule 6)
-  encode wall-time: 14646.5s (CPU, deterministic)
+  encode wall-time: 101.9s (CPU, deterministic)
 
 FLAGGED FOR HUMAN REVIEW
 ----------------------------------------------------------------
-  1. 4516 lexicon entries skipped from embedding — BDB lemma-only stubs with no English definition (a bare Hebrew lemma is noise to an English encoder). They remain in lexicons.sqlite; confirm none of these should instead be merged into a linked Strong's entry.
-  2. 485 chunks exceeded the character cap and were truncated before encoding (the encoder also truncates at 512 tokens). Confirm no long commentary block lost material it needed for retrieval.
-  3. Embeddings were NOT bit-for-bit reproducible across two CPU runs (min cosine 0.99999988, max abs diff 1.490e-07). Recorded as within-tolerance and flagged for the architect per CLAUDE.md rule 6 — do not accept silently.
+  1. 4516 BDB lexicon entries skipped from embedding — lemma-only stubs with no English definition (a bare Hebrew lemma is noise to an English encoder). They remain in lexicons.sqlite; confirm none should instead be merged into a linked Strong's entry.
+  2. 101 Strong's entries skipped from embedding — 'Not Used' placeholder numbers (Strong assigned but never populated; the new CC0 Greek edition ships them explicitly where the prior CC-BY-SA edition omitted them). No English text to embed; kept in lexicons.sqlite so the coverage span is explicit.
+  3. 485 chunks exceeded the character cap and were truncated before encoding (the encoder also truncates at 512 tokens). Confirm no long commentary block lost material it needed for retrieval.
+  4. Embeddings were NOT bit-for-bit reproducible across two CPU runs (min cosine 1.00000000, max abs diff 1.490e-07). Recorded as within-tolerance and flagged for the architect per CLAUDE.md rule 6 — do not accept silently.
 
