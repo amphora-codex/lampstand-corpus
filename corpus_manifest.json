@@ -1,0 +1,392 @@
+{
+  "corpus_version": "corpus-v1.0.0-candidate",
+  "ship_ready": false,
+  "note": "CANDIDATE. The pipeline never marks a corpus version ship-ready — the architect's 23-point spot-check gates ship. Pack .sqlite files are gitignored (output/packs/); only this manifest is committed.",
+  "embedding_dim": 384,
+  "packs": {
+    "bundled": {
+      "description": "Ships in the app binary. BSB Bible + Westminster Shorter Catechism + a BSB/WSC-scoped dense+BM25 search index.",
+      "delivery": "app-binary",
+      "license_class": "public-domain / CC0 only",
+      "total_bytes": 66797568,
+      "files": [
+        {
+          "name": "bundled_bibles.sqlite",
+          "role": "bibles",
+          "bytes": 6483968,
+          "sha256": "d82ee8691bf0c99a605f7b0bb42c7242ba446623dc150e45d0373f8f648165a6",
+          "contents": {
+            "translations": [
+              "bsb"
+            ],
+            "n_translations": 1,
+            "n_verses": 31102
+          }
+        },
+        {
+          "name": "bundled_confessions.sqlite",
+          "role": "confessions",
+          "bytes": 61440,
+          "sha256": "5b9669d8e46c322cdd248b7b41991246562e67e0fc1e443975e81650421fda33",
+          "contents": {
+            "documents": [
+              "wsc"
+            ],
+            "n_documents": 1,
+            "n_sections": 107
+          }
+        },
+        {
+          "name": "bundled_search.sqlite",
+          "role": "search",
+          "bytes": 60252160,
+          "sha256": "db0687218cece67097ce4a5c2179698d108ada3e80f32e3c55da680da37247c7",
+          "contents": {
+            "n_chunks": 3382,
+            "n_scripture": 3275,
+            "n_confession": 107,
+            "vocab_size": 14507,
+            "n_postings": 365626,
+            "avgdl": 216.95239503252515
+          }
+        }
+      ]
+    },
+    "on_demand": {
+      "description": "Free, downloaded on first launch. KJV/ASV/WEB, all commentaries, the remaining confessions, lexicons + tagged text, cross-references, and the full embeddings index.",
+      "delivery": "first-launch-download",
+      "total_bytes": 2238230528,
+      "files": [
+        {
+          "name": "ondemand_bibles.sqlite",
+          "role": "bibles",
+          "bytes": 20291584,
+          "sha256": "8c5a06983d6c787034405a52b57c7899e99db904b0c5de3d48ace906f9717779",
+          "contents": {
+            "translations": [
+              "asv",
+              "kjv",
+              "web"
+            ],
+            "n_translations": 3,
+            "n_verses": 93307
+          }
+        },
+        {
+          "name": "ondemand_commentaries.sqlite",
+          "role": "commentaries",
+          "bytes": 132046848,
+          "sha256": "03c0f27486919ecb9f86825f3a9eb902d5773a7f2aa9d01867bbf8e9b0a3adf7",
+          "contents": {
+            "copied_from": "commentaries.sqlite"
+          }
+        },
+        {
+          "name": "ondemand_confessions.sqlite",
+          "role": "confessions",
+          "bytes": 1163264,
+          "sha256": "5a434b9ef877e91842fa8ee80aaec46d056e0f4f2b68a72ccce6bd9d531535bc",
+          "contents": {
+            "documents": [
+              "belgic",
+              "dort",
+              "heidelberg",
+              "lbcf",
+              "wcf",
+              "wlc"
+            ],
+            "n_documents": 6,
+            "n_sections": 788
+          }
+        },
+        {
+          "name": "ondemand_crossrefs.sqlite",
+          "role": "crossrefs",
+          "bytes": 25362432,
+          "sha256": "ba499adefce419bf5b2ec07659588fdc9111cebc4d249d03a834263068fc671f",
+          "contents": {
+            "copied_from": "crossrefs.sqlite"
+          }
+        },
+        {
+          "name": "ondemand_embeddings.sqlite",
+          "role": "search",
+          "bytes": 1990508544,
+          "sha256": "2bf33e1d68dd93b2a4d87459bb0a2e32be9d21b73ce97d4986612c0dd35cb6b8",
+          "contents": {
+            "copied_from": "embeddings.sqlite"
+          }
+        },
+        {
+          "name": "ondemand_lexicons.sqlite",
+          "role": "lexicons",
+          "bytes": 68857856,
+          "sha256": "213203a8b527643d87dcb4d179f6f34fb6736da350c2afd608d01c7b25de5a90",
+          "contents": {
+            "copied_from": "lexicons.sqlite"
+          }
+        }
+      ]
+    }
+  },
+  "totals": {
+    "bundled_bytes": 66797568,
+    "ondemand_bytes": 2238230528,
+    "all_bytes": 2305028096
+  },
+  "acknowledgements": [
+    {
+      "id": "asv",
+      "name": "American Standard Version",
+      "resource_type": "scripture",
+      "version": "eng-asv 1901 (eBible.org USFM)",
+      "license": "Public domain",
+      "attribution": null,
+      "source_url": "https://ebible.org/Scriptures/eng-asv_usfm.zip",
+      "retrieved": "2026-06-10",
+      "source_checksum": "f88c96287942c74b08015319348402fd91c74cd67eb50acd44db6fcb9eead408"
+    },
+    {
+      "id": "bsb",
+      "name": "Berean Standard Bible",
+      "resource_type": "scripture",
+      "version": "bereanbible.com USFM (snapshot 2026-06-10)",
+      "license": "CC0 / public domain (bereanbible.com)",
+      "attribution": null,
+      "source_url": "https://bereanbible.com/bsb_usfm.zip",
+      "retrieved": "2026-06-10",
+      "source_checksum": "8c4a8068afb1e9c1528c34a89ba73dca9e3d529f4317428553c3695bd373d98a"
+    },
+    {
+      "id": "kjv",
+      "name": "King James Version",
+      "resource_type": "scripture",
+      "version": "eng-kjv2006 (eBible.org USFM)",
+      "license": "Public domain (KJV; UK Crown patent printing restriction only)",
+      "attribution": null,
+      "source_url": "https://ebible.org/Scriptures/eng-kjv2006_usfm.zip",
+      "retrieved": "2026-06-10",
+      "source_checksum": "af9d24284b2a222c9f5a3b140da21397c23b8ae0c20a00617ab34ef556bcd0a1"
+    },
+    {
+      "id": "web",
+      "name": "World English Bible",
+      "resource_type": "scripture",
+      "version": "eng-web 2020 stable (eBible.org USFM)",
+      "license": "Public domain",
+      "attribution": null,
+      "source_url": "https://ebible.org/Scriptures/eng-web_usfm.zip",
+      "retrieved": "2026-06-10",
+      "source_checksum": "dea78f5453c44e296e1cbc30c36278b30a10bd25f5c90e13d1f870fe421b464a"
+    },
+    {
+      "id": "belgic",
+      "name": "Belgic Confession",
+      "resource_type": "confession",
+      "version": "1840 RPDC English translation (Wikisource parse snapshot); 37 articles I-XXXVII",
+      "license": "Public domain (PD-old; 1840 translation)",
+      "attribution": null,
+      "source_url": "https://en.wikisource.org/w/api.php?action=parse&page=The_Constitution_of_the_Reformed_Dutch_Church_of_North_America/The_Confession_of_Faith&prop=text&formatversion=2&format=json",
+      "retrieved": "2026-06-10",
+      "source_checksum": "12830851fff95f6b0cbb4a71a4879a0e7b8cd10041971d4151187b8ef173621c"
+    },
+    {
+      "id": "dort",
+      "name": "Canons of Dort",
+      "resource_type": "confession",
+      "version": "CCEL ThML (English; Synod of Dordrecht 1618-1619)",
+      "license": "Public domain (CCEL)",
+      "attribution": null,
+      "source_url": "https://ccel.org/ccel/anonymous/canonsofdort.xml",
+      "retrieved": "2026-06-10",
+      "source_checksum": "a96a94d0a33cdfa3094c89312548e227845ab76c09c0cb20eb8594e2416b9c65"
+    },
+    {
+      "id": "heidelberg",
+      "name": "Heidelberg Catechism",
+      "resource_type": "confession",
+      "version": "CCEL ThML",
+      "license": "Public domain (CCEL)",
+      "attribution": null,
+      "source_url": "https://ccel.org/ccel/anonymous/heidelberg.xml",
+      "retrieved": "2026-06-10",
+      "source_checksum": "933c933049a1d75dbbe043350b9102569940e8b3eb6d7dc18bfdff1f9cf4660e"
+    },
+    {
+      "id": "lbcf",
+      "name": "Second London Baptist Confession of Faith (1689)",
+      "resource_type": "confession",
+      "version": "1677/89 text (ParticularBaptists/lbcf-1689 lbcf.json); 32 chapters",
+      "license": "Public domain (1677/89 text)",
+      "attribution": null,
+      "source_url": "https://raw.githubusercontent.com/ParticularBaptists/lbcf-1689/master/lbcf.json",
+      "retrieved": "2026-06-10",
+      "source_checksum": "7898f1dff259ee22d5e29cbcd19dd8374d26e6d138ea73db79c9a337ad071cef"
+    },
+    {
+      "id": "wcf",
+      "name": "Westminster Confession of Faith",
+      "resource_type": "confession",
+      "version": "Original 1646/47 text (andrewhwaller/westminster-json wcf.json); 33 chapters incl. original ch. 23 & 24; 1788 loci marked",
+      "license": "Public domain (original 1646/47 text)",
+      "attribution": null,
+      "source_url": "https://raw.githubusercontent.com/andrewhwaller/westminster-json/main/wcf.json",
+      "retrieved": "2026-06-10",
+      "source_checksum": "58d43de749e83198a714fe745b87981e675c4b83e78e4d530e4298748ed29344"
+    },
+    {
+      "id": "wlc",
+      "name": "Westminster Larger Catechism",
+      "resource_type": "confession",
+      "version": "CCEL ThML",
+      "license": "Public domain (CCEL)",
+      "attribution": null,
+      "source_url": "https://ccel.org/ccel/anonymous/westminster2.xml",
+      "retrieved": "2026-06-10",
+      "source_checksum": "1b23146c4302b8f94c527723377c2b6c8e0989cd0259bdf2aa81c3270c0140f2"
+    },
+    {
+      "id": "wsc",
+      "name": "Westminster Shorter Catechism",
+      "resource_type": "confession",
+      "version": "CCEL ThML (1674)",
+      "license": "Public domain (CCEL)",
+      "attribution": null,
+      "source_url": "https://ccel.org/ccel/anonymous/westminster1.xml",
+      "retrieved": "2026-06-10",
+      "source_checksum": "27bab86445b4a7b5f1199d5b1af9f8ad3720a026f77d51653d6f4237efb6ae12"
+    },
+    {
+      "id": "calvin",
+      "name": "John Calvin's Commentaries (NT + Psalms + Genesis)",
+      "resource_type": "commentary",
+      "version": "CCEL ThML (v1 scope: Genesis + Psalms + New Testament; remaining OT deferred to a later corpus version)",
+      "license": "Public domain (CCEL)",
+      "attribution": null,
+      "source_url": null,
+      "retrieved": "2026-06-10",
+      "source_checksum": null
+    },
+    {
+      "id": "henry",
+      "name": "Matthew Henry's Commentary on the Whole Bible",
+      "resource_type": "commentary",
+      "version": "CCEL ThML (complete; 6 volumes mhc1-mhc6)",
+      "license": "Public domain (CCEL)",
+      "attribution": null,
+      "source_url": null,
+      "retrieved": "2026-06-10",
+      "source_checksum": null
+    },
+    {
+      "id": "jfb",
+      "name": "Jamieson-Fausset-Brown Commentary on the Whole Bible",
+      "resource_type": "commentary",
+      "version": "CCEL ThML (complete; single file)",
+      "license": "Public domain (CCEL)",
+      "attribution": null,
+      "source_url": null,
+      "retrieved": "2026-06-10",
+      "source_checksum": null
+    },
+    {
+      "id": "spurgeon",
+      "name": "Charles H. Spurgeon — The Treasury of David",
+      "resource_type": "commentary",
+      "version": "Internet Archive DjVu OCR — all seven volumes; six from the Google-digitized *spurgoog scans, tod5 (Psalms 104-118) gap-filled from the alternate PD scan treasuryofdavidc0005spur (vol. 5, 1882)",
+      "license": "Public domain (Spurgeon d.1892; Treasury completed 1885)",
+      "attribution": null,
+      "source_url": null,
+      "retrieved": "2026-06-10",
+      "source_checksum": null
+    },
+    {
+      "id": "bdb",
+      "name": "Brown-Driver-Briggs Hebrew Lexicon",
+      "resource_type": "lexicon",
+      "version": "openscriptures/HebrewLexicon BDB XML (snapshot 2026-06-10)",
+      "license": "CC-BY-4.0 (OpenScriptures Hebrew Lexicon edition)",
+      "attribution": null,
+      "source_url": "https://raw.githubusercontent.com/openscriptures/HebrewLexicon/master/BrownDriverBriggs.xml",
+      "retrieved": "2026-06-11",
+      "source_checksum": "2b52658a4323d91674cda4090ab8b3ebddfff640f4f18143c28300e80b2c38f8"
+    },
+    {
+      "id": "strongs-greek",
+      "name": "Strong's Greek Dictionary",
+      "resource_type": "lexicon",
+      "version": "morphgnt/strongs-dictionary-xml strongsgreek.xml (snapshot 2026-06-11)",
+      "license": "CC0 / public domain (morphgnt/strongs-dictionary-xml)",
+      "attribution": null,
+      "source_url": "https://raw.githubusercontent.com/morphgnt/strongs-dictionary-xml/master/strongsgreek.xml",
+      "retrieved": "2026-06-11",
+      "source_checksum": "91474213b208a4e487d35f85c10e5c90737acc69082dad15dec5431406003545"
+    },
+    {
+      "id": "strongs-hebrew",
+      "name": "Strong's Hebrew Dictionary",
+      "resource_type": "lexicon",
+      "version": "openscriptures/HebrewLexicon HebrewStrong.xml (snapshot 2026-06-11)",
+      "license": "CC-BY-4.0 (OpenScriptures Hebrew Lexicon edition)",
+      "attribution": null,
+      "source_url": "https://raw.githubusercontent.com/openscriptures/HebrewLexicon/master/HebrewStrong.xml",
+      "retrieved": "2026-06-11",
+      "source_checksum": "a628f4f89f8bdaf2483fd3faf1abc8653cc6717758dfc9f24beb7571d9bdd0c4"
+    },
+    {
+      "id": "tbesg",
+      "name": "Tyndale Brief lexicon of Extended Strong's for Greek (TBESG)",
+      "resource_type": "lexicon",
+      "version": "STEPBible-Data TAGNT/TBESG (snapshot 2026-06-11)",
+      "license": "CC-BY-4.0 (STEPBible; Tyndale House Cambridge)",
+      "attribution": null,
+      "source_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Lexicons/TBESG%20-%20Translators%20Brief%20lexicon%20of%20Extended%20Strongs%20for%20Greek%20-%20STEPBible.org%20CC%20BY.txt",
+      "retrieved": "2026-06-10",
+      "source_checksum": "4bbafa4f8a1e804cde8de076a40b1285ac441a5e74ada586905c456fb150ba8d"
+    },
+    {
+      "id": "oshb",
+      "name": "Open Scriptures Hebrew Bible (WLC, Strong's + morphology)",
+      "resource_type": "tagged-text",
+      "version": "openscriptures/morphhb OSHB WLC 4.20 (snapshot 2026-06-10)",
+      "license": "CC-BY-4.0 (OSHB edition; WLC text public domain)",
+      "attribution": "Original work of the Open Scriptures Hebrew Bible available at https://github.com/openscriptures/morphhb",
+      "source_url": "https://raw.githubusercontent.com/openscriptures/morphhb/master/wlc/",
+      "retrieved": "2026-06-10",
+      "source_checksum": "356a2d36f9eefda00063f222a81090fc985c3b4db51d59f430378a020a252927"
+    },
+    {
+      "id": "tagnt",
+      "name": "Translators Amalgamated Greek New Testament (TAGNT)",
+      "resource_type": "tagged-text",
+      "version": "STEPBible-Data TAGNT/TBESG (snapshot 2026-06-11)",
+      "license": "CC-BY-4.0 (STEPBible; Tyndale House Cambridge)",
+      "attribution": "STEP Bible, www.STEPBible.org",
+      "source_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+      "retrieved": "2026-06-10",
+      "source_checksum": "8b52d1cfb7a7191b2fa9e0dd0e21647c70afc8d0829f8821807fc1d6c23a187a"
+    },
+    {
+      "id": "tsk",
+      "name": "Treasury of Scripture Knowledge cross-references (OpenBible.info)",
+      "resource_type": "crossref",
+      "version": null,
+      "license": "CC-BY 4.0 (www.openbible.info)",
+      "attribution": "Cross-reference data courtesy of www.openbible.info, used under CC-BY.",
+      "source_url": "https://a.openbible.info/data/cross-references.zip",
+      "retrieved": "2026-06-10",
+      "source_checksum": "d9df28f784e0933bc2d5edc22e73e12a85566d26ca30e35ff47204bd5c7be86c"
+    },
+    {
+      "id": "embedding-model",
+      "name": "BAAI/bge-small-en-v1.5",
+      "resource_type": "embedding-model",
+      "version": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+      "license": "MIT (BAAI/bge-small-en-v1.5)",
+      "attribution": null,
+      "source_url": "https://huggingface.co/BAAI/bge-small-en-v1.5",
+      "retrieved": null,
+      "source_checksum": "f6a428ffdb6afebc801a94fd3454aec2705f198ad710434a7919faa2a41b361b"
+    }
+  ]
+}

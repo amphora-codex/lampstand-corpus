@@ -54,6 +54,16 @@ BM25 index is rebuilt over the full new chunk set). ``build-embeddings full`` fo
 a from-scratch re-encode. Requires the ``[embeddings]`` extra (sentence-transformers
 + torch) and a one-time ``snapshot-model``.
 
+Usage (P7 packaging):
+    python -m lampstand_corpus.cli package  # split built DBs -> output/packs/ + manifest
+
+``package`` splits the built per-resource DBs into a BUNDLED pack (BSB + WSC +
+their search index, ships in the binary) and free ON-DEMAND packs (everything
+else, downloaded on first launch), deterministically, under output/packs/
+(gitignored). It writes the committed corpus_manifest.json (pack contents,
+per-file SHA-256 + byte sizes, the rolled-up source licenses/attributions, and a
+corpus-version placeholder) and reports the real pack sizes vs the targets.
+
 Reads committed snapshots from sources/, writes output/*.sqlite (gitignored) and
 reports/*.txt.
 """
@@ -106,6 +116,7 @@ from .lexicons import (
     parse_tagnt,
     parse_tbesg,
 )
+from .package import CORPUS_VERSION_PLACEHOLDER, package_corpus
 from .schema import Provenance
 from .sources import (
     BIBLE_SOURCES,
@@ -985,6 +996,56 @@ def _emit_embedding_report(ec, prov, stats, det, wall, np, *, incremental=None):
           f"errors={rep.error_total} flags={rep.flag_total}")
 
 
+# --- P7 packaging ------------------------------------------------------------
+PACKS_DIR = OUTPUT_DIR / "packs"
+CORPUS_MANIFEST = REPO_ROOT / "corpus_manifest.json"
+
+
+def cmd_package() -> None:
+    """Split the built DBs into bundled + on-demand packs and write the manifest.
+
+    Requires the per-resource DBs (incl. embeddings.sqlite) to be built first.
+    """
+    required = [
+        "bibles.sqlite", "confessions.sqlite", "commentaries.sqlite",
+        "lexicons.sqlite", "crossrefs.sqlite", "embeddings.sqlite",
+    ]
+    missing = [f for f in required if not (OUTPUT_DIR / f).exists()]
+    if missing:
+        print("Missing built DBs: " + ", ".join(missing)
+              + " — run the build-* commands first.", file=sys.stderr)
+        sys.exit(2)
+
+    print(f"Packaging built DBs -> {PACKS_DIR} (gitignored)")
+    result = package_corpus(OUTPUT_DIR, PACKS_DIR)
+
+    print(f"\nBUNDLED pack ({result.bundled_bytes:,} B = "
+          f"{result.bundled_bytes / (1024*1024):.1f} MB):")
+    for f in result.files:
+        if f.pack == "bundled":
+            print(f"  {f.name:34s} {f.bytes:>14,} B  {f.sha256[:12]}")
+    print(f"\nON-DEMAND pack(s) ({result.ondemand_bytes:,} B = "
+          f"{result.ondemand_bytes / (1024*1024):.1f} MB):")
+    for f in result.files:
+        if f.pack == "on-demand":
+            print(f"  {f.name:34s} {f.bytes:>14,} B  {f.sha256[:12]}")
+
+    if result.flags:
+        print("\nSIZE FLAGS:")
+        for fl in result.flags:
+            print(f"  FLAG: {fl}")
+    else:
+        print("\nNo size flags (bundled pack is within target).")
+
+    # Manifest is the only committed artifact of this step.
+    CORPUS_MANIFEST.write_text(
+        json.dumps(result.manifest, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8")
+    print(f"\nWrote committed manifest {CORPUS_MANIFEST} "
+          f"(corpus_version placeholder: {CORPUS_VERSION_PLACEHOLDER})")
+    print("Candidate only — the architect's 23-point spot-check gates ship.")
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     cmd = argv[0] if argv else "all"
@@ -1036,6 +1097,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_build_embeddings(full=("full" in argv[1:]))
     elif cmd == "validate-embeddings":
         cmd_validate_embeddings()
+    elif cmd == "package":
+        cmd_package()
     else:
         print(__doc__)
         return 1
