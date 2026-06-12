@@ -1,5 +1,6 @@
 # ── Compiled corpus artifacts — NEVER committed (built, not source) ──
 output/
+output/packs/   # P7 bundled + on-demand pack .sqlite files (built; manifest is committed)
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
