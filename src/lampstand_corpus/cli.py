@@ -88,6 +88,7 @@ from .lexicons import (
     STEPBIBLE_LICENSE,
     STEPBIBLE_SOURCES,
     STEPBIBLE_VERSION,
+    STRONGS_HEBREW_FLAG,
     TAGGED_TEXT_SOURCES,
     THAYERS_FLAG,
     ParsedLexicon,
@@ -95,6 +96,8 @@ from .lexicons import (
     parse_bdb,
     parse_oshb,
     parse_strongs,
+    parse_strongs_greek_xml,
+    parse_strongs_hebrew_xml,
     parse_tagnt,
     parse_tbesg,
 )
@@ -444,8 +447,11 @@ def normalize_lexicons() -> dict[str, ParsedLexicon]:
     parsed: dict[str, ParsedLexicon] = {}
     for lid, src in LEXICON_SOURCES.items():
         entry = manifest["sources"][lid]
+        # Provenance source prefix reflects the repo the edition is sourced from
+        # (morphgnt for the CC0 Greek, openscriptures for the CC-BY Hebrew/BDB).
+        prefix = "morphgnt" if "morphgnt" in src.url else "openscriptures"
         prov = Provenance(
-            source=f"openscriptures:{lid}",
+            source=f"{prefix}:{lid}",
             version=entry["version"],
             license=entry["license"],
             retrieved=entry["retrieved"],
@@ -453,12 +459,16 @@ def normalize_lexicons() -> dict[str, ParsedLexicon]:
             checksum=entry["sha256"],
         )
         content = src.dest.read_text(encoding="utf-8")
-        if src.lexicon == "strongs":
-            pl = parse_strongs(src, prov, content)
-        else:  # bdb — needs the LexicalIndex aux file for Strong's linkage
+        if src.fmt == "strongs-greek-xml":
+            pl = parse_strongs_greek_xml(src, prov, content)
+        elif src.fmt == "strongs-hebrew-xml":
+            pl = parse_strongs_hebrew_xml(src, prov, content)
+        elif src.fmt == "bdb-xml":  # needs LexicalIndex aux for Strong's linkage
             aux_path = LEXICONS_DIR / src.id / "LexicalIndex.xml"
             index_xml = aux_path.read_text(encoding="utf-8")
             pl = parse_bdb(src, prov, content, index_xml)
+        else:  # legacy .js JSON edition (no longer used for the swap)
+            pl = parse_strongs(src, prov, content)
         parsed[lid] = pl
         print(f"  {lid}: {len(pl.entries)} entries, {len(pl.flags)} flag(s)")
 
@@ -634,6 +644,7 @@ def _emit_lexicon_report(
         orphans=orphans,
         thayers_flag=THAYERS_FLAG,
         sblgnt_flag=FLAGGED_TEXT_SOURCES["sblgnt"].flag,
+        strongs_hebrew_flag=STRONGS_HEBREW_FLAG,
     )
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     rp = REPORTS_DIR / "lexicons_validation_p4.txt"

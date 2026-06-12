@@ -17,7 +17,9 @@ import pytest
 from lampstand_corpus.lexicons import (
     LEXICON_SOURCES,
     STEPBIBLE_BOOK_TO_USFM,
+    STRONGS_HEBREW_FLAG,
     THAYERS_FLAG,
+    _clean_kjv,
     _extract_js_object,
     _normalize_greek_dstrong,
     _normalize_strongs_key,
@@ -27,6 +29,8 @@ from lampstand_corpus.lexicons import (
     _tagnt_surface,
     parse_bdb,
     parse_strongs,
+    parse_strongs_greek_xml,
+    parse_strongs_hebrew_xml,
     parse_tagnt,
     parse_tbesg,
 )
@@ -111,6 +115,88 @@ def test_parse_strongs_hebrew_has_pronunciation():
     assert h1.translit == "ʼâb"
     # leading-zero key normalized
     assert any(e.strongs == "H8012" for e in pl.entries)
+
+
+# --- Strong's Greek CC0 XML (morphgnt) ---------------------------------------
+_GREEK_XML = """<?xml version='1.0' encoding='utf-8' standalone='yes'?>
+<strongsdictionary><prologue>Public Domain</prologue><entries>
+<entry strongs="00025">
+ <strongs>25</strongs>   <greek BETA="A)GAPA/W" unicode="ἀγαπάω" translit="agapáō"/>   <pronunciation strongs="ag-ap-ah'-o"/>
+ <strongs_derivation>perhaps from <greek BETA="A)/GAN" unicode="ἄγαν" translit="ágan"/> (much) [or compare <strongsref language="HEBREW" strongs="5689"/>];</strongs_derivation><strongs_def> to love</strongs_def><kjv_def>:--(be-)love(-ed).</kjv_def> Compare <strongsref language="GREEK" strongs="5368"/>.
+</entry>
+<entry strongs="02717">
+ <strongs>2717</strongs>  Not Used
+</entry>
+</entries></strongsdictionary>
+"""  # noqa: E501
+
+
+def test_parse_strongs_greek_xml_fields_and_flattening():
+    src = LEXICON_SOURCES["strongs-greek"]
+    pl = parse_strongs_greek_xml(src, _PROV, _GREEK_XML)
+    g25 = next(e for e in pl.entries if e.strongs == "G25")
+    assert g25.lemma == "ἀγαπάω" and g25.translit == "agapáō"
+    assert g25.pronunciation == "ag-ap-ah'-o"
+    assert g25.definition == "to love"
+    # inline <greek> flattened to its unicode; <strongsref> -> H5689
+    assert "ἄγαν" in g25.derivation and "H5689" in g25.derivation
+    # kjv_def lead-in ':--' stripped
+    assert g25.kjv_def == "(be-)love(-ed)."
+
+
+def test_parse_strongs_greek_xml_marks_not_used():
+    src = LEXICON_SOURCES["strongs-greek"]
+    pl = parse_strongs_greek_xml(src, _PROV, _GREEK_XML)
+    g2717 = next(e for e in pl.entries if e.strongs == "G2717")
+    assert g2717.not_used is True
+    assert g2717.definition is None
+    assert any("Not Used" in f for f in pl.flags)
+
+
+def test_clean_kjv_strips_lead_in():
+    assert _clean_kjv(":--Alpha.") == "Alpha."
+    assert _clean_kjv("--Aaron.") == "Aaron."
+    assert _clean_kjv("plain gloss") == "plain gloss"
+    assert _clean_kjv(None) is None
+
+
+# --- Strong's Hebrew CC-BY XML (HebrewLexicon) -------------------------------
+_HEBREW_XML = """<?xml version="1.0" encoding="utf-8"?>
+<lexicon xmlns="http://openscriptures.github.com/morphhb/namespace">
+ <entry id="H1">
+  <w pos="n-m" pron="awb" xlit="ʼâb" xml:lang="heb">אָב</w>
+  <source>a primitive word;</source>
+  <meaning><def>father</def>, in a literal application</meaning>
+  <usage>chief, (fore-) father(-less).</usage>
+ </entry>
+ <entry id="H2">
+  <w pos="n-m" pron="ab" xlit="ʔab" xml:lang="arc">אַב</w>
+  <source>(Aramaic) corresponding to <w src="H1">1</w></source>
+  <usage>father.</usage>
+ </entry>
+</lexicon>
+"""
+
+
+def test_parse_strongs_hebrew_xml_fields():
+    src = LEXICON_SOURCES["strongs-hebrew"]
+    pl = parse_strongs_hebrew_xml(src, _PROV, _HEBREW_XML)
+    keys = {e.strongs for e in pl.entries}
+    assert keys == {"H1", "H2"}
+    h1 = next(e for e in pl.entries if e.strongs == "H1")
+    assert h1.lemma == "אָב" and h1.translit == "ʼâb" and h1.pronunciation == "awb"
+    assert "father" in (h1.definition or "")
+    assert "chief" in (h1.kjv_def or "")
+    # H2 has no <meaning> but carries meaning via <source>/<usage> (Aramaic ref)
+    h2 = next(e for e in pl.entries if e.strongs == "H2")
+    assert h2.definition is None
+    assert "H1" in (h2.derivation or "")  # inline <w src='H1'> flattened to H1
+    assert "father" in (h2.kjv_def or "")
+
+
+def test_strongs_hebrew_flag_records_no_cc0():
+    assert "CC0" in STRONGS_HEBREW_FLAG and "CC-BY" in STRONGS_HEBREW_FLAG
+    assert "CC-BY-SA" in STRONGS_HEBREW_FLAG  # explains what was retired
 
 
 # --- BDB + lexical index -----------------------------------------------------
@@ -279,7 +365,21 @@ class TestBuiltLexicons:
         n = conn.execute(
             "SELECT COUNT(*) FROM entry WHERE lexicon='strongs-greek'"
         ).fetchone()[0]
+        # CC0 morphgnt edition ships the full G1..G5624 span (incl. 'Not Used'
+        # placeholders), so it reaches the upper bound the old edition omitted.
         assert 5000 < n <= 5624
+
+    def test_strongs_greek_is_cc0(self, conn):
+        row = conn.execute(
+            "SELECT license FROM lexicon WHERE id='strongs-greek'").fetchone()
+        assert row and "CC0" in row[0]
+
+    def test_strongs_dictionaries_are_not_share_alike(self, conn):
+        # The architect-approved swap removes CC-BY-SA from the Strong's editions.
+        rows = conn.execute(
+            "SELECT id, license FROM lexicon WHERE lexicon='strongs'").fetchall()
+        assert rows
+        assert all("CC-BY-SA" not in lic for _, lic in rows)
 
     def test_strongs_hebrew_count_in_range(self, conn):
         n = conn.execute(

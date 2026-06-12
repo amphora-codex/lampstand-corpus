@@ -1,19 +1,41 @@
-"""P4 — Lexicon dictionaries ingestion (OpenScriptures → NormalizedChunks).
+"""P4 — Lexicon dictionaries ingestion (→ NormalizedChunks).
 
 Canonical sources only (CLAUDE.md §Sources of record). Every structural or
 sourcing ambiguity is FLAGGED for human review, never silently resolved, and the
 pipeline never marks output ship-ready — the architect's spot-check gates ship.
 
-Primary deliverable — the keyed lexicon dictionaries
-----------------------------------------------------
-* **Strong's Greek** — ``openscriptures/strongs`` ``greek/strongs-greek-
-  dictionary.js``. A single ``var strongsGreekDictionary = {…};`` JSON object
-  keyed ``G####``. Fields: ``lemma``, ``translit``, ``strongs_def`` (gloss/
-  definition), ``derivation``, ``kjv_def``. (No pronunciation field in the Greek
-  set — recorded as None.)
-* **Strong's Hebrew** — ``openscriptures/strongs`` ``hebrew/strongs-hebrew-
-  dictionary.js``. ``var strongsHebrewDictionary = {…};`` keyed ``H####``. Adds
-  ``xlit`` (translit) and ``pron`` (pronunciation) to the same field set.
+Share-alike-free editions (architect-approved swap)
+---------------------------------------------------
+The Strong's Greek/Hebrew dictionaries were re-sourced OFF the OpenScriptures
+``openscriptures/strongs`` ``.js`` editions, which are **CC-BY-SA** (share-alike
+copyleft the architect wants out of the corpus). The replacements are:
+
+* **Strong's Greek** — ``morphgnt/strongs-dictionary-xml`` ``strongsgreek.xml``,
+  released **CC0 / public domain** (Ulrik Sandborg-Petersen's XML e-text of
+  Strong's Greek Dictionary, 1890). A single ``<strongsdictionary>`` with one
+  ``<entry strongs="00025">`` per number. Fields map to ours: ``<greek unicode=
+  translit=>`` (lemma + translit), ``<pronunciation strongs="…">`` (pron),
+  ``<strongs_def>`` (definition), ``<strongs_derivation>`` (derivation),
+  ``<kjv_def>`` (kjv_def). Inline ``<greek>``/``<strongsref>`` nodes inside the
+  prose fields are flattened (the Greek unicode is substituted, refs rendered
+  ``G####``/``H####``) so no Greek word is lost. CC0 means NO attribution and NO
+  share-alike obligation — strictly cleaner than the CC-BY-SA edition it replaces,
+  and it covers the full G1–G5624 span (101 numbers the old edition omitted).
+* **Strong's Hebrew** — ``openscriptures/HebrewLexicon`` ``HebrewStrong.xml``,
+  **CC-BY 4.0** (attribution-only; underlying Strong's Hebrew text, 1894, is PD).
+  NO clean CC0 / pure-PD machine-readable Strong's Hebrew dictionary exists in a
+  source of record — surveyed and FLAGGED. CC-BY is the best available and is
+  share-alike-free (the constraint the architect set), so it is used per the task
+  directive ("if nothing cleaner than CC-BY exists, use the best attribution-only
+  option and FLAG it; never fall back to CC-BY-SA"). This is the SAME repo we
+  already use for BDB + the OSHB lineage; ``HebrewStrong.xml`` is keyed ``H####``
+  with ``<w pron= xlit=>`` (lemma), ``<source>`` (derivation), ``<meaning>``/
+  ``<def>`` (definition), ``<usage>`` (kjv_def), full H1–H8674.
+
+The retired CC-BY-SA ``.js`` snapshots are removed from the build path (their
+``sources/lexicons/strongs-greek`` / ``strongs-hebrew`` dirs are repointed to the
+new editions); the old bytes remain in git history.
+
 * **Brown-Driver-Briggs (BDB)** — ``openscriptures/HebrewLexicon``
   ``BrownDriverBriggs.xml`` (the fuller Hebrew entry). BDB entries are keyed by an
   internal id (``a.ab.ab``), NOT by Strong's number; the Strong↔BDB linkage lives
@@ -22,10 +44,10 @@ Primary deliverable — the keyed lexicon dictionaries
   (do not guess) BDB entries the index leaves unlinked.
 
 License note (recorded per source in provenance): the underlying Strong's, BDB,
-and the WLC text are all **public domain**; the OpenScriptures *editions* carry
-licenses — Strong's dictionaries **CC-BY-SA** (per the file headers), the Hebrew
-Lexicon and morphhb (OSHB) **CC-BY-4.0**. These are bundle-friendly with
-attribution. Recorded so downstream attribution is correct.
+and the WLC text are all **public domain**; the *editions* carry licenses — the
+new Strong's Greek edition **CC0** (no obligations), Strong's Hebrew + the Hebrew
+Lexicon (BDB) and morphhb (OSHB) **CC-BY-4.0** (attribution-only, share-alike-
+free). Recorded so downstream attribution is correct.
 
 Thayer's — FLAGGED, not fabricated
 ----------------------------------
@@ -94,8 +116,10 @@ class LexiconSource:
     url: str           # canonical upstream raw download
     filename: str      # snapshot file under sources/lexicons/<id>/
     version: str
-    license: str       # the OpenScriptures EDITION license
+    license: str       # the EDITION license (CC0 / CC-BY / CC-BY-SA)
     text_license: str  # the underlying dictionary text license (PD)
+    fmt: str = "js"    # parse format: 'js' (JSON-in-.js) | 'strongs-greek-xml'
+                       #               | 'strongs-hebrew-xml' | 'bdb-xml'
 
     @property
     def dest(self) -> Path:
@@ -117,24 +141,35 @@ LEXICON_SOURCES: dict[str, LexiconSource] = {
         name="Strong's Greek Dictionary",
         language=GREEK,
         lexicon="strongs",
-        url="https://raw.githubusercontent.com/openscriptures/strongs/master/"
-            "greek/strongs-greek-dictionary.js",
-        filename="strongs-greek-dictionary.js",
-        version="openscriptures/strongs greek JSON (snapshot 2026-06-10)",
-        license="CC-BY-SA (OpenScriptures edition)",
+        # Share-alike-free swap: morphgnt/strongs-dictionary-xml is CC0 / PD
+        # (Sandborg-Petersen XML e-text of Strong's Greek, 1890), replacing the
+        # retired CC-BY-SA OpenScriptures .js edition.
+        url="https://raw.githubusercontent.com/morphgnt/strongs-dictionary-xml/"
+            "master/strongsgreek.xml",
+        filename="strongsgreek.xml",
+        version="morphgnt/strongs-dictionary-xml strongsgreek.xml "
+                "(snapshot 2026-06-11)",
+        license="CC0 / public domain (morphgnt/strongs-dictionary-xml)",
         text_license="Public domain (Strong's Greek Dictionary, 1890)",
+        fmt="strongs-greek-xml",
     ),
     "strongs-hebrew": LexiconSource(
         id="strongs-hebrew",
         name="Strong's Hebrew Dictionary",
         language=HEBREW,
         lexicon="strongs",
-        url="https://raw.githubusercontent.com/openscriptures/strongs/master/"
-            "hebrew/strongs-hebrew-dictionary.js",
-        filename="strongs-hebrew-dictionary.js",
-        version="openscriptures/strongs hebrew JSON (snapshot 2026-06-10)",
-        license="CC-BY-SA (OpenScriptures edition)",
+        # Share-alike-free swap: no CC0/PD machine-readable Strong's Hebrew exists
+        # in a source of record (surveyed + FLAGGED). openscriptures/HebrewLexicon
+        # HebrewStrong.xml is CC-BY 4.0 (attribution-only, NOT share-alike) — the
+        # best available, replacing the retired CC-BY-SA OpenScriptures .js edition.
+        url="https://raw.githubusercontent.com/openscriptures/HebrewLexicon/"
+            "master/HebrewStrong.xml",
+        filename="HebrewStrong.xml",
+        version="openscriptures/HebrewLexicon HebrewStrong.xml "
+                "(snapshot 2026-06-11)",
+        license="CC-BY-4.0 (OpenScriptures Hebrew Lexicon edition)",
         text_license="Public domain (Strong's Hebrew Dictionary, 1894)",
+        fmt="strongs-hebrew-xml",
     ),
     "bdb": LexiconSource(
         id="bdb",
@@ -147,6 +182,7 @@ LEXICON_SOURCES: dict[str, LexiconSource] = {
         version="openscriptures/HebrewLexicon BDB XML (snapshot 2026-06-10)",
         license="CC-BY-4.0 (OpenScriptures Hebrew Lexicon edition)",
         text_license="Public domain (Brown-Driver-Briggs, 1906)",
+        fmt="bdb-xml",
     ),
 }
 
@@ -165,6 +201,7 @@ class LexEntry:
     derivation: str | None
     kjv_def: str | None
     raw_key: str | None = None  # source-native key where it differs (BDB entry id)
+    not_used: bool = False      # Strong's "Not Used" placeholder (skipped number)
 
 
 @dataclass
@@ -248,6 +285,169 @@ def _normalize_strongs_key(raw: str, prefix: str) -> str | None:
 def _strongs_sort_key(raw: str) -> tuple[int, str]:
     m = re.fullmatch(r"[GH]0*(\d+)", raw.strip())
     return (int(m.group(1)), raw) if m else (1 << 30, raw)
+
+
+# --- Strong's Greek (CC0 morphgnt XML) ---------------------------------------
+# strongsgreek.xml: one <entry strongs="00025"> per number. The prose fields
+# (<strongs_def>, <strongs_derivation>, <kjv_def>) embed inline <greek
+# unicode="…"/> and <strongsref language= strongs=/> nodes. Those nodes carry
+# meaning in attributes, so a plain BeautifulSoup get_text() would silently drop
+# the Greek words and cross-references. We flatten manually: <greek> -> its
+# unicode form, <strongsref> -> the G####/H#### key, everything else -> its text.
+def _flatten_greek_field(node) -> str | None:
+    """Render a Greek prose field, substituting inline greek/ref attributes."""
+    if node is None:
+        return None
+    out: list[str] = []
+    for child in node.descendants:
+        name = getattr(child, "name", None)
+        if name is None:  # NavigableString
+            # Skip strings that live inside a <greek>/<strongsref> (handled below).
+            parent = getattr(child, "parent", None)
+            if parent is not None and parent.name in ("greek", "strongsref",
+                                                      "pronunciation"):
+                continue
+            out.append(str(child))
+        elif name == "greek":
+            out.append(child.get("unicode", ""))
+        elif name == "strongsref":
+            lang = (child.get("language") or "").upper()
+            num = child.get("strongs", "")
+            prefix = "H" if lang == "HEBREW" else "G"
+            if num.strip():
+                out.append(f"{prefix}{int(num)}" if num.strip().lstrip("0").isdigit()
+                           else f"{prefix}{num}")
+    return _clean("".join(out))
+
+
+def parse_strongs_greek_xml(
+    src: LexiconSource, prov: Provenance, content: str
+) -> ParsedLexicon:
+    """Parse the CC0 morphgnt ``strongsgreek.xml`` into LexEntries (keyed G####)."""
+    pl = ParsedLexicon(id=src.id, language=GREEK, lexicon="strongs", provenance=prov)
+    soup = BeautifulSoup(content, "lxml-xml")
+    seen: set[str] = set()
+    entries = soup.find_all("entry")
+    # Sort by numeric Strong's so the entry list is deterministic regardless of
+    # source ordering (the XML is already in order, but we don't rely on that).
+    entries.sort(key=lambda e: int(re.sub(r"\D", "", e.get("strongs") or "0") or 0))
+    for entry in entries:
+        raw = entry.get("strongs", "")
+        key = _normalize_strongs_key(f"G{int(raw)}" if raw.strip().isdigit() else raw,
+                                     "G")
+        if key is None:
+            pl.flags.append(f"{src.id}: unparseable Strong's attr {raw!r} (skipped)")
+            continue
+        if key in seen:
+            pl.flags.append(f"{src.id}: duplicate Strong's {key} (kept first)")
+            continue
+        seen.add(key)
+        greek = entry.find("greek")
+        pron = entry.find("pronunciation")
+        # "Not Used" entries are Strong's-assigned numbers he never populated
+        # (skipped/merged numbers). The CC0 source ships them as explicit
+        # placeholders where the old CC-BY-SA edition simply omitted them; we keep
+        # them flagged-as-placeholder so coverage is explicit, not an error.
+        body = _clean(entry.get_text())
+        not_used = (greek is None and body is not None
+                    and body.replace(key[1:], "").strip().lower() == "not used")
+        pl.entries.append(
+            LexEntry(
+                strongs=key,
+                language=GREEK,
+                lexicon="strongs",
+                lemma=_clean(greek.get("unicode")) if greek is not None else None,
+                translit=_clean(greek.get("translit")) if greek is not None else None,
+                pronunciation=(_clean(pron.get("strongs")) if pron is not None
+                               else None),
+                definition=_flatten_greek_field(entry.find("strongs_def")),
+                derivation=_flatten_greek_field(entry.find("strongs_derivation")),
+                kjv_def=_clean_kjv(_flatten_greek_field(entry.find("kjv_def"))),
+                not_used=not_used,
+            )
+        )
+    n_not_used = sum(1 for e in pl.entries if e.not_used)
+    if n_not_used:
+        pl.flags.append(
+            f"{src.id}: {n_not_used} 'Not Used' placeholder entries (Strong's "
+            f"numbers he assigned but never populated — kept so the G1..{STRONGS_GREEK_MAX} "
+            f"span is explicit; the prior CC-BY-SA edition omitted them as gaps)"
+        )
+    return pl
+
+
+# --- Strong's Hebrew (CC-BY HebrewLexicon XML) -------------------------------
+# HebrewStrong.xml: one <entry id="H1"> per number, OpenScriptures namespaced.
+#   <w pos= pron= xlit= xml:lang=>lemma</w>
+#   <source>derivation prose (with inline <w src="H24">24</w> refs)</source>
+#   <meaning>definition prose (with inline <def>…</def> glosses)</meaning>
+#   <usage>KJV renderings</usage>
+def _flatten_hebrew_field(node) -> str | None:
+    """Render a Hebrew prose field, substituting inline <w src> refs to H####."""
+    if node is None:
+        return None
+    out: list[str] = []
+    for child in node.descendants:
+        name = getattr(child, "name", None)
+        if name is None:  # NavigableString
+            parent = getattr(child, "parent", None)
+            if parent is not None and parent.name == "w" and parent.get("src"):
+                continue  # the ref number text is replaced below
+            out.append(str(child))
+        elif name == "w" and child.get("src"):
+            src_ref = child.get("src", "")
+            m = re.fullmatch(r"[Hh]?0*(\d+)\w*", src_ref)
+            out.append(f"H{int(m.group(1))}" if m else src_ref)
+    return _clean("".join(out))
+
+
+def parse_strongs_hebrew_xml(
+    src: LexiconSource, prov: Provenance, content: str
+) -> ParsedLexicon:
+    """Parse the CC-BY ``HebrewStrong.xml`` into LexEntries (keyed H####)."""
+    pl = ParsedLexicon(id=src.id, language=HEBREW, lexicon="strongs", provenance=prov)
+    soup = BeautifulSoup(content, "lxml-xml")
+    seen: set[str] = set()
+    entries = soup.find_all("entry")
+    entries.sort(key=lambda e: int(re.sub(r"\D", "", e.get("id") or "0") or 0))
+    for entry in entries:
+        key = _normalize_strongs_key(entry.get("id", ""), "H")
+        if key is None:
+            pl.flags.append(f"{src.id}: unparseable entry id {entry.get('id')!r} "
+                            f"(skipped)")
+            continue
+        if key in seen:
+            pl.flags.append(f"{src.id}: duplicate Strong's {key} (kept first)")
+            continue
+        seen.add(key)
+        w = entry.find("w")
+        pl.entries.append(
+            LexEntry(
+                strongs=key,
+                language=HEBREW,
+                lexicon="strongs",
+                lemma=_clean(w.get_text()) if w is not None else None,
+                translit=_clean(w.get("xlit")) if w is not None else None,
+                pronunciation=_clean(w.get("pron")) if w is not None else None,
+                definition=_flatten_hebrew_field(entry.find("meaning")),
+                derivation=_flatten_hebrew_field(entry.find("source")),
+                kjv_def=_flatten_hebrew_field(entry.find("usage")),
+            )
+        )
+    return pl
+
+
+def _clean_kjv(value: str | None) -> str | None:
+    """Trim Strong's kjv_def boilerplate punctuation (``:--``, leading ``--``).
+
+    The XML kjv_def reads ``:--(be-)love(-ed).`` / ``--Alpha.``; we strip the
+    leading ``:--`` / ``--`` lead-in for parity with the prior .js edition's
+    cleaner glosses, keeping the rendering itself intact.
+    """
+    if value is None:
+        return None
+    v = re.sub(r"^[:\s]*-{1,2}\s*", "", value).strip()
+    return v or None
 
 
 # --- BDB (XML) + the Strong's↔BDB lexical index ------------------------------
@@ -536,6 +736,28 @@ FLAGGED_TEXT_SOURCES: dict[str, FlaggedTextSource] = {
              "considered and REJECTED: CC-BY-SA, a copyleft term we avoid bundling.)",
     ),
 }
+
+
+# Strong's Hebrew CC-BY flag (share-alike-free swap). The Greek dictionary moved
+# to a CC0 source; no CC0 / pure-PD machine-readable Strong's HEBREW dictionary
+# exists in a source of record (surveyed: morphgnt ships Greek only; STEPBible
+# TBESH and openscriptures/HebrewLexicon are both CC-BY 4.0). Per the task
+# directive, the best attribution-only option is used — HebrewLexicon's
+# HebrewStrong.xml — and the absence of a CC0 Hebrew is FLAGGED here, never
+# resolved by falling back to the retired CC-BY-SA edition.
+STRONGS_HEBREW_FLAG = (
+    "Strong's Hebrew dictionary: NO CC0 / pure-public-domain machine-readable "
+    "edition exists in a source of record (the morphgnt CC0 set is Greek-only; the "
+    "available Hebrew editions — openscriptures/HebrewLexicon HebrewStrong.xml and "
+    "STEPBible TBESH — are both CC-BY 4.0). The retired OpenScriptures .js Hebrew "
+    "edition was CC-BY-SA (share-alike), which the architect wants out. Per the "
+    "swap directive ('if nothing cleaner than CC-BY exists, use the best "
+    "attribution-only option and FLAG it; never fall back to CC-BY-SA'), the "
+    "CC-BY-4.0 HebrewStrong.xml is ingested — same repo already used for BDB + the "
+    "OSHB lineage, so attribution requirements are already met. FLAGGED so the "
+    "architect can decide whether to keep the CC-BY Hebrew or source a CC0/PD "
+    "Hebrew Strong's later. (The Greek dictionary IS now CC0.)"
+)
 
 
 # Thayer's — superseded by the STEPBible TBESG (P4b). Kept as a recorded note so

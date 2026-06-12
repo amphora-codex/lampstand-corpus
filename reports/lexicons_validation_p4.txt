@@ -6,20 +6,23 @@ CANDIDATE ONLY. Not ship-ready: the architect's 23-point spot-check gates ship (
 ERROR / FLAG SUMMARY
 ----------------------------------------------------------------
   total errors: 0
-  total flags:  82
+  total flags:  318
 
 LEXICON DICTIONARIES
 ----------------------------------------------------------------
   bdb [hebrew]
+    license: CC-BY-4.0 (OpenScriptures Hebrew Lexicon edition)
     entries=11845 linked-to-strongs=8828 distinct-strongs=8256 with-definition=7329
     flag: bdb: 3017 BDB entries have no Strong's number in LexicalIndex (kept, keyed by BDB id; not guessed) — human to confirm coverage
     flag: bdb: linked 8256 distinct Strong's H-numbers via LexicalIndex (of 8674 possible)
     flag: bdb: 4516 entries have no <def> gloss (BDB cross-reference / root-pointer stubs — expected, not errored)
 
   strongs-greek [greek]
-    entries=5523 linked-to-strongs=5523 distinct-strongs=5523 with-definition=5503
+    license: CC0 / public domain (morphgnt/strongs-dictionary-xml)
+    entries=5624 linked-to-strongs=5624 distinct-strongs=5624 with-definition=5506
+    'Not Used' placeholders: 101 (expected skipped Strong's numbers; not errors)
     coverage span: 1..5624
-    GAP: 101 missing Strong's numbers in 1..5624: G2717, G3203-G3302
+    flag: strongs-greek: 101 'Not Used' placeholder entries (Strong's numbers he assigned but never populated — kept so the G1..5624 span is explicit; the prior CC-BY-SA edition omitted them as gaps)
     flag: strongs-greek:G302 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
     flag: strongs-greek:G687 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
     flag: strongs-greek:G814 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
@@ -27,14 +30,24 @@ LEXICON DICTIONARIES
     flag: strongs-greek:G1065 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
     flag: strongs-greek:G1122 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
     flag: strongs-greek:G1473 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
-    flag: strongs-greek:G1682 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
-    flag: ... (+12 more)
+    flag: ... (+10 more)
 
   strongs-hebrew [hebrew]
-    entries=8674 linked-to-strongs=8674 distinct-strongs=8674 with-definition=8674
+    license: CC-BY-4.0 (OpenScriptures Hebrew Lexicon edition)
+    entries=8674 linked-to-strongs=8674 distinct-strongs=8674 with-definition=8435
     coverage span: 1..8674
+    flag: strongs-hebrew:H2 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-hebrew:H4 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-hebrew:H7 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-hebrew:H47 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-hebrew:H69 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-hebrew:H81 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-hebrew:H84 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: strongs-hebrew:H144 (no strongs_def gloss; meaning in derivation/kjv_def — upstream quirk)
+    flag: ... (+231 more)
 
   tbesg [greek]
+    license: CC-BY-4.0 (STEPBible; Tyndale House Cambridge)
     entries=11035 linked-to-strongs=11035 distinct-strongs=10740 with-definition=11035
     FLAG (long def): tbesg:G575 (4358 chars)
     FLAG (long def): tbesg:G1096 (4066 chars)
@@ -65,6 +78,7 @@ TAGGED ORIGINAL-LANGUAGE TEXT (P4b)
 
 FLAGGED FOR HUMAN REVIEW
 ----------------------------------------------------------------
-  1. Thayer's Greek-English lexicon: no clean, canonical, machine-readable public-domain dataset found in a source of record. SUBSTITUTE INGESTED — the STEPBible TBESG (Tyndale Brief lexicon of Extended Strong's for Greek, Abbott-Smith-based, CC-BY 4.0) is the architect-approved stand-in for Thayer's and is now in lexicons.sqlite. A canonical Thayer's proper would still need architect + theological-advisor approval before ingestion.
-  2. MorphGNT/SBLGNT carries lemma + morphology but NO Strong's numbers, so it cannot supply the verse->Strong's link word-study needs without an out-of-corpus lemma->Strong's bridge; AND the SBLGNT text is under the SBLGNT EULA (not pure PD — bundling is an architect decision). NOT ingested: the Greek NT tagging is now supplied by the STEPBible TAGNT (CC-BY 4.0), which DOES carry disambiguated Strong's. SBLGNT remains snapshotted for provenance only. (OpenGNT was also considered and REJECTED: CC-BY-SA, a copyleft term we avoid bundling.)
+  1. Strong's Hebrew dictionary: NO CC0 / pure-public-domain machine-readable edition exists in a source of record (the morphgnt CC0 set is Greek-only; the available Hebrew editions — openscriptures/HebrewLexicon HebrewStrong.xml and STEPBible TBESH — are both CC-BY 4.0). The retired OpenScriptures .js Hebrew edition was CC-BY-SA (share-alike), which the architect wants out. Per the swap directive ('if nothing cleaner than CC-BY exists, use the best attribution-only option and FLAG it; never fall back to CC-BY-SA'), the CC-BY-4.0 HebrewStrong.xml is ingested — same repo already used for BDB + the OSHB lineage, so attribution requirements are already met. FLAGGED so the architect can decide whether to keep the CC-BY Hebrew or source a CC0/PD Hebrew Strong's later. (The Greek dictionary IS now CC0.)
+  2. Thayer's Greek-English lexicon: no clean, canonical, machine-readable public-domain dataset found in a source of record. SUBSTITUTE INGESTED — the STEPBible TBESG (Tyndale Brief lexicon of Extended Strong's for Greek, Abbott-Smith-based, CC-BY 4.0) is the architect-approved stand-in for Thayer's and is now in lexicons.sqlite. A canonical Thayer's proper would still need architect + theological-advisor approval before ingestion.
+  3. MorphGNT/SBLGNT carries lemma + morphology but NO Strong's numbers, so it cannot supply the verse->Strong's link word-study needs without an out-of-corpus lemma->Strong's bridge; AND the SBLGNT text is under the SBLGNT EULA (not pure PD — bundling is an architect decision). NOT ingested: the Greek NT tagging is now supplied by the STEPBible TAGNT (CC-BY 4.0), which DOES carry disambiguated Strong's. SBLGNT remains snapshotted for provenance only. (OpenGNT was also considered and REJECTED: CC-BY-SA, a copyleft term we avoid bundling.)
 

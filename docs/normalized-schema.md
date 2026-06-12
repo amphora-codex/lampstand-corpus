@@ -6,7 +6,7 @@ Every source — whatever its original format (USFM, USX, CCEL HTML, OpenScriptu
 
 | Field | Meaning |
 |---|---|
-| `source` | Canonical source id (e.g. `bsb`, `kjv`, `ccel:henry`, `openscriptures:strongs`) |
+| `source` | Canonical source id (e.g. `bsb`, `kjv`, `ccel:henry`, `morphgnt:strongs-greek`, `openscriptures:strongs-hebrew`) |
 | `version` | Upstream version/edition identifier |
 | `license` | License / public-domain status string |
 | `retrieved` | ISO date the snapshot was fetched |
