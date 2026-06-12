@@ -26,3 +26,8 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+# scratch markers/logs from detached builds
+reports/.p6_done
+reports/.p6_encode.log
+reports/.*.log
