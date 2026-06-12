@@ -35,9 +35,11 @@ LONG_DEF_CHARS = 4_000
 class LexiconReport:
     lexicon: str
     language: str = ""
+    license: str = ""           # the EDITION license (CC0 / CC-BY / CC-BY-SA)
     n_entries: int = 0
     n_linked: int = 0            # entries keyed by a Strong's number
     n_with_definition: int = 0
+    n_not_used: int = 0          # Strong's "Not Used" placeholder entries
     expected_max: int = 0        # G5624 / H8674 span (Strong's dictionaries only)
     distinct_strongs: int = 0
     coverage_gaps: list[str] = field(default_factory=list)
@@ -115,7 +117,8 @@ def _gaps(present: set[int], max_n: int, prefix: str, *, limit: int = 40) -> lis
 
 
 def validate_lexicon(pl: ParsedLexicon) -> LexiconReport:
-    rep = LexiconReport(lexicon=pl.id, language=pl.language)
+    rep = LexiconReport(lexicon=pl.id, language=pl.language,
+                        license=pl.provenance.license)
     rep.parser_flags = list(pl.flags)
     rep.n_entries = len(pl.entries)
     present: set[int] = set()
@@ -130,6 +133,11 @@ def validate_lexicon(pl: ParsedLexicon) -> LexiconReport:
             seen_keys.add(key)
             if e.strongs[1:].isdigit():
                 present.add(int(e.strongs[1:]))
+        # Strong's "Not Used" placeholders (skipped numbers) are expected empties,
+        # not errors — kept so the coverage span is explicit. Counted + flagged.
+        if getattr(e, "not_used", False):
+            rep.n_not_used += 1
+            continue
         if e.definition:
             rep.n_with_definition += 1
             if len(e.definition) > LONG_DEF_CHARS:
@@ -312,6 +320,7 @@ def render_lexicon_report(
     orphans: OrphanReport | None = None,
     thayers_flag: str | None = None,
     sblgnt_flag: str | None = None,
+    strongs_hebrew_flag: str | None = None,
 ) -> str:
     tagged_reports = tagged_reports or {}
     lines: list[str] = []
@@ -340,9 +349,14 @@ def render_lexicon_report(
     for lid in sorted(lex_reports):
         r = lex_reports[lid]
         lines.append(f"  {lid} [{r.language}]")
+        if r.license:
+            lines.append(f"    license: {r.license}")
         lines.append(f"    entries={r.n_entries} linked-to-strongs={r.n_linked} "
                      f"distinct-strongs={r.distinct_strongs} "
                      f"with-definition={r.n_with_definition}")
+        if r.n_not_used:
+            lines.append(f"    'Not Used' placeholders: {r.n_not_used} "
+                         f"(expected skipped Strong's numbers; not errors)")
         if r.expected_max:
             lines.append(f"    coverage span: 1..{r.expected_max}")
         for g in r.coverage_gaps:
@@ -398,6 +412,9 @@ def render_lexicon_report(
     lines.append("FLAGGED FOR HUMAN REVIEW")
     lines.append("-" * 64)
     n = 1
+    if strongs_hebrew_flag:
+        lines.append(f"  {n}. {strongs_hebrew_flag}")
+        n += 1
     if thayers_flag:
         lines.append(f"  {n}. {thayers_flag}")
         n += 1
