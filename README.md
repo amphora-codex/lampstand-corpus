@@ -61,6 +61,22 @@ python -m lampstand_corpus.cli build-embeddings      # chunk built DBs, encode (
 index in plain SQLite tables; both the model weights and the compiled index are
 gitignored and never committed.
 
+**Incremental re-encode.** `build-embeddings` is incremental by default: when an
+`embeddings.sqlite` already exists (built under the same pinned model revision), it
+reuses every vector whose chunk is unchanged and re-encodes only the changed/new
+chunks. A chunk is "unchanged" iff its content-addressed id —
+`sha256(resource_type · source · anchor · text_checksum)` — matches a row in the
+prior DB, which guarantees the embedded text is byte-identical. Removed chunks
+simply fall out of the new set; the BM25 index is always rebuilt over the full new
+chunk set (deterministic and order-stable). This turns a corpus update that touches
+a small slice (e.g. swapping the Strong's dictionaries re-texts ~14k of ~175k
+chunks) from a ~4-hour full encode into minutes. Run `build-embeddings full` to
+force a from-scratch re-encode. Determinism is architect-decided **Option A**:
+cosine-tolerance acceptance, locked by model revision + input checksums + artifact
+SHA (a reused vector is provably the embedding of identical text under the same
+model; CPU float reductions jitter at ~1e-7, recorded and accepted, not silently
+ignored).
+
 ---
 
 *LampStand · An Amphora Company.* See the app repo (`lampstand-ios`, private) for the consuming side.
