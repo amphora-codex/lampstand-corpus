@@ -48,6 +48,19 @@ pip install -e ".[dev]"
 ruff check . && pytest
 ```
 
+The embeddings phase (P6) needs the heavy encoder, kept out of the default install
+so the light snapshot/build/validate phases stay lean:
+
+```bash
+pip install -e ".[embeddings]"                       # sentence-transformers + torch
+python -m lampstand_corpus.cli snapshot-model        # download BGE-small (pinned rev) -> models/ (gitignored)
+python -m lampstand_corpus.cli build-embeddings      # chunk built DBs, encode (CPU, deterministic), write embeddings.sqlite + report
+```
+
+`embeddings.sqlite` carries the dense float32 vectors (dim 384) and a BM25 keyword
+index in plain SQLite tables; both the model weights and the compiled index are
+gitignored and never committed.
+
 ---
 
 *LampStand · An Amphora Company.* See the app repo (`lampstand-ios`, private) for the consuming side.

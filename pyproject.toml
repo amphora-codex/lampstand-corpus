@@ -15,19 +15,23 @@ dependencies = [
     "beautifulsoup4>=4.12",  # CCEL HTML parsing
     "lxml>=5.2",             # HTML/USX parsing
     "pydantic>=2.7",         # typed normalized records + provenance
-    "rank-bm25>=0.2.2",      # sparse keyword index
-    "numpy>=1.26",
-    # Embedding model per spec §4.2 (BGE-small). sentence-transformers pulls in
-    # torch (large). Embedding computation is the heavy step (run in batch);
-    # an ONNX-runtime path is a lighter alternative to evaluate if torch is a
-    # burden on the build machine.
-    "sentence-transformers>=3.0",
+    "rank-bm25>=0.2.2",      # sparse keyword index (reference; pipeline writes its own)
+    "numpy>=1.26",           # float32 vector blobs + cosine smoke test
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.2",
     "ruff>=0.5",
+]
+# Heavy: only the P6 embeddings phase needs torch + sentence-transformers
+# (~hundreds of MB). Kept OUT of the default install so the light snapshot/
+# build/validate phases stay lean. Install with:  pip install -e ".[embeddings]"
+# Model weights (BGE-small) are downloaded to a gitignored models/ cache and
+# never committed; their hashes are recorded in the embeddings manifest.
+embeddings = [
+    "sentence-transformers>=3.0",  # BGE-small encoder (spec §4.2)
+    "torch>=2.2",                  # CPU/MPS build; no CUDA required
 ]
 
 [project.scripts]

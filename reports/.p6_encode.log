@@ -1,0 +1,16 @@
+Extracting chunks from built DBs...
+  175442 chunks (commentary=128885, confession=895, lexicon=32561, scripture=13101)
+  skipped lexicon: 4516 (flagged, not dropped)
+Encoding with BAAI/bge-small-en-v1.5 @ 5c38ec7c405e on CPU (deterministic)...
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 3622.06it/s]
+  encoded 175442 vectors dim=384 in 14646.5s
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 15776.41it/s]
+Building /Users/jgwhitley/lampstand-corpus/output/embeddings.sqlite ...
+  wrote /Users/jgwhitley/lampstand-corpus/output/embeddings.sqlite (1,992,323,072 bytes)
+Running retrieval smoke test...
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 7990.91it/s]
+  [PASS] 'justification by faith'
+  [PASS] 'the LORD is my shepherd'
+  [PASS] 'in the beginning God created the heavens and the earth'
+  wrote /Users/jgwhitley/lampstand-corpus/reports/embeddings_validation_p6.txt
+  chunks=175442 dim=384 vocab=145558 postings=10834008 errors=1 flags=4517
