@@ -156,8 +156,21 @@ def _make_crossrefs(path: Path) -> None:
     conn.execute(
         "INSERT INTO source VALUES('tsk','TSK','CC-BY 4.0','courtesy openbible',"
         "'http://x','2026-06-10','ck','hdr')")
-    conn.execute("CREATE TABLE crossref(id TEXT PRIMARY KEY, payload TEXT)")
-    conn.execute("INSERT INTO crossref VALUES('x1','GEN 1:1->JHN 1:1')")
+    conn.execute(
+        "CREATE TABLE crossref(src_book TEXT, src_chapter INT, src_verse INT,"
+        " tgt_book TEXT, tgt_chapter INT, tgt_verse INT, tgt_end_book TEXT,"
+        " tgt_end_chapter INT, tgt_end_verse INT, is_range INT, votes INT,"
+        " rank INT, src_resolves INT, tgt_resolves INT)")
+    conn.executemany(
+        "INSERT INTO crossref VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [
+            # GEN 1:1 -> JHN 1:1 (maps to the fixture's bsb JHN chunk).
+            ("GEN", 1, 1, "JHN", 1, 1, "JHN", 1, 1, 0, 50, 1, 1, 1),
+            # GEN 1:1 -> PSA 33:6, community-downvoted (signed votes preserved).
+            ("GEN", 1, 1, "PSA", 33, 6, "PSA", 33, 6, 0, -3, 2, 1, 1),
+            # Non-resolving edge: must NOT be packed.
+            ("GEN", 1, 1, "REV", 99, 1, "REV", 99, 1, 0, 7, 3, 1, 0),
+        ])
     conn.commit()
     conn.close()
 
@@ -184,6 +197,8 @@ def _make_embeddings(path: Path) -> None:
          "of the holy scripture light", "h4", 0),
         ("lex_g", "lexicon", "strongs-greek", "strongs-greek:G25", None, None,
          None, None, "G25", "agape love charity", "h5", 0),
+        ("scr_j", "scripture", "bsb", "bsb:JHN 1:1", "JHN", 1, 1, 1, None,
+         "in the beginning was the word", "h6", 0),
     ]
     conn.executemany(
         "INSERT INTO chunk VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", rows)
@@ -289,14 +304,15 @@ def test_bundled_search_v2_scopes_quantizes_and_recomputes_bm25(tmp_path):
         exp_blob, exp_scale = quantize_int8(np.frombuffer(vf, dtype="<f4"))
         assert vb == exp_blob and scale == exp_scale
 
-    # BM25 N reflects ONLY the bundled subset (2 docs), not the global 5.
+    # BM25 N reflects ONLY the bundled subset (2 bsb scripture + 1 wsc = 3
+    # docs), not the global 6.
     n_docs = bun.execute(
         "SELECT value FROM bm25_stats WHERE key='n_docs'").fetchone()[0]
-    assert n_docs == 2.0
-    # "light" appears in the bsb scripture chunk; doc_freq must be <= bundled N.
+    assert n_docs == 3.0
+    # "light" appears in the bsb GEN chunk; doc_freq must be <= bundled N.
     df = bun.execute(
         "SELECT doc_freq FROM bm25_term WHERE term='light'").fetchone()
-    assert df is not None and df[0] <= 2
+    assert df is not None and df[0] <= 3
     full.close()
     bun.close()
 
@@ -311,7 +327,7 @@ def test_ondemand_search_pack_v2_contract(tmp_path):
     rows = sp.execute(
         "SELECT id, string_id, text, doc_len FROM chunk ORDER BY id").fetchall()
     # 1-based int ids assigned by ascending string id.
-    assert [r[0] for r in rows] == list(range(1, 6))
+    assert [r[0] for r in rows] == list(range(1, 7))
     assert [r[1] for r in rows] == sorted(r[1] for r in rows)
     # Display text included (the data-driven decision) + doc_len from BM25.
     by_sid = {r[1]: r for r in rows}
@@ -402,6 +418,51 @@ def test_packaging_is_deterministic(tmp_path):
     package_corpus(out, out / "packs_b")
     for f in sorted((out / "packs_a").glob("*.sqlite")):
         assert _sha(f) == _sha(out / "packs_b" / f.name), f.name
+
+
+def test_bundled_crossrefs_pack_edges_and_expansion(tmp_path):
+    from lampstand_corpus.crossref_pack import (
+        decode_neighbors,
+        decode_targets,
+        verse_key,
+    )
+
+    out = tmp_path / "output"
+    _build_fixture(out)
+    package_corpus(out, out / "packs")
+
+    cp = sqlite3.connect(out / "packs" / "bundled_crossrefs.sqlite")
+    meta = dict(cp.execute("SELECT key, value FROM meta"))
+    assert meta["format"] == "crossrefs-pack-v1"
+    assert "CC-BY" in meta["license"]
+    assert meta["attribution"] == "courtesy openbible"
+
+    # Edge table: one source (GEN 1:1), TWO resolving targets in rank order —
+    # the non-resolving edge is excluded; signed votes survive zigzag.
+    n_targets, blob = cp.execute(
+        "SELECT n_targets, targets FROM crossref WHERE src_verse=?",
+        (verse_key("GEN", 1, 1),)).fetchone()
+    targets = decode_targets(blob)
+    assert n_targets == 2 and len(targets) == 2
+    assert targets[0] == (verse_key("JHN", 1, 1), verse_key("JHN", 1, 1), 50)
+    assert targets[1] == (verse_key("PSA", 33, 6), verse_key("PSA", 33, 6), -3)
+
+    # Expansion: BOTH translations of GEN 1:1 point at the bsb JHN pericope
+    # (the downvoted PSA target has no chunk and would be negative anyway).
+    sp = sqlite3.connect(out / "packs" / "ondemand_search.sqlite")
+    int_id = {sid: i for i, sid in sp.execute("SELECT id, string_id FROM chunk")}
+    for src_sid in ("scr_a", "scr_b"):
+        n, nblob = cp.execute(
+            "SELECT n_neighbors, neighbors FROM chunk_crossref WHERE chunk_id=?",
+            (int_id[src_sid],)).fetchone()
+        assert n == 1
+        assert decode_neighbors(nblob) == [(int_id["scr_j"], 50)]
+    # JHN 1:1 has no outgoing edges -> no expansion row.
+    assert cp.execute(
+        "SELECT count(*) FROM chunk_crossref WHERE chunk_id=?",
+        (int_id["scr_j"],)).fetchone()[0] == 0
+    sp.close()
+    cp.close()
 
 
 def test_preserve_models_subtree_carries_coreml_entries(tmp_path):

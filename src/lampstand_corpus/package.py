@@ -720,6 +720,15 @@ def package_corpus(
         vector_format=vector_format, model_meta=emb_meta)
     register("bundled", "bundled_search.sqlite", "search", c)
 
+    # TSK cross-reference layer (Rank 13): edge table + per-pericope expansion,
+    # BUNDLED — small, always available, and a single-purpose reader that never
+    # touches the search index (contract: docs/crossrefs-pack.md).
+    from .crossref_pack import build_bundled_crossrefs
+    c = build_bundled_crossrefs(
+        output_dir / "crossrefs.sqlite", output_dir / "embeddings.sqlite",
+        id_map, packs_dir / "bundled_crossrefs.sqlite")
+    register("bundled", "bundled_crossrefs.sqlite", "crossrefs", c)
+
     # --- On-demand packs ---
     c = _filter_bibles(
         output_dir / "bibles.sqlite",

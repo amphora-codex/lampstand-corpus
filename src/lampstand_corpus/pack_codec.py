@@ -62,6 +62,17 @@ def read_uvarint(blob: bytes, pos: int) -> tuple[int, int]:
         shift += 7
 
 
+# --- zigzag (signed values inside uvarint streams) --------------------------------
+def zigzag_encode(n: int) -> int:
+    """Map a signed int to unsigned for uvarint storage (0,-1,1,-2 → 0,1,2,3)."""
+    return (n << 1) if n >= 0 else ((-n) << 1) - 1
+
+
+def zigzag_decode(u: int) -> int:
+    """Inverse of :func:`zigzag_encode`."""
+    return (u >> 1) if (u & 1) == 0 else -((u + 1) >> 1)
+
+
 # --- posting blobs ---------------------------------------------------------------
 def encode_postings(postings: list[tuple[int, int]]) -> bytes:
     """Encode ``[(int_chunk_id, term_freq), ...]`` (ids ascending, >= 1).
