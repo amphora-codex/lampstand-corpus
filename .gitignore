@@ -36,3 +36,4 @@ reports/.*.log
 # re-chunk resume chain (transient run state)
 .rechunk-run.log
 .rechunk-resume.sh
+.rechunk-package*.log
