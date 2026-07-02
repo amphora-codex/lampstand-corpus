@@ -217,6 +217,10 @@ def parse_proof_block(block: str) -> ScripRefResult:
         last_book: str | None = None
         for token in _CONNECTOR_RE.split(raw_token):
             token = _TAIL_NOISE_RE.sub("", token).strip().strip(".,").strip()
+            # A LEADING connector word ("With Genesis 2:24") carries no verse
+            # data — the mid-token connector split only matches between spaces.
+            token = re.sub(r"^(?:with|and|cf|see|compare)\.?\s+", "", token,
+                           flags=re.IGNORECASE)
             # Drop a "ver."/"verse" word between book and number ("Jude ver. 4").
             token = re.sub(r"\b(?:ver|verse|vers)\.?\s+(?=\d)", "", token,
                            flags=re.IGNORECASE)

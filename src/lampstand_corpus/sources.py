@@ -137,12 +137,26 @@ def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
     # Imported here to avoid a circular import (confessions imports SOURCES_DIR).
     from .confessions import CONFESSION_SOURCES, CONFESSIONS_DIR
 
+    # Provenance honesty: a file that already exists keeps its ORIGINAL
+    # retrieved date from the prior manifest; only a fresh fetch is stamped
+    # with this run's date. (An additive snapshot — e.g. the Westminster
+    # proof-text aux files — must not restamp untouched sources.)
+    manifest_path = CONFESSIONS_DIR / "manifest.json"
+    prior_sources: dict = {}
+    if manifest_path.exists():
+        import json as _json
+        prior_sources = _json.loads(
+            manifest_path.read_text(encoding="utf-8")).get("sources", {})
+
     manifest: dict = {"retrieved": retrieved, "sources": {}}
     for src in CONFESSION_SOURCES.values():
+        was = prior_sources.get(src.id, {})
         if force or not src.dest.exists():
             checksum = fetch(src.url, src.dest)
+            entry_retrieved = retrieved
         else:
             checksum = sha256_of(src.dest)
+            entry_retrieved = was.get("retrieved", retrieved)
         entry: dict = {
             "name": src.name,
             "shortcode": src.shortcode,
@@ -150,21 +164,27 @@ def snapshot_confessions(retrieved: str, *, force: bool = False) -> dict:
             "file": str(src.dest.relative_to(SOURCES_DIR.parent)),
             "version": src.version,
             "license": src.license,
-            "retrieved": retrieved,
+            "retrieved": entry_retrieved,
             "sha256": checksum,
         }
         if src.repo_license:
             entry["repo_license"] = src.repo_license
-        # Auxiliary file (e.g. the 1689 per-paragraph proof-text markdown).
+        # Auxiliary file (e.g. the 1689 per-paragraph proof-text markdown, the
+        # Westminster catechism proof-text JSONs).
         aux = src.aux_dest
         if aux is not None:
             if force or not aux.exists():
                 aux_checksum = fetch(src.aux_url, aux)
+                entry["aux_retrieved"] = retrieved
             else:
                 aux_checksum = sha256_of(aux)
+                entry["aux_retrieved"] = was.get(
+                    "aux_retrieved", was.get("retrieved", retrieved))
             entry["aux_file"] = str(aux.relative_to(SOURCES_DIR.parent))
             entry["aux_url"] = src.aux_url
             entry["aux_sha256"] = aux_checksum
+            if src.aux_note:
+                entry["aux_note"] = src.aux_note
         # Amendment source (e.g. the CCEL 1788 American-revision WCF, used to
         # populate the verbatim revised wording of the six amended loci).
         amend = src.amend_dest

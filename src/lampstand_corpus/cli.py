@@ -189,6 +189,9 @@ REPO_ROOT = SOURCES_DIR.parent
 OUTPUT_DIR = REPO_ROOT / "output"
 REPORTS_DIR = REPO_ROOT / "reports"
 RETRIEVED = "2026-06-10"
+# Snapshot-run date for the Westminster proof-text supplement (confessions);
+# unchanged files keep their original retrieved stamps (see snapshot_confessions).
+RETRIEVED_WESTMINSTER = "2026-07-02"
 
 # Matches the \id book code at the very start of a USFM member file.
 _ID_RE = re.compile(rb"^\\id\s+(\S+)", re.MULTILINE)
@@ -311,7 +314,7 @@ def normalize_confessions() -> dict:
 
 def cmd_snapshot_confessions() -> None:
     print("Snapshotting confession sources -> sources/confessions/ + manifest.json")
-    manifest = snapshot_confessions(RETRIEVED)
+    manifest = snapshot_confessions(RETRIEVED_WESTMINSTER)
     for cid, e in sorted(manifest["sources"].items()):
         print(f"  {cid}: {e['sha256']}  {e['file']}")
 
@@ -339,8 +342,10 @@ def _emit_confession_report(parsed: dict) -> None:
     wcf_prose = (
         crosscheck_wcf_prose(parsed["wcf"], burges) if "wcf" in parsed else None
     )
+    from .validate_confessions import prooftext_summary
     text = render_confession_report(
-        reports, bible_crosscheck=crosscheck, wcf_prose_crosscheck=wcf_prose
+        reports, bible_crosscheck=crosscheck, wcf_prose_crosscheck=wcf_prose,
+        prooftext_lines=prooftext_summary(parsed),
     )
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     rp = REPORTS_DIR / "confessions_validation_p2.txt"

@@ -146,6 +146,7 @@ class ConfessionSource:
     repo_license: str = ""   # license of the upstream REPO (text itself is PD)
     aux_url: str = ""        # secondary source file (e.g. the 1689 proof-text md)
     aux_filename: str = ""
+    aux_note: str = ""       # provenance/license note for the aux file (manifest)
     xref_url: str = ""       # validation-only cross-check snapshot (not a source)
     xref_filename: str = ""
     amend_url: str = ""      # amendment source (e.g. the 1788 American-revision WCF)
@@ -209,6 +210,18 @@ CONFESSION_SOURCES: dict[str, ConfessionSource] = {
         filename="westminster2.xml",
         version="CCEL ThML",
         license="Public domain (CCEL)",
+        # ARCHITECT-APPROVED proof-text supplement (Rank 14 follow-up): the
+        # Westminster Standards JSON repo carries the Assembly's lettered
+        # proof groups per answer clause. Text still comes from CCEL (chunk
+        # ids unchanged); ONLY the proof apparatus is merged in.
+        aux_url="https://raw.githubusercontent.com/reformed-christian/"
+                "westminster-standards-json/main/catechisms/larger/"
+                "westminster_larger_catechism_with_references.json",
+        aux_filename="wlc_with_references.json",
+        aux_note="reformed-christian/westminster-standards-json — repo "
+                 "declares NO license; underlying 1647/48 catechism text + "
+                 "proof apparatus are public domain (repo's own sources/ are "
+                 "the PD PRTS edition PDFs). FLAGGED for architect review.",
     ),
     "wsc": ConfessionSource(
         id="wsc", name="Westminster Shorter Catechism", shortcode="WSC",
@@ -216,6 +229,14 @@ CONFESSION_SOURCES: dict[str, ConfessionSource] = {
         filename="westminster1.xml",
         version="CCEL ThML (1674)",
         license="Public domain (CCEL)",
+        aux_url="https://raw.githubusercontent.com/reformed-christian/"
+                "westminster-standards-json/main/catechisms/shorter/"
+                "westminster_shorter_catechism.json",
+        aux_filename="wsc_with_references.json",
+        aux_note="reformed-christian/westminster-standards-json — repo "
+                 "declares NO license; underlying 1647/48 catechism text + "
+                 "proof apparatus are public domain (repo's own sources/ are "
+                 "the PD PRTS edition PDFs). FLAGGED for architect review.",
     ),
     # ADDED: 1689 London Baptist Confession (original 1677/89, 32 chapters).
     "lbcf": ConfessionSource(
@@ -310,11 +331,80 @@ _WLC_Q_RE = re.compile(r"^Question\s+(\d{1,3})[:.]\s*(.*)$", re.DOTALL)
 _WLC_A_RE = re.compile(r"^Answer[:.]?\s*(.*)$", re.DOTALL)
 
 
+def _load_westminster_proofs(
+    src: ConfessionSource, flags: list[str]
+) -> dict[int, list[dict]]:
+    """Proof-texts per question from the Westminster-Standards JSON aux file.
+
+    The source follows the Assembly's convention of LETTERED PROOF GROUPS per
+    answer clause: each question carries ``clauses[]``, each clause a footnote
+    number and its ``references[]`` (citation string + KJV text). We flatten to
+    the per-question union in clause order (the shape every other document's
+    ``proof_texts`` uses), deduped first-seen. Every reference string is parsed
+    through the same :func:`scripref.parse_proof_block` spine parser used by
+    the WCF/1689 — an unresolvable citation is FLAGGED, never guessed.
+
+    Bookkeeping identity (source-count sanity, checked here): for each
+    question, parsed refs + flagged-unparsed refs == reference entries in the
+    source JSON.
+    """
+    import json as _json
+
+    aux = src.aux_dest
+    if aux is None or not aux.exists():
+        flags.append(
+            f"{src.id}: Westminster proof-text JSON not present "
+            f"({src.aux_filename}); questions ingested without proof-texts — "
+            "run snapshot-confessions")
+        return {}
+    data = _json.loads(aux.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        flags.append(f"{src.id}: unexpected proof JSON shape (not a list) — review")
+        return {}
+
+    out: dict[int, list[dict]] = {}
+    for q in data:
+        qnum = q.get("number")
+        if not isinstance(qnum, int):
+            flags.append(f"{src.id}: proof JSON entry without a question number — review")
+            continue
+        n_source_refs = 0
+        n_parsed = 0
+        n_unparsed = 0
+        seen: set[tuple] = set()
+        proofs: list[dict] = []
+        for clause in q.get("clauses", []):
+            for ref in clause.get("references", []):
+                citation = _norm_ws(str(ref.get("reference", "")))
+                if not citation:
+                    continue
+                n_source_refs += 1
+                res = parse_proof_block(citation)
+                for vr in res.refs:
+                    k = (vr.book, vr.chapter, vr.verse_start)
+                    if k not in seen:
+                        seen.add(k)
+                        proofs.append(vr.model_dump(exclude_none=True))
+                n_parsed += len(res.refs)
+                for tok in res.unparsed:
+                    n_unparsed += 1
+                    flags.append(
+                        f"{src.id}: Q{qnum} proof citation not resolved -> "
+                        f"{tok!r} (kept for human review, not guessed)")
+        if n_parsed == 0 and n_source_refs > 0:
+            flags.append(
+                f"{src.id}: Q{qnum} has {n_source_refs} source citations but "
+                "NONE parsed — review")
+        out[qnum] = proofs
+    return out
+
+
 def parse_westminster_catechism(
     src: ConfessionSource, prov: Provenance, content: str, *, larger: bool
 ) -> ParsedConfession:
     soup = BeautifulSoup(content, "lxml-xml")
     flags: list[str] = []
+    proofs_by_q = _load_westminster_proofs(src, flags)
     # Gather all paragraph texts in document order.
     paras = [_norm_ws(p.get_text(" ", strip=True)) for p in soup.find_all("p")]
     paras = [p for p in paras if p]
@@ -352,10 +442,26 @@ def parse_westminster_catechism(
                 src, prov, key=str(qnum),
                 text=text,
                 meta={"question": qnum, "question_text": qtext,
-                      "answer_text": atext, "proof_texts": []},
+                      "answer_text": atext,
+                      "proof_texts": proofs_by_q.get(qnum, [])},
             ))
             pending_q = None
     chunks.sort(key=lambda c: int(c.key))
+    # Proof coverage bookkeeping: when the aux apparatus is present, every
+    # question should carry proofs; question numbers in the JSON must match the
+    # CCEL question set exactly.
+    if proofs_by_q:
+        ccel_q = {int(c.key) for c in chunks}
+        json_q = set(proofs_by_q)
+        for qnum in sorted(ccel_q - json_q):
+            flags.append(f"{src.id}: Q{qnum} missing from the proof JSON — review")
+        for qnum in sorted(json_q - ccel_q):
+            flags.append(f"{src.id}: proof JSON has unknown Q{qnum} — review")
+        empties = [int(c.key) for c in chunks if not c.meta["proof_texts"]]
+        if empties:
+            flags.append(
+                f"{src.id}: {len(empties)} question(s) with zero parsed "
+                f"proof-texts: {empties[:12]} — review")
     return ParsedConfession(id=src.id, chunks=chunks, flags=flags)
 
 

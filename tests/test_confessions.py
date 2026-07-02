@@ -395,6 +395,10 @@ class TestConfessionsDB:
                     unresolved.append(f"{did}:{key} {pt['book']} "
                                       f"{pt['chapter']}:{pt['verse_start']}")
         b.close()
-        # Exactly the one known source-typo ref (lbcf 5.4 -> PSA 1:21) is allowed
-        # to resolve nowhere; it is FLAGGED in the report for the architect.
-        assert len(unresolved) <= 1, unresolved
+        # Exactly the KNOWN source-typo refs are allowed to resolve nowhere;
+        # each is FLAGGED in the report for the architect, never dropped:
+        #   * lbcf 5.4 -> PSA 1:21 (1689 source typo, known since P2)
+        #   * wsc 1 -> 1CO 6:31 (Westminster-Standards JSON collapsed
+        #     "1 Cor. 6:20; 10:31" into "6:20, 31", losing the chapter change)
+        known = {"lbcf:5.4 PSA 1:21", "wsc:1 1CO 6:31"}
+        assert set(unresolved) <= known, unresolved

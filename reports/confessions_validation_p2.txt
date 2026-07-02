@@ -91,24 +91,108 @@ fix. The pipeline never marks a corpus ship-ready.
     - wcf 1788: verbatim American-revision text populated on the amended loci (20.4, 22.3, 23.3, 25.6, 31.1, 31.2) alongside the retained original text; 24.4 verbatim is the one justified gap (source ch.24 is a later denominational rewrite) — human-verify the two bracket loci 22.3 & 25.6, and source/reconstruct 24.4 separately
 
 ## WLC
-  questions=196/196  proof-texts=0
-  count_ok=True  errors=0  flags=0
+  questions=196/196  proof-texts=2449
+  count_ok=True  errors=0  flags=48
+  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (48):
+    - wlc: Q4 proof citation not resolved -> 'Corinthians 2:6-7, 13' (kept for human review, not guessed)
+    - wlc: Q22 proof citation not resolved -> 'Corinthians 15:21-22' (kept for human review, not guessed)
+    - wlc: Q23 proof citation not resolved -> 'God' (kept for human review, not guessed)
+    - wlc: Q30 proof citation not resolved -> 'Christ' (kept for human review, not guessed)
+    - wlc: Q39 proof citation not resolved -> 'Abraham' (kept for human review, not guessed)
+    - wlc: Q45 proof citation not resolved -> 'Corinthians 5:4-5' (kept for human review, not guessed)
+    - wlc: Q55 proof citation not resolved -> 'God' (kept for human review, not guessed)
+    - wlc: Q59 proof citation not resolved -> 'Corinthians 4:13' (kept for human review, not guessed)
+    - wlc: Q63 proof citation not resolved -> 'Jerusalem' (kept for human review, not guessed)
+    - wlc: Q74 proof citation not resolved -> 'Almighty' (kept for human review, not guessed)
+    - wlc: Q79 proof citation not resolved -> 'Amen' (kept for human review, not guessed)
+    - wlc: Q79 proof citation not resolved -> 'Lord' (kept for human review, not guessed)
+    - wlc: Q83 proof citation not resolved -> 'God' (kept for human review, not guessed)
+    - wlc: Q84 proof citation not resolved -> 'Lord' (kept for human review, not guessed)
+    - wlc: Q93 proof citation not resolved -> 'Thessalonians 5:23' (kept for human review, not guessed)
+    - wlc: Q105 proof citation not resolved -> 'Nazareth' (kept for human review, not guessed)
+    - wlc: Q105 proof citation not resolved -> 'Samuel 28:7, 11' (kept for human review, not guessed)
+    - wlc: Q108 proof citation not resolved -> 'Timothy 6:13-14' (kept for human review, not guessed)
+    - wlc: Q109 proof citation not resolved -> 'Samuel 15:21' (kept for human review, not guessed)
+    - wlc: Q113 proof citation not resolved -> "PSA '39' (part '39')" (kept for human review, not guessed)
+    - wlc: Q113 proof citation not resolved -> 'Timothy 6:4-5, 20' (kept for human review, not guessed)
+    - wlc: Q113 proof citation not resolved -> 'Timothy 2:14' (kept for human review, not guessed)
+    - wlc: Q130 proof citation not resolved -> 'Samuel 2:29-31' (kept for human review, not guessed)
+    - wlc: Q135 proof citation not resolved -> 'Roman' (kept for human review, not guessed)
+    - wlc: Q144 proof citation not resolved -> 'Corinthians 12:21' (kept for human review, not guessed)
+    - wlc: Q147 proof citation not resolved -> 'Corinthians 13:4-7' (kept for human review, not guessed)
+    - wlc: Q151 proof citation not resolved -> 'Kings 11:9-10' (kept for human review, not guessed)
+    - wlc: Q155 proof citation not resolved -> "2CH '34:18-19 26-28' (part '34:18-19 26-28')" (kept for human review, not guessed)
+    - wlc: Q155 proof citation not resolved -> 'Thessalonians 3:2, 10-11, 13' (kept for human review, not guessed)
+    - wlc: Q157 proof citation not resolved -> 'Corinthians 3:13-16' (kept for human review, not guessed)
+    - wlc: Q158 proof citation not resolved -> 'Corinthians 12:28-29' (kept for human review, not guessed)
+    - wlc: Q158 proof citation not resolved -> 'Timothy 5:22' (kept for human review, not guessed)
+    - wlc: Q162 proof citation not resolved -> 'Ghost' (kept for human review, not guessed)
+    - wlc: Q172 proof citation not resolved -> "PSA '88' (part '88')" (kept for human review, not guessed)
+    - wlc: Q173 proof citation not resolved -> "1CO '5' (part '5')" (kept for human review, not guessed)
+    - wlc: Q176 proof citation not resolved -> 'Holy Ghost' (kept for human review, not guessed)
+    - wlc: Q176 proof citation not resolved -> 'Corinthians 4:1' (kept for human review, not guessed)
+    - wlc: Q176 proof citation not resolved -> 'God' (kept for human review, not guessed)
+    - wlc: Q178 proof citation not resolved -> 'Selah' (kept for human review, not guessed)
+    - wlc: Q181 proof citation not resolved -> 'Timothy 2:5' (kept for human review, not guessed)
+    - wlc: Q190 proof citation not resolved -> "PSA '145' (part '145')" (kept for human review, not guessed)
+    - wlc: Q190 proof citation not resolved -> "PSA '8' (part '8')" (kept for human review, not guessed)
+    - wlc: Q190 proof citation not resolved -> "PSA '83' (part '83')" (kept for human review, not guessed)
+    - wlc: Q191 proof citation not resolved -> "PSA '67' (part '67')" (kept for human review, not guessed)
+    - wlc: Q191 proof citation not resolved -> 'Lord Jesus' (kept for human review, not guessed)
+    - wlc: Q193 proof citation not resolved -> 'Thessalonians 3:11-12' (kept for human review, not guessed)
+    - wlc: Q194 proof citation not resolved -> 'Lord' (kept for human review, not guessed)
+    - wlc: 2 question(s) with zero parsed proof-texts: [100, 188] — review
 
 ## WSC
-  questions=107/107  proof-texts=0
-  count_ok=True  errors=0  flags=0
+  questions=107/107  proof-texts=632
+  count_ok=True  errors=1  flags=9
+  PROOF-TEXT REFS OUTSIDE CANON (review) (1):
+    - wsc:1 -> 1CO 6:31
+  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (9):
+    - wsc: Q1 proof citation not resolved -> "PSA '86' (part '86')" (kept for human review, not guessed)
+    - wsc: Q10 proof citation not resolved -> "PSA '8' (part '8')" (kept for human review, not guessed)
+    - wsc: Q25 proof citation not resolved -> "ISA '53' (part '53')" (kept for human review, not guessed)
+    - wsc: Q74 proof citation not resolved -> "EPH '4:28b' (part '4:28b')" (kept for human review, not guessed)
+    - wsc: Q75 proof citation not resolved -> "EPH '4:28a' (part '4:28a')" (kept for human review, not guessed)
+    - wsc: Q82 proof citation not resolved -> "ROM '3:9 ff., 23' (part '3:9 ff.')" (kept for human review, not guessed)
+    - wsc: Q82 proof citation not resolved -> "ROM '3:9 ff., 23' (part '23')" (kept for human review, not guessed)
+    - wsc: Q98 proof citation not resolved -> "PSA '136' (part '136')" (kept for human review, not guessed)
+    - wsc: Q103 proof citation not resolved -> "PSA '119' (part '119')" (kept for human review, not guessed)
 
 ## WCF PROSE CROSS-CHECK vs Wikisource Burges-1646
   wcf prose cross-checked vs Wikisource Burges-1646: 14 sampled sections, 0 divergence(s) (incl. forced ch.23.1 & ch.24.1)
 
+## PROOF-TEXT APPARATUS (Rank 14 supplement)
+  belgic     sections-with-proofs=0/37  stored-refs=0
+  dort       sections-with-proofs=42/94  stored-refs=80
+  heidelberg sections-with-proofs=124/129  stored-refs=1645
+  lbcf       sections-with-proofs=159/160  stored-refs=1121
+  wcf        sections-with-proofs=172/172  stored-refs=2465
+  wlc        sections-with-proofs=194/196  stored-refs=2449
+  wsc        sections-with-proofs=107/107  stored-refs=632
+  (belgic: proof apparatus NOT in the Wikisource 1840 source; coverable via CCEL schaff/creeds3 — architect decision pending)
+
+## ADVISOR SPOT-CHECK (Westminster proof-text supplement)
+  Hand-verify these loci against a printed Westminster edition
+  (proof refs, not just presence). DRAFT until the advisor signs:
+    WSC Q1 (chief end; incl. the KNOWN source defect: the JSON
+      collapses 1 Cor. 6:20; 10:31 into '6:20, 31' -> phantom
+      1CO 6:31, FLAGGED not guessed), WSC Q33 (justification),
+    WSC Q88 (outward means), WSC Q98 (prayer),
+    WLC Q1, WLC Q70 (justification), WLC Q109 (images),
+    WLC Q154 (outward means), WLC Q196 (conclusion of prayer),
+    plus every 'proof citation not resolved' flag above (source
+    defects: leading 1/2 dropped from numbered books, stray words).
+
 ## PROOF-TEXT CROSS-CHECK vs bibles.sqlite (refs must resolve in our own Bibles)
-  proof-text refs cross-checked against bibles.sqlite under the canonical-spine versification map: 5311 refs across translations ['asv', 'bsb', 'kjv', 'web']
-    asv: 1 proof ref(s) do not resolve in this translation
-    bsb: 1 proof ref(s) do not resolve in this translation
-    kjv: 1 proof ref(s) do not resolve in this translation
-    web: 3 proof ref(s) do not resolve in this translation
-  proof refs that resolve in NO bundled translation (1) — these are genuine bad/typo refs to adjudicate (NOT renumbered):
+  proof-text refs cross-checked against bibles.sqlite under the canonical-spine versification map: 8392 refs across translations ['asv', 'bsb', 'kjv', 'web']
+    asv: 2 proof ref(s) do not resolve in this translation
+    bsb: 2 proof ref(s) do not resolve in this translation
+    kjv: 2 proof ref(s) do not resolve in this translation
+    web: 5 proof ref(s) do not resolve in this translation
+  proof refs that resolve in NO bundled translation (2) — these are genuine bad/typo refs to adjudicate (NOT renumbered):
       - lbcf:5.4 -> PSA 1:21 (resolves in NO bundled translation)
+      - wsc:1 -> 1CO 6:31 (resolves in NO bundled translation)
   NOTE (architect): the BSB Hebrew Psalm-superscription numbering is now handled by the canonical-spine versification map (lampstand_corpus.versification). DATA-VERIFIED CORRECTION to the earlier '+1 offset' framing: BSB body verse numbers match KJV (offset 0), not +1 — BSB folds the superscription INTO verse 1, it does not shift the body. The earlier 'Psalm N:1 misses in BSB' failures were a separate ingestion bug (BSB's \d \v 1 line was dropped, so verse 1 had no row); that is fixed in usfm.py and BSB now carries a verse 1 for every superscribed psalm. Remaining no-resolve refs above (if any) are genuine source typos, NOT versification.
 
 ## DOCUMENTS IN SCOPE BUT SKIPPED (flagged for human sourcing)

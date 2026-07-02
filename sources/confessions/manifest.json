@@ -1,5 +1,5 @@
 {
-  "retrieved": "2026-06-10",
+  "retrieved": "2026-07-02",
   "sources": {
     "belgic": {
       "file": "sources/confessions/belgic/belgic-1840-rpdc.parse.json",
@@ -34,6 +34,7 @@
     },
     "lbcf": {
       "aux_file": "sources/confessions/lbcf/lbcf_with_scripture_refs.md",
+      "aux_retrieved": "2026-06-10",
       "aux_sha256": "5940782e930cd05230f240b7568a980f2cf34920629044d16eab8e7086afd301",
       "aux_url": "https://raw.githubusercontent.com/ParticularBaptists/lbcf-1689/master/lbcf_with_scripture_refs.md",
       "file": "sources/confessions/lbcf/lbcf.json",
@@ -67,6 +68,11 @@
       "xref_url": "https://en.wikisource.org/w/api.php?action=parse&page=The_Confession_of_Faith_of_the_Assembly_of_Divines_at_Westminster&prop=text&formatversion=2&format=json"
     },
     "wlc": {
+      "aux_file": "sources/confessions/wlc/wlc_with_references.json",
+      "aux_note": "reformed-christian/westminster-standards-json \u2014 repo declares NO license; underlying 1647/48 catechism text + proof apparatus are public domain (repo's own sources/ are the PD PRTS edition PDFs). FLAGGED for architect review.",
+      "aux_retrieved": "2026-07-02",
+      "aux_sha256": "baab3b798e0c4cdaa82b825418b2ff4736bd00ad09f85564b2811095cf9723be",
+      "aux_url": "https://raw.githubusercontent.com/reformed-christian/westminster-standards-json/main/catechisms/larger/westminster_larger_catechism_with_references.json",
       "file": "sources/confessions/wlc/westminster2.xml",
       "license": "Public domain (CCEL)",
       "name": "Westminster Larger Catechism",
@@ -77,6 +83,11 @@
       "version": "CCEL ThML"
     },
     "wsc": {
+      "aux_file": "sources/confessions/wsc/wsc_with_references.json",
+      "aux_note": "reformed-christian/westminster-standards-json \u2014 repo declares NO license; underlying 1647/48 catechism text + proof apparatus are public domain (repo's own sources/ are the PD PRTS edition PDFs). FLAGGED for architect review.",
+      "aux_retrieved": "2026-07-02",
+      "aux_sha256": "6ad9060b3aa14ad6885575140eb324f7d6428daccdfa5b3105a5c3862183f9ce",
+      "aux_url": "https://raw.githubusercontent.com/reformed-christian/westminster-standards-json/main/catechisms/shorter/westminster_shorter_catechism.json",
       "file": "sources/confessions/wsc/westminster1.xml",
       "license": "Public domain (CCEL)",
       "name": "Westminster Shorter Catechism",

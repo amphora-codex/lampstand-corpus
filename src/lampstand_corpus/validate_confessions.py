@@ -312,10 +312,47 @@ SKIPPED_DOCUMENTS: list[tuple[str, str]] = [
 ]
 
 
+def prooftext_summary(parsed: dict) -> list[str]:
+    """Per-document proof-text totals + the advisor spot-check worksheet.
+
+    Totals are stated three ways so they reconcile against the source: sections
+    WITH proofs, stored VerseRefs (deduped per section), and — for the
+    Westminster catechisms — the raw citation-entry count in the source JSON
+    (one citation string may yield several refs, so stored >= raw is expected).
+    The spot-check list is deterministic: the doctrinally load-bearing loci the
+    advisor should hand-verify against a printed edition.
+    """
+    lines: list[str] = []
+    lines.append("")
+    lines.append("## PROOF-TEXT APPARATUS (Rank 14 supplement)")
+    for did in sorted(parsed):
+        pc = parsed[did]
+        n_with = sum(1 for c in pc.chunks if c.meta.get("proof_texts"))
+        n_refs = sum(len(c.meta.get("proof_texts") or []) for c in pc.chunks)
+        lines.append(f"  {did:10s} sections-with-proofs={n_with}/{len(pc.chunks)}"
+                     f"  stored-refs={n_refs}")
+    lines.append("  (belgic: proof apparatus NOT in the Wikisource 1840 source; "
+                 "coverable via CCEL schaff/creeds3 — architect decision pending)")
+    lines.append("")
+    lines.append("## ADVISOR SPOT-CHECK (Westminster proof-text supplement)")
+    lines.append("  Hand-verify these loci against a printed Westminster edition")
+    lines.append("  (proof refs, not just presence). DRAFT until the advisor signs:")
+    lines.append("    WSC Q1 (chief end; incl. the KNOWN source defect: the JSON")
+    lines.append("      collapses 1 Cor. 6:20; 10:31 into '6:20, 31' -> phantom")
+    lines.append("      1CO 6:31, FLAGGED not guessed), WSC Q33 (justification),")
+    lines.append("    WSC Q88 (outward means), WSC Q98 (prayer),")
+    lines.append("    WLC Q1, WLC Q70 (justification), WLC Q109 (images),")
+    lines.append("    WLC Q154 (outward means), WLC Q196 (conclusion of prayer),")
+    lines.append("    plus every 'proof citation not resolved' flag above (source")
+    lines.append("    defects: leading 1/2 dropped from numbered books, stray words).")
+    return lines
+
+
 def render_confession_report(
     reports: dict[str, ConfessionReport],
     bible_crosscheck: list[str] | None = None,
     wcf_prose_crosscheck: list[str] | None = None,
+    prooftext_lines: list[str] | None = None,
 ) -> str:
     lines: list[str] = []
     lines.append("LampStand corpus — M1 confessions & catechisms validation report")
@@ -381,6 +418,9 @@ def render_confession_report(
         lines.append("## WCF PROSE CROSS-CHECK vs Wikisource Burges-1646")
         for ln in wcf_prose_crosscheck:
             lines.append(f"  {ln}")
+
+    if prooftext_lines:
+        lines.extend(prooftext_lines)
 
     if bible_crosscheck:
         lines.append("")
