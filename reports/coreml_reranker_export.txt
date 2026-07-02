@@ -1,0 +1,29 @@
+LampStand corpus — on-device reranker Core ML export (Rank 4, SHIP)
+
+Model: cross-encoder/ms-marco-MiniLM-L-6-v2 (apache-2.0, BERT (MiniLM-L6))
+Revision: c5ee24cb16019beea0893ab7796b1df96625c6b8
+model_combined_sha256: cd22d44f8ae30ae37302aa38fbe00562f544f9db84355b9e9a65e85c190f5e08
+
+Artifact:
+  Reranker.mlpackage  45,535,881 B (43.4 MB, fp16)
+  tree sha256: d7fd5fcdf83cb4c7a090b6bf853f50cbafb38764f9aa94eb0a464405d130f894
+  reranker_vocab.txt  sha256 07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3
+  seq axis: RangeDim(1,512)  pair truncation: 192 tokens
+  512-token forward: 19.3 ms (CPU_ONLY convert)
+
+Score semantics: raw classifier logit; higher = more relevant (no sigmoid; only the order matters for reranking).
+
+Parity gate (fp16 CPU_ONLY Core ML, reloaded from disk, vs float32 PyTorch, over 30 fixed pairs):
+  max relative logit err: 0.01211  (floor <= 0.02)
+  max |abs err|: 0.09791  (unbounded logits ~[-12,+11])
+  mean |abs err|: 0.04492
+  non-tied order inversions: 0  (floor <= 0)
+  tied reorders (not gated): 2
+  -> PASS
+
+Reproducibility: PASS — re-trace+convert yielded a byte-identical .mlpackage tree (sha256 d7fd5fcdf83cb4c7…).
+
+Flags:
+  - FLAG (size): Reranker.mlpackage is 43.4 MB, above the ~20-25 MB back-of-envelope target (ms-marco-MiniLM-L-6-v2 is ~22M params; coremltools keeps embedding/gather ops at higher precision + carries spec/metadata). Still a fraction of bge-reranker-base (~140 MB) and under the shipped BGEQuery encoder (~66 MB) — acceptable, but the architect should confirm the binary-size budget.
+
+The .mlpackage + vocab are synced (never committed) like the corpus packs; app-integration contract: docs/reranker-pack.md.

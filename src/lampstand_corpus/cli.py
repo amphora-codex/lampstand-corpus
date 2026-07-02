@@ -1248,6 +1248,194 @@ def _check_coreml_reproducibility(res) -> str:
         _shutil.rmtree(tmp, ignore_errors=True)
 
 
+def cmd_coreml_export_reranker() -> None:
+    """Export the on-device cross-encoder RERANKER to a fp16 Core ML .mlpackage.
+
+    Runs only after the rerank quality gate SHIPPED (reports/reranker_eval_v1.md).
+    Traces the pinned ms-marco-MiniLM-L-6-v2 cross-encoder (Apache-2.0, ~22 MB
+    fp16 — the model that both clears the gate AND fits the on-device envelope),
+    runs a lineage + score-parity gate (fp16 logits vs float32 PyTorch, plus
+    zero order-inversions), emits Reranker.mlpackage + reranker_vocab.txt + the
+    parity/tokenizer fixtures under output/models/ (gitignored), writes a report,
+    and records the model in the manifest's packs.reranker + acknowledgements.
+    Requires the [coreml] + [rerank] extras.
+    """
+    try:
+        from .coreml_rerank_export import (
+            RerankLineageError,
+            RerankParityError,
+            export_reranker_coreml,
+        )
+    except ImportError as e:  # pragma: no cover - guarded import message
+        print(f"  coreml_rerank_export import failed ({e}). Install the extras "
+              "with `pip install -e \".[coreml]\" -e \".[rerank]\"` (needs "
+              "coremltools + torch + transformers).", file=sys.stderr)
+        sys.exit(2)
+
+    from .coreml_rerank_export import DEFAULT_RERANK_MODEL
+    from .encode import MODEL_CACHE
+    from .eval_rerank import RERANK_MODELS
+
+    os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
+    model_key = DEFAULT_RERANK_MODEL
+    spec = RERANK_MODELS[model_key]
+    print(f"Exporting cross-encoder reranker ({model_key}, {spec['license']}) "
+          "-> Core ML (.mlpackage, fp16)")
+    print("  Lineage, trace+convert (single logit output), parity gate "
+          "(fp16 logit abs + zero order-inversions)...")
+    try:
+        res = export_reranker_coreml(MODELS_OUT_DIR, MODEL_CACHE, model_key=model_key)
+    except RerankLineageError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+
+    det_note = _check_reranker_reproducibility(res, model_key)
+
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    report = _render_reranker_report(res, spec, det_note)
+    rp = REPORTS_DIR / "coreml_reranker_export.txt"
+    rp.write_text(report, encoding="utf-8")
+
+    # Record in the manifest: packs.reranker subtree + acknowledgements entry.
+    from collections import OrderedDict
+
+    from .package import (
+        build_reranker_pack,
+        update_manifest_acknowledgement,
+        update_manifest_reranker,
+    )
+    reranker_pack = build_reranker_pack(
+        mlpackage_path=res.mlpackage_path,
+        mlpackage_tree_sha256=res.mlpackage_tree_sha256,
+        mlpackage_bytes=res.mlpackage_bytes,
+        vocab_path=res.vocab_path,
+        vocab_sha256=res.vocab_sha256,
+        model_name=res.model_name,
+        model_revision=res.model_revision,
+        model_combined_sha256=res.model_combined_sha256,
+        license_id=spec["license"],
+        precision="float16",
+        seq_len="RangeDim(1,512)",
+        max_pair_tokens=192,
+    )
+    if CORPUS_MANIFEST.exists():
+        update_manifest_reranker(CORPUS_MANIFEST, reranker_pack)
+        update_manifest_acknowledgement(CORPUS_MANIFEST, OrderedDict([
+            ("id", "reranker-model"),
+            ("name", res.model_name),
+            ("resource_type", "reranker"),
+            ("version", f"HF revision {res.model_revision}"),
+            ("license", spec["license"]),
+            ("attribution", None),
+            ("source_url", f"https://huggingface.co/{res.model_name}"),
+            ("model_combined_sha256", res.model_combined_sha256),
+            ("note", "On-device cross-encoder reranker (Rank 4); shipped as a "
+                     "fp16 Core ML export, not the original weights. Chosen over "
+                     "the higher-scoring BAAI/bge-reranker-base (MIT) because it "
+                     "fits the ~20-25 MB on-device envelope."),
+        ]))
+        print(f"  updated {CORPUS_MANIFEST.name} packs.reranker + acknowledgements")
+    else:
+        print(f"  WARNING: {CORPUS_MANIFEST.name} not found — run `package` first.",
+              file=sys.stderr)
+
+    print(f"  mlpackage:  {res.mlpackage_path} ({res.mlpackage_bytes:,} B / "
+          f"{res.mlpackage_bytes / (1024 * 1024):.1f} MB)")
+    print(f"  tree sha256: {res.mlpackage_tree_sha256}")
+    print(f"  vocab:      sha256 {res.vocab_sha256}")
+    from .coreml_rerank_export import PARITY_MAX_REL
+    print(f"  parity:     max_rel={res.parity.max_rel_err:.5f} "
+          f"(<= {PARITY_MAX_REL}) max_abs={res.parity.max_abs_err:.5f} "
+          f"inversions={res.parity.inversions} "
+          f"tied_reorders={res.parity.tied_reorders} -> "
+          f"{'PASS' if res.parity.passed else 'FAIL'}")
+    print(f"  wrote {rp}")
+
+    if not res.parity.passed:
+        print("PARITY GATE FAILED. Stop-and-investigate (tokenizer / "
+              "token_type_ids / segment-id bug), never a threshold loosening. "
+              "Report written for forensics.", file=sys.stderr)
+        raise RerankParityError(
+            f"max_rel={res.parity.max_rel_err:.5f} "
+            f"inversions={res.parity.inversions}")
+
+
+def _check_reranker_reproducibility(res, model_key: str) -> str:
+    """Re-trace+convert to a temp dir; compare the .mlpackage tree hash."""
+    import shutil as _shutil
+    import tempfile
+
+    from .coreml_rerank_export import (
+        MLPACKAGE_NAME,
+        _build_wrapper,
+        _convert,
+        _snapshot_dir,
+        _trace,
+    )
+    from .encode import MODEL_CACHE
+    from .package import _sha256_tree
+
+    tmp = Path(tempfile.mkdtemp(prefix="coreml_rerank_repro_"))
+    try:
+        snap = _snapshot_dir(model_key, MODEL_CACHE)
+        wrapper = _build_wrapper(snap)
+        traced = _trace(wrapper)
+        out = tmp / MLPACKAGE_NAME
+        _convert(traced, out)
+        second = _sha256_tree(out)
+        if second == res.mlpackage_tree_sha256:
+            return (f"PASS — re-trace+convert yielded a byte-identical "
+                    f".mlpackage tree (sha256 {second[:16]}…).")
+        return (f"FLAG — re-conversion tree hash {second} != first "
+                f"{res.mlpackage_tree_sha256}; recorded for the architect.")
+    finally:
+        _shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _render_reranker_report(res, spec: dict, det_note: str) -> str:
+    """Deterministic text report for the reranker Core ML export."""
+    lines = [
+        "LampStand corpus — on-device reranker Core ML export (Rank 4, SHIP)",
+        "",
+        f"Model: {res.model_name} ({spec['license']}, {spec['arch']})",
+        f"Revision: {res.model_revision}",
+        f"model_combined_sha256: {res.model_combined_sha256}",
+        "",
+        "Artifact:",
+        f"  {res.mlpackage_path.name}  "
+        f"{res.mlpackage_bytes:,} B ({res.mlpackage_bytes / (1024 * 1024):.1f} MB, "
+        "fp16)",
+        f"  tree sha256: {res.mlpackage_tree_sha256}",
+        f"  {res.vocab_path.name}  sha256 {res.vocab_sha256}",
+        "  seq axis: RangeDim(1,512)  pair truncation: 192 tokens",
+        f"  512-token forward: {res.forward_512_ms:.1f} ms (CPU_ONLY convert)",
+        "",
+        "Score semantics: raw classifier logit; higher = more relevant "
+        "(no sigmoid; only the order matters for reranking).",
+        "",
+        "Parity gate (fp16 CPU_ONLY Core ML, reloaded from disk, vs float32 "
+        f"PyTorch, over {res.parity.n} fixed pairs):",
+        f"  max relative logit err: {res.parity.max_rel_err:.5f}  (floor <= 0.02)",
+        f"  max |abs err|: {res.parity.max_abs_err:.5f}  "
+        "(unbounded logits ~[-12,+11])",
+        f"  mean |abs err|: {res.parity.mean_abs_err:.5f}",
+        f"  non-tied order inversions: {res.parity.inversions}  (floor <= 0)",
+        f"  tied reorders (not gated): {res.parity.tied_reorders}",
+        f"  -> {'PASS' if res.parity.passed else 'FAIL'}",
+        "",
+        f"Reproducibility: {det_note}",
+        "",
+    ]
+    if res.notes:
+        lines.append("Flags:")
+        lines.extend(f"  - {n}" for n in res.notes)
+        lines.append("")
+    lines.append("The .mlpackage + vocab are synced (never committed) like the "
+                 "corpus packs; app-integration contract: docs/reranker-pack.md.")
+    lines.append("")
+    return "\n".join(lines)
+
+
 # --- Retrieval eval (F5 measurement foundation) --------------------------------
 def cmd_build_eval() -> None:
     """Build the deterministic retrieval gold set from the built DBs."""
@@ -1632,6 +1820,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_validate_embeddings()
     elif cmd == "coreml-export":
         cmd_coreml_export()
+    elif cmd == "coreml-export-reranker":
+        cmd_coreml_export_reranker()
     elif cmd == "build-eval":
         cmd_build_eval()
     elif cmd == "validate-retrieval":

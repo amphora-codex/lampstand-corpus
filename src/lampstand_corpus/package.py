@@ -1084,10 +1084,16 @@ def preserve_models_subtree(manifest_path: Path, manifest: dict) -> bool:
         old = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
-    models = old.get("packs", {}).get("models")
-    if not models:
+    old_packs = old.get("packs", {})
+    models = old_packs.get("models")
+    reranker = old_packs.get("reranker")
+    if not models and not reranker:
         return False
-    manifest.setdefault("packs", {})["models"] = models
+    dst = manifest.setdefault("packs", {})
+    if models:
+        dst["models"] = models
+    if reranker:
+        dst["reranker"] = reranker
     return True
 
 
@@ -1105,6 +1111,99 @@ def update_manifest_models(manifest_path: Path, models_pack: OrderedDict) -> Non
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     packs = manifest.setdefault("packs", {})
     packs["models"] = models_pack
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+
+def build_reranker_pack(
+    *,
+    mlpackage_path: Path,
+    mlpackage_tree_sha256: str,
+    mlpackage_bytes: int,
+    vocab_path: Path,
+    vocab_sha256: str,
+    model_name: str,
+    model_revision: str,
+    model_combined_sha256: str,
+    license_id: str,
+    precision: str,
+    seq_len: str,
+    max_pair_tokens: int,
+) -> OrderedDict:
+    """Build the ``packs.reranker`` subtree (sibling to models/bundled/on_demand).
+
+    The on-device cross-encoder reranker + its tokenizer vocab. Synced like the
+    other packs (never committed); the app loads the ``.mlpackage`` from disk and
+    scores the fused top-30 (query, passage) pairs between RRF fusion and the
+    tradition multiplier. Nesting under ``.packs`` lets ``sync-corpus.sh
+    verify()`` pick it up with its existing jq walk — zero jq changes.
+    """
+    model_bytes = int(mlpackage_bytes)
+    vocab_bytes = vocab_path.stat().st_size
+    return OrderedDict([
+        ("description",
+         "On-device cross-encoder reranker + tokenizer vocab. Re-scores the "
+         "fused top-30 (query, passage) candidate pairs (between RRF fusion and "
+         "the tradition multiplier); the app measures on-device latency and "
+         "falls through to plain RRF on a budget miss. Synced (never committed); "
+         "the app loads the .mlpackage strictly from disk. The .mlpackage sha256 "
+         "is a deterministic directory-tree hash."),
+        ("delivery", "app-binary"),
+        ("license_class", f"{license_id} (model) / Apache-2.0 (BERT vocab); "
+                          "static weights"),
+        ("score_semantics", "raw classifier logit; higher = more relevant "
+                            "(no sigmoid; only the order matters)"),
+        ("max_pair_tokens", int(max_pair_tokens)),
+        ("total_bytes", model_bytes + vocab_bytes),
+        ("files", [
+            OrderedDict([
+                ("name", mlpackage_path.name),
+                ("role", "reranker-model"),
+                ("bytes", model_bytes),
+                ("sha256", mlpackage_tree_sha256),
+                ("model_name", model_name),
+                ("model_revision", model_revision),
+                ("model_combined_sha256", model_combined_sha256),
+                ("precision", precision),
+                ("seq_len", seq_len),
+            ]),
+            OrderedDict([
+                ("name", vocab_path.name),
+                ("role", "tokenizer-vocab"),
+                ("bytes", vocab_bytes),
+                ("sha256", vocab_sha256),
+            ]),
+        ]),
+    ])
+
+
+def update_manifest_reranker(manifest_path: Path, reranker_pack: OrderedDict) -> None:
+    """Insert/replace the ``packs.reranker`` subtree in an existing manifest.
+
+    Surgical, like :func:`update_manifest_models` — touches only
+    ``packs.reranker``, leaving models/bundled/on_demand/totals/acknowledgements
+    intact.
+    """
+    import json
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    packs = manifest.setdefault("packs", {})
+    packs["reranker"] = reranker_pack
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+
+
+def update_manifest_acknowledgement(manifest_path: Path, ack: OrderedDict) -> None:
+    """Insert/replace one acknowledgements entry by its ``id`` (idempotent)."""
+    import json
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    acks = manifest.setdefault("acknowledgements", [])
+    acks = [a for a in acks if a.get("id") != ack.get("id")]
+    acks.append(dict(ack))
+    manifest["acknowledgements"] = acks
     manifest_path.write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )

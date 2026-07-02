@@ -218,6 +218,33 @@
           "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
         }
       ]
+    },
+    "reranker": {
+      "description": "On-device cross-encoder reranker + tokenizer vocab. Re-scores the fused top-30 (query, passage) candidate pairs (between RRF fusion and the tradition multiplier); the app measures on-device latency and falls through to plain RRF on a budget miss. Synced (never committed); the app loads the .mlpackage strictly from disk. The .mlpackage sha256 is a deterministic directory-tree hash.",
+      "delivery": "app-binary",
+      "license_class": "apache-2.0 (model) / Apache-2.0 (BERT vocab); static weights",
+      "score_semantics": "raw classifier logit; higher = more relevant (no sigmoid; only the order matters)",
+      "max_pair_tokens": 192,
+      "total_bytes": 45767389,
+      "files": [
+        {
+          "name": "Reranker.mlpackage",
+          "role": "reranker-model",
+          "bytes": 45535881,
+          "sha256": "d7fd5fcdf83cb4c7a090b6bf853f50cbafb38764f9aa94eb0a464405d130f894",
+          "model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+          "model_revision": "c5ee24cb16019beea0893ab7796b1df96625c6b8",
+          "model_combined_sha256": "cd22d44f8ae30ae37302aa38fbe00562f544f9db84355b9e9a65e85c190f5e08",
+          "precision": "float16",
+          "seq_len": "RangeDim(1,512)"
+        },
+        {
+          "name": "reranker_vocab.txt",
+          "role": "tokenizer-vocab",
+          "bytes": 231508,
+          "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+        }
+      ]
     }
   },
   "totals": {
@@ -478,6 +505,17 @@
       "source_url": "https://huggingface.co/BAAI/bge-small-en-v1.5",
       "retrieved": null,
       "source_checksum": "f6a428ffdb6afebc801a94fd3454aec2705f198ad710434a7919faa2a41b361b"
+    },
+    {
+      "id": "reranker-model",
+      "name": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+      "resource_type": "reranker",
+      "version": "HF revision c5ee24cb16019beea0893ab7796b1df96625c6b8",
+      "license": "apache-2.0",
+      "attribution": null,
+      "source_url": "https://huggingface.co/cross-encoder/ms-marco-MiniLM-L-6-v2",
+      "model_combined_sha256": "cd22d44f8ae30ae37302aa38fbe00562f544f9db84355b9e9a65e85c190f5e08",
+      "note": "On-device cross-encoder reranker (Rank 4); shipped as a fp16 Core ML export, not the original weights. Chosen over the higher-scoring BAAI/bge-reranker-base (MIT) because it fits the ~20-25 MB on-device envelope."
     }
   ]
 }
