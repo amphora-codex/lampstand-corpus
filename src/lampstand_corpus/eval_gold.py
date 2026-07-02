@@ -563,8 +563,14 @@ def hardneg_queries(
             f"hardneg: generated {len(candidates)} DRAFT candidates -> "
             f"{HARDNEG_RELPATH.as_posix()}")
     payload = json.loads(hardneg_path.read_text(encoding="utf-8"))
-    if "DRAFT" in str(payload.get("status", "")):
+    status = str(payload.get("status", ""))
+    if "DRAFT" in status:
         notes.append("hardneg: suite is DRAFT — pending theological-advisor review")
+    elif status.lower().startswith("approved"):
+        by = str(payload.get("approved_by", "")) or "architect"
+        notes.append(
+            f"hardneg: suite approved (by {by}); advisor spot-check still "
+            f"recommended before public ship")
 
     out: list[GoldQuery] = []
     for t in payload["triples"]:

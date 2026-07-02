@@ -114,6 +114,39 @@ def test_approved_synonyms_are_folded_in(tmp_path):
     assert ("love", "charity", "synonym") in as_set
 
 
+def test_architect_only_approval_keeps_synonyms_unwired(tmp_path):
+    """Architect clearance (status=approved, approved_by=architect) does NOT
+    fold synonyms into the shipped table — the wiring gate is the advisor's."""
+    db = _parallel_fixture(tmp_path)
+    syn = tmp_path / "data" / "eval" / "theological_synonyms_v1.json"
+    syn.parent.mkdir(parents=True)
+    syn.write_text(json.dumps({
+        "status": "approved",
+        "approved_by": "architect",
+        "pairs": [{"archaic": "charity", "modern": "love", "score": 0.9}],
+    }), encoding="utf-8")
+    assert ex.load_approved_synonyms(syn) == []
+    rows, _ = ex.build_expansion_rows(db, {}, tmp_path)
+    as_set = {(r[0], r[1], r[2]) for r in rows}
+    assert all(kind != "synonym" for _t, _e, kind in as_set)
+
+
+def test_advisor_approval_by_field_wires_synonyms(tmp_path):
+    """An `approved_by` naming the advisor DOES wire the pairs."""
+    db = _parallel_fixture(tmp_path)
+    syn = tmp_path / "data" / "eval" / "theological_synonyms_v1.json"
+    syn.parent.mkdir(parents=True)
+    syn.write_text(json.dumps({
+        "status": "approved",
+        "approved_by": "theological-advisor",
+        "pairs": [{"archaic": "charity", "modern": "love", "score": 0.9}],
+    }), encoding="utf-8")
+    assert len(ex.load_approved_synonyms(syn)) == 1
+    rows, _ = ex.build_expansion_rows(db, {}, tmp_path)
+    as_set = {(r[0], r[1], r[2]) for r in rows}
+    assert ("charity", "love", "synonym") in as_set
+
+
 def test_load_expansion_map_shape():
     rows = [("a", "b", "archaic", 0.9), ("a", "c", "suffix", 1.0),
             ("b", "a", "archaic", 0.9)]

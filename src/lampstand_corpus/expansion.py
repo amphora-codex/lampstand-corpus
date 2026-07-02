@@ -236,12 +236,28 @@ def write_synonym_candidates(path: Path, pairs: list[dict]) -> None:
 
 
 def load_approved_synonyms(path: Path) -> list[dict]:
-    """Approved synonym pairs from the tracked file ([] while DRAFT)."""
+    """Approved synonym pairs from the tracked file ([] until ADVISOR-approved).
+
+    The theological-synonym gate is specifically the theological ADVISOR's gate
+    (synonym wiring changes query-time scoring and must not ship on architect
+    clearance alone). So a file that is ``status: approved`` by the ARCHITECT —
+    but not yet advisor-signed — stays unwired: this returns ``[]`` for it. The
+    file is wired ONLY when it records advisor approval, i.e. either
+    ``approved_by`` names the advisor or the status reads "APPROVED by advisor".
+    Architect clearance is recorded in the header for provenance but does not
+    trip this gate.
+    """
     if not path.exists():
         return []
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if not str(payload.get("status", "")).upper().startswith("APPROVED"):
+    status = str(payload.get("status", ""))
+    approved_by = str(payload.get("approved_by", ""))
+    if not status.upper().startswith("APPROVED"):
         return []
+    advisor_signed = (
+        "advisor" in approved_by.lower() or "advisor" in status.lower())
+    if not advisor_signed:
+        return []  # architect-only clearance: unwired (measurement-null)
     return payload.get("pairs", [])
 
 

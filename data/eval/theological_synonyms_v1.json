@@ -1,7 +1,10 @@
 {
-  "status": "DRAFT — pending theological-advisor review",
+  "status": "approved",
+  "approved_by": "architect",
+  "approved_date": "2026-07-02",
+  "advisor_note": "Architect clearance recorded. A theological-advisor spot-check is still recommended before public ship. This file remains UNWIRED from query-time scoring: the synonym→expansion gate is the advisor's, so architect clearance alone does not fold these pairs into the shipped expansion table (see load_approved_synonyms). It exists for the future gloss UX and measurement.",
   "format": "expansion-v1",
-  "method": "Non-mechanical residue of the archaic→modern parallel-verse mining: lexical substitutions (charity→love), not inflections. NOT shipped in the expansion table until this file's status is changed to APPROVED by the advisor; entries may be struck or amended and are honored verbatim.",
+  "method": "Non-mechanical residue of the archaic→modern parallel-verse mining: lexical substitutions (charity→love), not inflections. NOT shipped in the expansion table until an advisor signs off (approved_by names the advisor, or status reads 'APPROVED by advisor'); architect clearance keeps it unwired. Entries may be struck or amended and are honored verbatim.",
   "pairs": [
     {
       "archaic": "hast",

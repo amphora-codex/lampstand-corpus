@@ -1,5 +1,8 @@
 {
-  "status": "DRAFT — pending theological-advisor review",
+  "status": "approved",
+  "approved_by": "architect",
+  "approved_date": "2026-07-02",
+  "advisor_note": "Architect clearance recorded. A theological-advisor spot-check is still recommended before public ship.",
   "version": "v1",
   "method": "WSC/WLC same-document question pairs ranked by answer content-token Jaccard (stopworded), floor 0.1, greedy one-use-per-question; deterministic (no RNG).",
   "review_note": "Each triple asserts that question A's answer chunk should outrank question B's for query A. An advisor may strike or amend pairs; edits to this file are honored verbatim by build-eval.",
