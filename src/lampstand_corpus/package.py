@@ -148,6 +148,12 @@ def _table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
     return [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
 
 
+def _has_table(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone() is not None
+
+
 def _copy_filtered_table(
     src: sqlite3.Connection,
     dst: sqlite3.Connection,
@@ -197,9 +203,22 @@ def _filter_bibles(
             where=f"translation IN ({tset})",
             order_by="translation, book, chapter, verse_start",
         )
+        # Carry the USFM \s section headings (verse anchor -> heading text, per
+        # translation) so the app's BibleStore.headings query resolves. Scoped
+        # to this pack's translations; only BSB actually mines headings today.
+        # Guarded on table presence: every real build DB has `heading`, but a
+        # minimal fixture DB may not (the schema copy above then makes no such
+        # table either, so nothing to fill).
+        n_h = 0
+        if _has_table(src, "heading"):
+            n_h = _copy_filtered_table(
+                src, dst, "heading",
+                where=f"translation IN ({tset})",
+                order_by="translation, book, chapter, verse_start",
+            )
         dst.commit()
         return {"translations": sorted(translations), "n_translations": n_tr,
-                "n_verses": n_v}
+                "n_verses": n_v, "n_headings": n_h}
     finally:
         src.close()
         dst.close()

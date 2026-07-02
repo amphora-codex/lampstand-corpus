@@ -54,6 +54,9 @@ def _make_bibles(path: Path) -> None:
         "CREATE TABLE verse(translation TEXT, book TEXT, chapter INTEGER,"
         " verse_start INTEGER, verse_end INTEGER, text TEXT,"
         " PRIMARY KEY(translation, book, chapter, verse_start));"
+        "CREATE TABLE heading(translation TEXT, book TEXT, chapter INTEGER,"
+        " verse_start INTEGER, text TEXT,"
+        " PRIMARY KEY(translation, book, chapter, verse_start));"
     )
     conn.execute("INSERT INTO meta VALUES('schema_version','1')")
     conn.execute("INSERT INTO book VALUES('GEN','Genesis',0)")
@@ -66,6 +69,11 @@ def _make_bibles(path: Path) -> None:
             "INSERT INTO verse VALUES(?,?,?,?,?,?)",
             (tid, "GEN", 1, 1, 1, f"In the beginning ({tid})."),
         )
+    # \s section headings: BSB carries them (bundled scope); KJV carries one
+    # (on-demand scope). Verifies the pack builder carries the heading table
+    # per translation into each pack.
+    conn.execute("INSERT INTO heading VALUES('bsb','GEN',1,1,'The Creation')")
+    conn.execute("INSERT INTO heading VALUES('kjv','GEN',1,1,'In the beginning')")
     conn.commit()
     conn.close()
 
@@ -245,6 +253,12 @@ def test_bundled_pack_is_bsb_and_wsc_only(tmp_path):
     bb = sqlite3.connect(out / "packs" / "bundled_bibles.sqlite")
     assert [r[0] for r in bb.execute("SELECT id FROM translation")] == ["bsb"]
     assert bb.execute("SELECT count(*) FROM verse").fetchone()[0] == 1
+    # GAP 1: the \s section-heading table is carried into the pack, scoped to
+    # the bundled translation (BSB). KJV's heading must NOT leak in.
+    hrows = bb.execute(
+        "SELECT translation, book, chapter, verse_start, text FROM heading"
+    ).fetchall()
+    assert hrows == [("bsb", "GEN", 1, 1, "The Creation")]
     bb.close()
 
     bc = sqlite3.connect(out / "packs" / "bundled_confessions.sqlite")
@@ -263,6 +277,11 @@ def test_ondemand_has_the_rest_with_no_overlap(tmp_path):
     ob = sqlite3.connect(out / "packs" / "ondemand_bibles.sqlite")
     assert sorted(r[0] for r in ob.execute("SELECT id FROM translation")) == [
         "asv", "kjv", "web"]
+    # GAP 1: on-demand bibles carry their own scoped headings (KJV here); BSB's
+    # heading stays in the bundled pack and must NOT leak here.
+    assert ob.execute(
+        "SELECT translation, text FROM heading"
+    ).fetchall() == [("kjv", "In the beginning")]
     ob.close()
 
     oc = sqlite3.connect(out / "packs" / "ondemand_confessions.sqlite")
