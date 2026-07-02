@@ -2,7 +2,7 @@
 
 **CANDIDATE MEASUREMENT — gates retrieval tuning; changes no app constant.** The sweep recommends; the architect decides.
 
-Corpus reference: `corpus-v1.0.0-candidate` · model `5c38ec7c405e` · 317,204 chunks · gold seed 613.
+Corpus reference: `corpus-v2.0.0-candidate` · model `5c38ec7c405e` · 317,204 chunks · gold seed 613.
 
 ## 1. Gold set
 
@@ -10,7 +10,7 @@ Zero-annotation labels from the corpus itself; every query records its own sourc
 
 | category | n | query | relevant |
 |---|---:|---|---|
-| prooftext | 150 | catechism question / confession opening sentence (citations stripped) | chunks covering the section's proof-text verses |
+| prooftext | 149 | catechism question / confession opening sentence (citations stripped) | chunks covering the section's proof-text verses |
 | crossref | 150 | source verse text (BSB) | chunks covering TSK targets with votes ≥ 116 (data-driven threshold) |
 | commentary-anchor | 152 | commentary paragraph (word-boundary truncated) | Scripture chunks at its verse anchor |
 | hardneg | 60 | WSC/WLC question A | A's Q&A chunk (hard negative: doctrinally-adjacent B's chunk) — **DRAFT, pending theological-advisor review** (`data/eval/hard_negatives_v1.json`) |
@@ -27,10 +27,10 @@ Labels are CONSERVATIVE (zero-annotation): only the derived chunks count as rele
 
 | set | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| OVERALL | 452 | 0.199 | 0.248 | 0.305 | 0.148 | 0.058 |
+| OVERALL | 451 | 0.188 | 0.237 | 0.297 | 0.141 | 0.055 |
 | commentary-anchor | 152 | 0.289 | 0.342 | 0.408 | 0.219 | 0.089 |
 | crossref | 150 | 0.247 | 0.320 | 0.393 | 0.192 | 0.073 |
-| prooftext | 150 | 0.060 | 0.080 | 0.113 | 0.031 | 0.011 |
+| prooftext | 149 | 0.027 | 0.047 | 0.087 | 0.011 | 0.004 |
 
 hard-negative pairwise (DRAFT suite): 58/60 wins = 0.967
 
@@ -38,10 +38,10 @@ hard-negative pairwise (DRAFT suite): 58/60 wins = 0.967
 
 | set | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| OVERALL | 452 | 0.119 | 0.162 | 0.235 | 0.086 | 0.032 |
+| OVERALL | 451 | 0.113 | 0.153 | 0.224 | 0.080 | 0.030 |
 | commentary-anchor | 152 | 0.112 | 0.158 | 0.211 | 0.078 | 0.035 |
 | crossref | 150 | 0.220 | 0.260 | 0.387 | 0.151 | 0.051 |
-| prooftext | 150 | 0.027 | 0.067 | 0.107 | 0.028 | 0.010 |
+| prooftext | 149 | 0.007 | 0.040 | 0.074 | 0.010 | 0.004 |
 
 hard-negative pairwise (DRAFT suite): 60/60 wins = 1.000
 
@@ -49,10 +49,10 @@ hard-negative pairwise (DRAFT suite): 60/60 wins = 1.000
 
 | set | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| OVERALL | 452 | 0.133 | 0.235 | 0.308 | 0.088 | 0.044 |
+| OVERALL | 451 | 0.129 | 0.224 | 0.297 | 0.084 | 0.042 |
 | commentary-anchor | 152 | 0.151 | 0.329 | 0.408 | 0.086 | 0.060 |
 | crossref | 150 | 0.233 | 0.313 | 0.387 | 0.158 | 0.065 |
-| prooftext | 150 | 0.013 | 0.060 | 0.127 | 0.019 | 0.006 |
+| prooftext | 149 | 0.000 | 0.027 | 0.094 | 0.008 | 0.002 |
 
 hard-negative pairwise (DRAFT suite): 60/60 wins = 1.000
 
@@ -60,14 +60,14 @@ hard-negative pairwise (DRAFT suite): 60/60 wins = 1.000
 
 **Verdict: MARGINAL.** Rule: hybrid must beat BM25-only by ≥ 2% absolute on some headline metric or category for JUSTIFIED; ≥ 0.5% for MARGINAL.
 
-- overall recall@5: hybrid − BM25 = -0.066
+- overall recall@5: hybrid − BM25 = -0.060
 - overall recall@10: hybrid − BM25 = -0.013
-- overall recall@20: hybrid − BM25 = +0.002
-- overall MRR: hybrid − BM25 = -0.060
-- overall nDCG@10: hybrid − BM25 = -0.014
+- overall recall@20: hybrid − BM25 = +0.000
+- overall MRR: hybrid − BM25 = -0.057
+- overall nDCG@10: hybrid − BM25 = -0.013
 - commentary-anchor: recall@20 +0.000, MRR -0.134
 - crossref: recall@20 -0.007, MRR -0.034
-- prooftext: recall@20 +0.013, MRR -0.011
+- prooftext: recall@20 +0.007, MRR -0.003
 - hardneg pairwise wins (DRAFT suite): bm25 58/60, dense 60/60, hybrid 60/60
 
 Context for the verdict: these corpus-native labels favor lexical overlap (crossref and commentary-anchor queries share verse wording with their targets), while dense retrieval's known strength — short paraphrased USER queries (the app's ~46-case eval, recall@20≈0.826) — is structurally under-represented here. This verdict gates the corpus-side evidence only; the app-side eval remains the user-experience gate, and the two should be read together before any decision about the ~1.9 GB dense pack.
@@ -121,10 +121,10 @@ BM25 query terms also score their mined expansions (archaic↔modern pairs + suf
 
 | set | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| bm25 | 452 | 0.199 | 0.248 | 0.305 | 0.148 | 0.058 |
-| bm25-expand | 452 | 0.184 | 0.243 | 0.301 | 0.143 | 0.056 |
-| hybrid | 452 | 0.133 | 0.235 | 0.308 | 0.088 | 0.044 |
-| hybrid-expand | 452 | 0.133 | 0.217 | 0.308 | 0.086 | 0.042 |
+| bm25 | 451 | 0.188 | 0.237 | 0.297 | 0.141 | 0.055 |
+| bm25-expand | 451 | 0.173 | 0.233 | 0.293 | 0.137 | 0.054 |
+| hybrid | 451 | 0.129 | 0.224 | 0.297 | 0.084 | 0.042 |
+| hybrid-expand | 451 | 0.129 | 0.206 | 0.297 | 0.082 | 0.040 |
 
 ## 5. retrieve.py ↔ app parity notes
 

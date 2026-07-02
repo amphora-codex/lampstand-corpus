@@ -9,7 +9,7 @@
       "description": "Ships in the app binary. BSB Bible + Westminster Shorter Catechism + a BSB/WSC-scoped dense+BM25 search index.",
       "delivery": "app-binary",
       "license_class": "public-domain / CC0 only",
-      "total_bytes": 50176000,
+      "total_bytes": 50302976,
       "files": [
         {
           "name": "bundled_bibles.sqlite",
@@ -27,8 +27,8 @@
         {
           "name": "bundled_confessions.sqlite",
           "role": "confessions",
-          "bytes": 61440,
-          "sha256": "5b9669d8e46c322cdd248b7b41991246562e67e0fc1e443975e81650421fda33",
+          "bytes": 102400,
+          "sha256": "d27f8a9fce50184423bb31702fc0363e5a544cd682595f4b13eded0507115cdc",
           "contents": {
             "documents": [
               "wsc"
@@ -40,14 +40,14 @@
         {
           "name": "bundled_crossrefs.sqlite",
           "role": "crossrefs",
-          "bytes": 7282688,
-          "sha256": "31594bd050a6b926dc63b9b1438e2f838c205430d8b712936adc132371605932",
+          "bytes": 7368704,
+          "sha256": "3a4e216566b877a9817ff04b232fe4c441c3c5e409fad19755e34596b1fbb759",
           "contents": {
             "format": "crossrefs-pack-v1",
             "n_sources": 29363,
             "n_edges": 344794,
             "n_expanded_chunks": 117265,
-            "n_prooftext_rows": 5758,
+            "n_prooftext_rows": 10427,
             "expansion_top_n": 8,
             "license": "CC-BY 4.0 (www.openbible.info)",
             "attribution": "Cross-reference data courtesy of www.openbible.info, used under CC-BY."
@@ -73,7 +73,7 @@
     "on_demand": {
       "description": "Free, downloaded on first launch. KJV/ASV/WEB, all commentaries, the remaining confessions, lexicons + tagged text, cross-references, and the full search + vectors packs (pack-diet v2).",
       "delivery": "first-launch-download",
-      "total_bytes": 630833152,
+      "total_bytes": 630984704,
       "files": [
         {
           "name": "ondemand_bibles.sqlite",
@@ -102,8 +102,8 @@
         {
           "name": "ondemand_confessions.sqlite",
           "role": "confessions",
-          "bytes": 1171456,
-          "sha256": "0c7d499c434a2fcc91fed0a727c62797ca0b37e13d46fe7c971f7a57537b733d",
+          "bytes": 1323008,
+          "sha256": "49dca22c2b85ba2e932e39af1d1759d0a1b0a36bee0f5ef199f9151702f00539",
           "contents": {
             "documents": [
               "belgic",
@@ -196,9 +196,9 @@
     }
   },
   "totals": {
-    "bundled_bytes": 50176000,
-    "ondemand_bytes": 630833152,
-    "all_bytes": 681009152
+    "bundled_bytes": 50302976,
+    "ondemand_bytes": 630984704,
+    "all_bytes": 681287680
   },
   "acknowledgements": [
     {
