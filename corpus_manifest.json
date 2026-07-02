@@ -127,6 +127,31 @@
           }
         }
       ]
+    },
+    "models": {
+      "description": "On-device Tier-1 query-embedding model + tokenizer vocab. Synced (never committed) like the corpus packs; the app loads the .mlpackage strictly from disk (no runtime download). The .mlpackage sha256 is a deterministic directory-tree hash.",
+      "delivery": "app-binary",
+      "license_class": "MIT (model) / Apache-2.0 (BERT vocab); static weights",
+      "total_bytes": 66844181,
+      "files": [
+        {
+          "name": "BGEQuery.mlpackage",
+          "role": "embedding-model",
+          "bytes": 66612673,
+          "sha256": "67140125bf914df858b796bcc666a02d2edd72a7fa868b79653c92e0b74eab7d",
+          "model_name": "BAAI/bge-small-en-v1.5",
+          "model_revision": "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a",
+          "model_combined_sha256": "f6a428ffdb6afebc801a94fd3454aec2705f198ad710434a7919faa2a41b361b",
+          "precision": "float16",
+          "seq_len": "RangeDim(1,512)"
+        },
+        {
+          "name": "vocab.txt",
+          "role": "tokenizer-vocab",
+          "bytes": 231508,
+          "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+        }
+      ]
     }
   },
   "totals": {

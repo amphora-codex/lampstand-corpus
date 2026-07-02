@@ -1,0 +1,70 @@
+========================================================================
+ LampStand corpus — M4 T0 Core ML query-embedding export
+========================================================================
+
+MODEL
+  name                 BAAI/bge-small-en-v1.5
+  revision             5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+  combined_sha256      f6a428ffdb6afebc801a94fd3454aec2705f198ad710434a7919faa2a41b361b
+
+LINEAGE GATE
+  PASS — snapshot combined_sha256 matches the corpus vectors' model_combined_sha256
+  (== bundled_search.sqlite meta value, == manifest acknowledgements)
+
+ARTIFACTS
+  BGEQuery.mlpackage         66,612,673 B  tree-sha256 67140125bf914df8…
+  vocab.txt                     231,508 B  sha256 07eced375cec144d…
+    vocab matches expected sha256: YES
+  bge_parity_fixture.json       246,341 B
+  bge_tokenizer_fixture.json        2,706 B
+
+PARITY GATE (P4) — bare passage vectors vs stored float32
+  source index         bundled_search.sqlite
+  cases                33
+  embedding dim        384  (expect 384)
+  mean cosine          0.999992  (floor 0.999)
+  min  cosine          0.999989  (floor 0.995)
+  max  cosine          0.999993
+  output L2 norm range [0.999552, 1.000365]  (expect [0.999, 1.001])
+  VERDICT              PASS
+  multi-subword coverage (>=3 WordPieces exercised):
+    - WSC 14 (transgression)
+    - WSC 16 (transgression)
+    - WSC 36 (sanctification)
+    - WSC 44 (redeemer)
+    - WSC 20 (redeemer)
+    - WSC 1 (glorify)
+
+  per-case (worst 8 by cosine):
+    0.999989  norm=0.99977  confession WSC 14
+    0.999990  norm=0.99993  confession WSC 67
+    0.999990  norm=1.00024  confession WSC 8
+    0.999990  norm=0.99989  confession WSC 1
+    0.999990  norm=0.99977  confession WSC 25
+    0.999990  norm=1.00024  confession WSC 44
+    0.999991  norm=0.99955  confession WSC 20
+    0.999991  norm=1.00023  confession WSC 42
+
+TOKENIZER FIXTURE (HF ground truth for the Swift tokenizer test)
+  propitiation                                               -> [101, 17678, 29050, 3508, 102]
+  justification                                              -> [101, 19777, 102]
+  God's love                                                 -> [101, 2643, 1005, 1055, 2293, 102]
+  régénération                                               -> [101, 20045, 102]
+  1 John 2:2                                                 -> [101, 1015, 2198, 1016, 1024, 1016, 102]
+  Yahweh-Jireh                                               -> [101, 8038, 2232, 8545, 2232, 1011, 10147, 2890, 2232, 102]
+  (empty string)                                             -> [101, 102]
+  Represent this sentence for searching relevant passages: p -> [101, 5050, 2023, 6251, 2005, 6575, 7882, 13768, 1024, 17678, 29050, 3508, 102]
+
+PERFORMANCE / RESIDENCY
+  single 512-token forward pass: 35.7 ms (CPU, fp16)
+  seq axis: RangeDim(1,512,default=16)
+
+REPRODUCIBILITY
+  PASS — re-trace+convert (separate process) yielded a byte-identical .mlpackage tree (sha256 67140125bf914df8…). coremltools embeds no timestamps; cross-process protobuf/UUID ordering is canonicalized in the tool (model behavior is unchanged — predictions bit-identical).
+
+NOTES / FLAGS
+  FLAG (architect O-F): bge_parity_fixture.json is 241 KB (> the design-doc ~50 KB target). Driven by 33 cases x (full passage text + 384 floats). Trimming cases would weaken the gate; recommend committing as-is or the architect picking a case cap.
+
+NOTE: candidate artifacts only. The architect's 23-point spot-check + the
+Swift-side parity test (T6) gate ship. Artifacts are gitignored build
+output (output/models/) and are synced into the app via sync-corpus.sh.

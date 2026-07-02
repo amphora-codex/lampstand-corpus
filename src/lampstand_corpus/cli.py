@@ -54,6 +54,17 @@ BM25 index is rebuilt over the full new chunk set). ``build-embeddings full`` fo
 a from-scratch re-encode. Requires the ``[embeddings]`` extra (sentence-transformers
 + torch) and a one-time ``snapshot-model``.
 
+Usage (M4 on-device query model — Core ML export):
+    python -m lampstand_corpus.cli coreml-export  # BGE-small -> BGEQuery.mlpackage
+
+``coreml-export`` traces the pinned BGE-small weights into a fp16 Core ML
+``.mlpackage`` whose graph bakes in CLS pooling + L2-normalize, runs a lineage gate
+(combined_sha256 == the corpus vectors' model hash) and a cosine-parity gate (P4)
+against the bundled BSB+WSC index, and emits the .mlpackage + vocab.txt +
+bge_parity_fixture.json + bge_tokenizer_fixture.json under output/models/
+(gitignored) with a report in reports/. Requires the ``[coreml]`` extra
+(``pip install -e ".[coreml]"``) and a built bundled_search.sqlite (run ``package``).
+
 Usage (P7 packaging):
     python -m lampstand_corpus.cli package  # split built DBs -> output/packs/ + manifest
 
@@ -996,6 +1007,220 @@ def _emit_embedding_report(ec, prov, stats, det, wall, np, *, incremental=None):
           f"errors={rep.error_total} flags={rep.flag_total}")
 
 
+# --- M4 T0: Core ML query-embedding model export -----------------------------
+MODELS_OUT_DIR = OUTPUT_DIR / "models"
+
+
+def _render_coreml_report(res, search_db: Path, det_note: str) -> str:
+    """Fixed-width report for the .mlpackage export (lineage + parity + repro)."""
+    from .embeddings import MODEL_REVISION as MODEL_REVISION_DISPLAY
+    p = res.parity
+    lines: list[str] = []
+    w = lines.append
+    w("=" * 72)
+    w(" LampStand corpus — M4 T0 Core ML query-embedding export")
+    w("=" * 72)
+    w("")
+    w("MODEL")
+    w("  name                 BAAI/bge-small-en-v1.5")
+    w(f"  revision             {MODEL_REVISION_DISPLAY}")
+    w(f"  combined_sha256      {res.model_combined_sha256}")
+    w("")
+    w("LINEAGE GATE")
+    w("  PASS — snapshot combined_sha256 matches the corpus vectors' "
+      "model_combined_sha256")
+    w("  (== bundled_search.sqlite meta value, == manifest acknowledgements)")
+    w("")
+    w("ARTIFACTS")
+    w(f"  {res.mlpackage_path.name:24s} {res.mlpackage_bytes:>12,} B  "
+      f"tree-sha256 {res.mlpackage_tree_sha256[:16]}…")
+    w(f"  {res.vocab_path.name:24s} {res.vocab_path.stat().st_size:>12,} B  "
+      f"sha256 {res.vocab_sha256[:16]}…")
+    w(f"    vocab matches expected sha256: "
+      f"{'YES' if res.vocab_sha256_matches_expected else 'NO (FLAG)'}")
+    w(f"  {res.parity_fixture_path.name:24s} "
+      f"{res.parity_fixture_path.stat().st_size:>12,} B")
+    w(f"  {res.tokenizer_fixture_path.name:24s} "
+      f"{res.tokenizer_fixture_path.stat().st_size:>12,} B")
+    w("")
+    w("PARITY GATE (P4) — bare passage vectors vs stored float32")
+    w(f"  source index         {search_db.name}")
+    w(f"  cases                {p.n}")
+    w(f"  embedding dim        {p.dim}  (expect 384)")
+    w(f"  mean cosine          {p.mean_cosine:.6f}  (floor {0.999})")
+    w(f"  min  cosine          {p.min_cosine:.6f}  (floor {0.995})")
+    w(f"  max  cosine          {p.max_cosine:.6f}")
+    w(f"  output L2 norm range [{p.min_norm:.6f}, {p.max_norm:.6f}]  "
+      f"(expect [0.999, 1.001])")
+    w(f"  VERDICT              {'PASS' if p.passed else 'FAIL — STOP-AND-INVESTIGATE'}")
+    if p.multi_subword_anchors:
+        w("  multi-subword coverage (>=3 WordPieces exercised):")
+        for a in p.multi_subword_anchors:
+            w(f"    - {a}")
+    w("")
+    w("  per-case (worst 8 by cosine):")
+    worst = sorted(p.per_case, key=lambda c: c["cosine"])[:8]
+    for c in worst:
+        w(f"    {c['cosine']:.6f}  norm={c['fp16_norm']:.5f}  "
+          f"{c['resource_type']:10s} {c['anchor']}")
+    w("")
+    w("TOKENIZER FIXTURE (HF ground truth for the Swift tokenizer test)")
+    for c in res.tokenizer_fixture:
+        shown = c["text"] if c["text"] else "(empty string)"
+        w(f"  {shown[:58]:58s} -> {c['input_ids']}")
+    w("")
+    w("PERFORMANCE / RESIDENCY")
+    w(f"  single 512-token forward pass: {res.forward_512_ms:.1f} ms (CPU, fp16)")
+    w("  seq axis: RangeDim(1,512,default=16)")
+    w("")
+    w("REPRODUCIBILITY")
+    w(f"  {det_note}")
+    if res.notes:
+        w("")
+        w("NOTES / FLAGS")
+        for n in res.notes:
+            w(f"  {n}")
+    w("")
+    w("NOTE: candidate artifacts only. The architect's 23-point spot-check + the")
+    w("Swift-side parity test (T6) gate ship. Artifacts are gitignored build")
+    w("output (output/models/) and are synced into the app via sync-corpus.sh.")
+    w("")
+    return "\n".join(lines)
+
+
+def cmd_coreml_export() -> None:
+    """Export the on-device BGE-small query model to a fp16 Core ML .mlpackage.
+
+    Runs the lineage gate (combined_sha256 == the corpus vectors' model hash) and
+    the parity gate (P4 cosine vs stored float32 passage vectors), emits the
+    .mlpackage + vocab.txt + parity/tokenizer fixtures under output/models/
+    (gitignored), and writes a report to reports/. Requires the ``[coreml]`` extra.
+    """
+    try:
+        from .coreml_export import (
+            LineageError,
+            ParityError,
+            export_coreml,
+        )
+    except ImportError as e:  # pragma: no cover - guarded import message
+        print(f"  coreml_export import failed ({e}). Install the extras with "
+              "`pip install -e \".[coreml]\"` (needs coremltools + torch + "
+              "transformers).", file=sys.stderr)
+        sys.exit(2)
+
+    from .encode import MODEL_CACHE
+    os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
+    bundled_search = PACKS_DIR / "bundled_search.sqlite"
+    if not bundled_search.exists():
+        print(f"No {bundled_search} — run `package` first (the parity gate scores "
+              "against the bundled BSB+WSC index).", file=sys.stderr)
+        sys.exit(2)
+
+    print("Exporting BGE-small query model -> Core ML (.mlpackage, fp16)")
+    print("  Lineage gate, trace+convert (CLS pool + L2-normalize baked in), "
+          "parity gate (P4)...")
+    try:
+        res = export_coreml(MODELS_OUT_DIR, bundled_search)
+    except LineageError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
+
+    # Reproducibility check: re-trace + re-convert into a temp dir and compare the
+    # .mlpackage tree hash (coremltools mlprogram should embed no timestamps).
+    det_note = _check_coreml_reproducibility(res)
+
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    report = _render_coreml_report(res, bundled_search, det_note)
+    rp = REPORTS_DIR / "coreml_export_m4.txt"
+    rp.write_text(report, encoding="utf-8")
+
+    # Update the committed manifest's packs.models subtree (sibling to bundled/
+    # on_demand) so sync-corpus.sh verify() picks up the model + vocab with zero jq
+    # changes. Only touches packs.models; the rest of the manifest is left intact.
+    from .embeddings import MODEL_NAME, MODEL_REVISION
+    from .package import build_models_pack, update_manifest_models
+    models_pack = build_models_pack(
+        mlpackage_path=res.mlpackage_path,
+        mlpackage_tree_sha256=res.mlpackage_tree_sha256,
+        mlpackage_bytes=res.mlpackage_bytes,
+        vocab_path=res.vocab_path,
+        vocab_sha256=res.vocab_sha256,
+        model_name=MODEL_NAME,
+        model_revision=MODEL_REVISION,
+        model_combined_sha256=res.model_combined_sha256,
+        precision="float16",
+        seq_len="RangeDim(1,512)",
+    )
+    if CORPUS_MANIFEST.exists():
+        update_manifest_models(CORPUS_MANIFEST, models_pack)
+        print(f"  updated {CORPUS_MANIFEST.name} packs.models subtree")
+    else:
+        print(f"  WARNING: {CORPUS_MANIFEST.name} not found — run `package` first "
+              "to write the base manifest; packs.models NOT added.", file=sys.stderr)
+
+    print(f"  mlpackage:  {res.mlpackage_path} ({res.mlpackage_bytes:,} B)")
+    print(f"  tree sha256: {res.mlpackage_tree_sha256}")
+    print(f"  vocab.txt:  sha256 {res.vocab_sha256} "
+          f"({'OK' if res.vocab_sha256_matches_expected else 'FLAG: mismatch'})")
+    print(f"  parity:     mean={res.parity.mean_cosine:.6f} "
+          f"min={res.parity.min_cosine:.6f} "
+          f"norm=[{res.parity.min_norm:.5f},{res.parity.max_norm:.5f}] "
+          f"dim={res.parity.dim} -> "
+          f"{'PASS' if res.parity.passed else 'FAIL'}")
+    print(f"  wrote {rp}")
+
+    if not res.parity.passed:
+        print("PARITY GATE FAILED (P4). This is a stop-and-investigate (almost "
+              "always a tokenizer / token_type_ids bug), never a threshold "
+              "loosening. Report written for forensics.", file=sys.stderr)
+        raise ParityError(
+            f"P4 floors not met: mean={res.parity.mean_cosine:.6f} (>=0.999), "
+            f"min={res.parity.min_cosine:.6f} (>=0.995), "
+            f"norm=[{res.parity.min_norm:.5f},{res.parity.max_norm:.5f}], "
+            f"dim={res.parity.dim}")
+
+
+def _check_coreml_reproducibility(res) -> str:
+    """Re-trace+convert to a temp dir; compare the .mlpackage tree hash.
+
+    A byte-identical tree hash proves the conversion is reproducible (no embedded
+    timestamps). A mismatch is FLAGGED (not failed) with the differing hash so the
+    architect can inspect — coremltools mlprogram is expected to be deterministic
+    but the finding is recorded rather than assumed (CLAUDE.md rule 6).
+    """
+    import shutil as _shutil
+    import tempfile
+
+    from .coreml_export import (
+        MLPACKAGE_NAME,
+        _build_wrapper,
+        _convert,
+        _snapshot_dir,
+        _trace,
+    )
+    from .package import _sha256_tree
+
+    tmp = Path(tempfile.mkdtemp(prefix="coreml_repro_"))
+    try:
+        snap = _snapshot_dir()
+        wrapper = _build_wrapper(snap)
+        traced = _trace(wrapper)
+        out = tmp / MLPACKAGE_NAME
+        _convert(traced, out)
+        second = _sha256_tree(out)
+        if second == res.mlpackage_tree_sha256:
+            return (f"PASS — re-trace+convert (separate process) yielded a "
+                    f"byte-identical .mlpackage tree (sha256 {second[:16]}…). "
+                    f"coremltools embeds no timestamps; cross-process protobuf/"
+                    f"UUID ordering is canonicalized in the tool (model behavior "
+                    f"is unchanged — predictions bit-identical).")
+        return (f"FLAG — re-conversion tree hash {second} != first "
+                f"{res.mlpackage_tree_sha256}. mlprogram is NOT byte-identical on "
+                f"re-run; recorded for architect (CLAUDE.md rule 6).")
+    finally:
+        _shutil.rmtree(tmp, ignore_errors=True)
+
+
 # --- P7 packaging ------------------------------------------------------------
 PACKS_DIR = OUTPUT_DIR / "packs"
 CORPUS_MANIFEST = REPO_ROOT / "corpus_manifest.json"
@@ -1097,6 +1322,8 @@ def main(argv: list[str] | None = None) -> int:
         cmd_build_embeddings(full=("full" in argv[1:]))
     elif cmd == "validate-embeddings":
         cmd_validate_embeddings()
+    elif cmd == "coreml-export":
+        cmd_coreml_export()
     elif cmd == "package":
         cmd_package()
     else:

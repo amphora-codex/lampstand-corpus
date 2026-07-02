@@ -33,6 +33,15 @@ embeddings = [
     "sentence-transformers>=3.0",  # BGE-small encoder (spec §4.2)
     "torch>=2.2",                  # CPU/MPS build; no CUDA required
 ]
+# Core ML export (M4 Tier-1 on-device query embedding). Adds coremltools on top
+# of the [embeddings] torch/transformers stack (both already present). Install with:
+#   pip install -e ".[coreml]"   (run once in the existing .venv)
+# This group is corpus-repo-only — the iOS app ships no Python and gains no SPM
+# dependency from it; the export tool merely produces the BGEQuery.mlpackage +
+# vocab.txt + parity/tokenizer fixtures the app syncs as checksummed assets.
+coreml = [
+    "coremltools>=8.0",            # torch->Core ML mlprogram conversion (fp16)
+]
 
 [project.scripts]
 # Filled in as the CLI takes shape (fetch / normalize / build / validate).

@@ -63,6 +63,40 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _sha256_tree(root: Path) -> str:
+    """Deterministic SHA-256 of a directory tree (for the .mlpackage bundle).
+
+    A ``.mlpackage`` is a *directory*, so a single-file ``shasum`` cannot hash it.
+    This folds every regular file's relative POSIX path and content hash into one
+    digest, walking paths in sorted order so the result is platform-stable and
+    reproducible. The iOS sync side mirrors this exact recipe
+    (``find -s <dir> -type f | sorted relpath + per-file sha256``) so the manifest
+    tree hash verifies on both ends.
+
+    Recipe (must match the shell mirror):
+      for each regular file under ``root``, sorted by POSIX relpath:
+        update(relpath + "\\0" + sha256(file_bytes) + "\\n")
+    Symlinks are resolved to their targets (HF/Core ML stores no symlinks inside a
+    freshly written .mlpackage, but resolving keeps the hash content-addressed if
+    one ever appears). Empty directories do not affect the hash.
+    """
+    if root.is_file():
+        return _sha256_file(root)
+    entries: list[tuple[str, str]] = []
+    for p in sorted(root.rglob("*"), key=lambda x: x.relative_to(root).as_posix()):
+        if p.is_dir():
+            continue
+        rel = p.relative_to(root).as_posix()
+        entries.append((rel, _sha256_file(p.resolve())))
+    h = hashlib.sha256()
+    for rel, file_hash in sorted(entries):
+        h.update(rel.encode("utf-8"))
+        h.update(b"\x00")
+        h.update(file_hash.encode("ascii"))
+        h.update(b"\n")
+    return h.hexdigest()
+
+
 def _copy_schema(src: sqlite3.Connection, dst: sqlite3.Connection) -> None:
     """Copy every table/index DDL from ``src`` to ``dst`` verbatim.
 
@@ -679,3 +713,78 @@ def _build_manifest(
         ])),
         ("acknowledgements", acks),
     ])
+
+
+# --- M4: packs.models subtree (Core ML query model + tokenizer vocab) ---------
+def build_models_pack(
+    *,
+    mlpackage_path: Path,
+    mlpackage_tree_sha256: str,
+    mlpackage_bytes: int,
+    vocab_path: Path,
+    vocab_sha256: str,
+    model_name: str,
+    model_revision: str,
+    model_combined_sha256: str,
+    precision: str,
+    seq_len: str,
+) -> OrderedDict:
+    """Build the ``packs.models`` subtree (sibling to bundled/on_demand).
+
+    Nesting the model + vocab under ``.packs`` lets ``sync-corpus.sh verify()``
+    pick them up with its existing jq walk (``.packs | to_entries[] |
+    .value.files[]``) — **zero jq changes**. The ``.mlpackage`` is a directory, so
+    its ``sha256`` is the deterministic *tree* hash (``_sha256_tree``), which the
+    iOS sync side mirrors. The top-level ``acknowledgements[].embedding-model``
+    entry is kept separately as the human-readable license/provenance record.
+    """
+    model_bytes = int(mlpackage_bytes)
+    vocab_bytes = vocab_path.stat().st_size
+    return OrderedDict([
+        ("description",
+         "On-device Tier-1 query-embedding model + tokenizer vocab. Synced "
+         "(never committed) like the corpus packs; the app loads the .mlpackage "
+         "strictly from disk (no runtime download). The .mlpackage sha256 is a "
+         "deterministic directory-tree hash."),
+        ("delivery", "app-binary"),
+        ("license_class", "MIT (model) / Apache-2.0 (BERT vocab); static weights"),
+        ("total_bytes", model_bytes + vocab_bytes),
+        ("files", [
+            OrderedDict([
+                ("name", mlpackage_path.name),
+                ("role", "embedding-model"),
+                ("bytes", model_bytes),
+                ("sha256", mlpackage_tree_sha256),
+                ("model_name", model_name),
+                ("model_revision", model_revision),
+                ("model_combined_sha256", model_combined_sha256),
+                ("precision", precision),
+                ("seq_len", seq_len),
+            ]),
+            OrderedDict([
+                ("name", vocab_path.name),
+                ("role", "tokenizer-vocab"),
+                ("bytes", vocab_bytes),
+                ("sha256", vocab_sha256),
+            ]),
+        ]),
+    ])
+
+
+def update_manifest_models(manifest_path: Path, models_pack: OrderedDict) -> None:
+    """Insert/replace the ``packs.models`` subtree in an existing manifest, on disk.
+
+    The model export runs after ``package`` (which writes the rest of the manifest),
+    so this surgically updates only ``packs.models`` — leaving bundled/on_demand,
+    totals, and acknowledgements untouched. ``models`` is placed last under
+    ``.packs`` (after bundled/on_demand) for readability; jq does not care about
+    ordering.
+    """
+    import json
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    packs = manifest.setdefault("packs", {})
+    packs["models"] = models_pack
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
