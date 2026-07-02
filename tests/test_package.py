@@ -21,8 +21,11 @@ from pathlib import Path
 import numpy as np
 
 from lampstand_corpus.embeddings import EMBED_DIM
+from lampstand_corpus.pack_codec import decode_postings, quantize_int8
 from lampstand_corpus.package import (
     CORPUS_VERSION_PLACEHOLDER,
+    VECTOR_FORMAT_FP32,
+    VECTOR_FORMAT_INT8,
     build_acknowledgements,
     package_corpus,
 )
@@ -241,13 +244,26 @@ def test_ondemand_has_the_rest_with_no_overlap(tmp_path):
     assert "wcf" in {r[0] for r in oc.execute("SELECT id FROM document")}
     oc.close()
 
-    # Whole-DB copies present for the heavy resources.
+    # Whole-DB copies present for the heavy resources; the v2 split replaces
+    # the former ondemand_embeddings.sqlite byte-copy.
     for name in ("ondemand_commentaries.sqlite", "ondemand_lexicons.sqlite",
-                 "ondemand_crossrefs.sqlite", "ondemand_embeddings.sqlite"):
+                 "ondemand_crossrefs.sqlite", "ondemand_search.sqlite",
+                 "ondemand_vectors.sqlite"):
         assert (out / "packs" / name).exists()
+    assert not (out / "packs" / "ondemand_embeddings.sqlite").exists()
 
 
-def test_bundled_search_reuses_vectors_and_recomputes_bm25(tmp_path):
+def test_stale_v1_embeddings_pack_is_removed(tmp_path):
+    out = tmp_path / "output"
+    _build_fixture(out)
+    packs = out / "packs"
+    packs.mkdir(parents=True)
+    (packs / "ondemand_embeddings.sqlite").write_bytes(b"stale v1 pack")
+    package_corpus(out, packs)
+    assert not (packs / "ondemand_embeddings.sqlite").exists()
+
+
+def test_bundled_search_v2_scopes_quantizes_and_recomputes_bm25(tmp_path):
     out = tmp_path / "output"
     _build_fixture(out)
     package_corpus(out, out / "packs")
@@ -260,13 +276,18 @@ def test_bundled_search_reuses_vectors_and_recomputes_bm25(tmp_path):
         "SELECT DISTINCT source FROM chunk"))
     assert sources == ["bsb", "wsc"]
 
-    # Vectors are byte-identical to the full index (reused, not re-encoded).
-    for cid in ("scr_a", "con_w"):
-        vb = bun.execute(
-            "SELECT vector FROM embedding WHERE chunk_id=?", (cid,)).fetchone()[0]
+    # Embedded vectors are the int8 quantization of the EXACT stored float32
+    # bytes (quantized at pack time, never re-encoded).
+    for sid in ("scr_a", "con_w"):
+        int_id, = bun.execute(
+            "SELECT id FROM chunk WHERE string_id=?", (sid,)).fetchone()
+        vb, scale = bun.execute(
+            "SELECT vector, scale FROM embedding WHERE chunk_id=?",
+            (int_id,)).fetchone()
         vf = full.execute(
-            "SELECT vector FROM embedding WHERE chunk_id=?", (cid,)).fetchone()[0]
-        assert vb == vf
+            "SELECT vector FROM embedding WHERE chunk_id=?", (sid,)).fetchone()[0]
+        exp_blob, exp_scale = quantize_int8(np.frombuffer(vf, dtype="<f4"))
+        assert vb == exp_blob and scale == exp_scale
 
     # BM25 N reflects ONLY the bundled subset (2 docs), not the global 5.
     n_docs = bun.execute(
@@ -278,6 +299,100 @@ def test_bundled_search_reuses_vectors_and_recomputes_bm25(tmp_path):
     assert df is not None and df[0] <= 2
     full.close()
     bun.close()
+
+
+def test_ondemand_search_pack_v2_contract(tmp_path):
+    """Int ids ascend with string ids, postings decode, doc_len is folded in."""
+    out = tmp_path / "output"
+    _build_fixture(out)
+    package_corpus(out, out / "packs")
+
+    sp = sqlite3.connect(out / "packs" / "ondemand_search.sqlite")
+    rows = sp.execute(
+        "SELECT id, string_id, text, doc_len FROM chunk ORDER BY id").fetchall()
+    # 1-based int ids assigned by ascending string id.
+    assert [r[0] for r in rows] == list(range(1, 6))
+    assert [r[1] for r in rows] == sorted(r[1] for r in rows)
+    # Display text included (the data-driven decision) + doc_len from BM25.
+    by_sid = {r[1]: r for r in rows}
+    assert by_sid["con_w"][2] == "chief end of man glorify"
+    assert by_sid["con_w"][3] == 5
+    # Meta declares the v2 contract.
+    meta = dict(sp.execute("SELECT key, value FROM meta"))
+    assert meta["format"] == "search-pack-v2"
+    assert meta["posting_format"] == "uvarint-gap-tf-v1"
+    assert meta["text_included"] == "1"
+
+    # Posting blobs decode to (int id, tf) pairs consistent with the corpus:
+    # "light" appears in scr_a, scr_b, con_c — three distinct chunks.
+    df, blob = sp.execute(
+        "SELECT doc_freq, postings FROM bm25_term WHERE term='light'").fetchone()
+    postings = decode_postings(blob)
+    assert len(postings) == df == 3
+    ids_for_light = {
+        by_sid[sid][0] for sid in ("scr_a", "scr_b", "con_c")}
+    assert {cid for cid, _tf in postings} == ids_for_light
+    assert all(tf == 1 for _cid, tf in postings)
+    # No per-posting row table exists in v2.
+    tables = {r[0] for r in sp.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "bm25_posting" not in tables and "bm25_doc" not in tables
+    sp.close()
+
+
+def test_vectors_pack_shares_int_ids_and_round_trips(tmp_path):
+    out = tmp_path / "output"
+    _build_fixture(out)
+    package_corpus(out, out / "packs")
+
+    sp = sqlite3.connect(out / "packs" / "ondemand_search.sqlite")
+    vp = sqlite3.connect(out / "packs" / "ondemand_vectors.sqlite")
+    full = sqlite3.connect(out / "embeddings.sqlite")
+
+    meta = dict(vp.execute("SELECT key, value FROM meta"))
+    assert meta["format"] == "vectors-pack-v2"
+    assert meta["vector_format"] == VECTOR_FORMAT_INT8
+
+    # Every search-pack chunk has a vector row under the SAME int id, and the
+    # int8 dequantization is within half a quantization step of the fp32 truth.
+    for sid in ("scr_a", "lex_g"):
+        int_id, = sp.execute(
+            "SELECT id FROM chunk WHERE string_id=?", (sid,)).fetchone()
+        blob, scale = vp.execute(
+            "SELECT vector, scale FROM embedding WHERE chunk_id=?",
+            (int_id,)).fetchone()
+        truth = np.frombuffer(full.execute(
+            "SELECT vector FROM embedding WHERE chunk_id=?",
+            (sid,)).fetchone()[0], dtype="<f4")
+        back = np.frombuffer(blob, dtype=np.int8).astype(np.float32) * scale
+        assert len(blob) == EMBED_DIM
+        assert float(np.max(np.abs(back - truth))) <= scale / 2 + 1e-7
+    sp.close()
+    vp.close()
+    full.close()
+
+
+def test_fp32_flag_keeps_exact_vector_bytes(tmp_path):
+    out = tmp_path / "output"
+    _build_fixture(out)
+    package_corpus(out, out / "packs", vector_format=VECTOR_FORMAT_FP32)
+
+    sp = sqlite3.connect(out / "packs" / "ondemand_search.sqlite")
+    vp = sqlite3.connect(out / "packs" / "ondemand_vectors.sqlite")
+    full = sqlite3.connect(out / "embeddings.sqlite")
+    meta = dict(vp.execute("SELECT key, value FROM meta"))
+    assert meta["vector_format"] == VECTOR_FORMAT_FP32
+    int_id, = sp.execute(
+        "SELECT id FROM chunk WHERE string_id='scr_a'").fetchone()
+    blob, scale = vp.execute(
+        "SELECT vector, scale FROM embedding WHERE chunk_id=?",
+        (int_id,)).fetchone()
+    truth = full.execute(
+        "SELECT vector FROM embedding WHERE chunk_id='scr_a'").fetchone()[0]
+    assert blob == truth and scale == 1.0
+    sp.close()
+    vp.close()
+    full.close()
 
 
 def test_packaging_is_deterministic(tmp_path):

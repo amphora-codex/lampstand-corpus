@@ -39,8 +39,11 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
+
 from .build_embeddings import BM25_B, BM25_K1, build_bm25
 from .embeddings import EMBED_DIM, Chunk
+from .pack_codec import assign_int_ids, encode_postings, quantize_int8
 
 # Corpus version placeholder. The pipeline NEVER finalizes a version — tagging
 # happens only after the architect's 23-point spot-check passes. This string is a
@@ -53,6 +56,19 @@ BUNDLED_CONFESSION = "wsc"
 
 # Size targets (from the spec / architect note), in bytes, for the FLAG check.
 BUNDLED_TARGET_MAX = 200 * 1024 * 1024  # well under ~150-200 MB
+# Pack-diet target for the on-demand SEARCH pack (with display text). If the
+# built pack exceeds this, the display-text decision is FLAGGED for the
+# architect (documented fallback: drop text and resolve display text from the
+# per-resource packs).
+SEARCH_PACK_TARGET_MAX = 250 * 1024 * 1024
+
+# --- Pack-diet v2 format identifiers (the app-side contract; docs/pack-diet.md)
+SEARCH_PACK_FORMAT = "search-pack-v2"
+VECTORS_PACK_FORMAT = "vectors-pack-v2"
+POSTING_FORMAT = "uvarint-gap-tf-v1"
+ID_ASSIGNMENT = "ascending-string-chunk-id-1based"
+VECTOR_FORMAT_INT8 = "int8-symmetric-per-vector-le"
+VECTOR_FORMAT_FP32 = "float32-le"
 
 
 def _sha256_file(path: Path) -> str:
@@ -243,16 +259,16 @@ def _stable_order(conn: sqlite3.Connection, table: str) -> str:
     return ", ".join(r[1] for r in info)
 
 
-# --- Bundled search index (BSB scripture + WSC confession; BM25 recomputed) ---
+# --- Pack-diet v2 search / vectors packs ---------------------------------------
 def _read_chunks_for(
     emb_path: Path, predicate_sql: str, params: tuple
 ) -> tuple[list[Chunk], dict[str, bytes]]:
-    """Load the bundled chunk subset + their vector blobs from embeddings.sqlite.
+    """Load a chunk scope + its float32 vector blobs from embeddings.sqlite.
 
-    Returns ``(chunks, vectors_by_id)``. Chunks are returned in a fixed order
-    (resource_type, source, anchor) so the bundled index is reproducible. We reuse
-    the exact stored vector bytes — no re-encoding — and recompute only the BM25
-    statistics over this subset.
+    Returns ``(chunks, vectors_by_string_id)`` ordered by string chunk id
+    ascending (== integer-id ascending under ``assign_int_ids``), so every pack
+    write is reproducible. Vector bytes are the exact stored float32 blobs —
+    never re-encoded; quantization (if any) happens at pack-write time.
     """
     conn = sqlite3.connect(emb_path)
     try:
@@ -262,7 +278,7 @@ def _read_chunks_for(
             "c.truncated, e.vector "
             "FROM chunk c JOIN embedding e ON e.chunk_id = c.id "
             f"WHERE {predicate_sql} "
-            "ORDER BY c.resource_type, c.source, c.anchor",
+            "ORDER BY c.id",
             params,
         ).fetchall()
     finally:
@@ -281,13 +297,18 @@ def _read_chunks_for(
     return chunks, vectors
 
 
-_SEARCH_SCHEMA = """
+# The v2 search-pack schema (docs/pack-diet.md is the app-side contract).
+# vs v1: chunk.id is the stable INTEGER id (string_id kept for provenance),
+# bm25_doc is folded into chunk.doc_len, bm25_posting rows + idx_posting_chunk
+# are replaced by one varint-delta BLOB per term.
+_SEARCH_SCHEMA_V2 = """
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
 CREATE TABLE chunk (
-    id            TEXT PRIMARY KEY,
+    id            INTEGER PRIMARY KEY,  -- stable int id (per corpus version)
+    string_id     TEXT NOT NULL UNIQUE, -- content-addressed id (provenance)
     resource_type TEXT NOT NULL,
     source        TEXT NOT NULL,
     anchor        TEXT NOT NULL,
@@ -296,92 +317,110 @@ CREATE TABLE chunk (
     verse_start   INTEGER,
     verse_end     INTEGER,
     key           TEXT,
-    text          TEXT NOT NULL,
+    text          TEXT,                 -- display text (NULL when excluded)
     text_checksum TEXT NOT NULL,
-    truncated     INTEGER NOT NULL DEFAULT 0
+    truncated     INTEGER NOT NULL DEFAULT 0,
+    doc_len       INTEGER NOT NULL      -- BM25 token count (was bm25_doc)
 );
 CREATE INDEX idx_chunk_resource ON chunk (resource_type);
 CREATE INDEX idx_chunk_source ON chunk (source);
 CREATE INDEX idx_chunk_ref ON chunk (book, chapter, verse_start);
-CREATE TABLE embedding (
-    chunk_id TEXT PRIMARY KEY REFERENCES chunk(id),
-    dim      INTEGER NOT NULL,
-    vector   BLOB NOT NULL
-);
-CREATE TABLE bm25_doc (
-    chunk_id TEXT PRIMARY KEY REFERENCES chunk(id),
-    length   INTEGER NOT NULL
-);
 CREATE TABLE bm25_term (
     term_id  INTEGER PRIMARY KEY,
     term     TEXT NOT NULL UNIQUE,
-    doc_freq INTEGER NOT NULL
+    doc_freq INTEGER NOT NULL,
+    postings BLOB NOT NULL              -- [gap uvarint, tf uvarint] * doc_freq
 );
-CREATE TABLE bm25_posting (
-    term_id   INTEGER NOT NULL REFERENCES bm25_term(term_id),
-    chunk_id  TEXT NOT NULL REFERENCES chunk(id),
-    term_freq INTEGER NOT NULL,
-    PRIMARY KEY (term_id, chunk_id)
-);
-CREATE INDEX idx_posting_chunk ON bm25_posting (chunk_id);
 CREATE TABLE bm25_stats (
     key   TEXT PRIMARY KEY,
     value REAL NOT NULL
 );
 """
 
+# Embedding table shared by ondemand_vectors.sqlite and (embedded) the bundled
+# search pack. chunk_id is the SAME integer id space as the search pack.
+_EMBEDDING_SCHEMA_V2 = """
+CREATE TABLE embedding (
+    chunk_id INTEGER PRIMARY KEY,
+    vector   BLOB NOT NULL,   -- dim int8 (int8 format) or dim float32-le
+    scale    REAL NOT NULL    -- per-vector dequant scale (1.0 for float32)
+);
+"""
 
-def _build_bundled_search(
-    emb_path: Path, dst_path: Path, model_meta: dict
+
+def _vector_meta(model_meta: dict, vector_format: str, n: int) -> list[tuple[str, str]]:
+    return [
+        ("model_name", model_meta.get("model_name", "")),
+        ("model_revision", model_meta.get("model_revision", "")),
+        ("model_combined_sha256", model_meta.get("model_combined_sha256", "")),
+        ("embedding_dim", str(EMBED_DIM)),
+        ("vector_format", vector_format),
+        ("query_instruction",
+         model_meta.get(
+             "query_instruction",
+             "Represent this sentence for searching relevant passages: ")),
+        ("n_vectors", str(n)),
+    ]
+
+
+def _vector_rows(
+    chunks: list[Chunk], vectors: dict[str, bytes], id_map: dict[str, int],
+    vector_format: str,
+) -> list[tuple[int, bytes, float]]:
+    """(int_id, blob, scale) rows in int-id order, quantized per the format."""
+    rows: list[tuple[int, bytes, float]] = []
+    for c in sorted(chunks, key=lambda c: id_map[c.id]):
+        blob = vectors[c.id]
+        if vector_format == VECTOR_FORMAT_INT8:
+            q, scale = quantize_int8(np.frombuffer(blob, dtype="<f4"))
+            rows.append((id_map[c.id], q, scale))
+        else:
+            rows.append((id_map[c.id], blob, 1.0))
+    return rows
+
+
+def _build_search_pack(
+    dst_path: Path,
+    chunks: list[Chunk],
+    id_map: dict[str, int],
+    *,
+    scope: str,
+    include_text: bool = True,
+    vectors: dict[str, bytes] | None = None,
+    vector_format: str = VECTOR_FORMAT_INT8,
+    model_meta: dict | None = None,
 ) -> dict:
-    """Build the BSB+WSC scoped search index with BM25 recomputed over the subset.
+    """Write a v2 search pack: chunk metadata + varint-delta BM25 posting blobs.
 
-    Reuses the exact stored float32 vectors (no re-encode — the bundled vectors are
-    byte-identical to the full index) but rebuilds the BM25 tables so ``avgdl`` and
-    document frequencies reflect ONLY the bundled corpus. The schema mirrors the
-    full ``embeddings.sqlite`` so the app's retriever code is identical.
+    BM25 statistics are recomputed over ``chunks`` with the same ``build_bm25``
+    that produced the built index (recompute == stored for the full scope; for
+    the bundled subset avgdl/df/N correctly reflect only that subset). When
+    ``vectors`` is given (the bundled pack) the embedding table is embedded in
+    the same file so the bundled index stays a single file.
     """
-    predicate = (
-        "(c.resource_type='scripture' AND c.source=?) "
-        "OR (c.resource_type='confession' AND c.source=?)"
-    )
-    chunks, vectors = _read_chunks_for(
-        emb_path, predicate, (BUNDLED_TRANSLATION, BUNDLED_CONFESSION)
-    )
+    bm25 = build_bm25(chunks)
+    ordered = sorted(chunks, key=lambda c: id_map[c.id])
     dst = _new_db(dst_path)
     try:
-        dst.executescript(_SEARCH_SCHEMA)
+        dst.executescript(_SEARCH_SCHEMA_V2)
         dst.executemany(
-            "INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [
-                (c.id, c.resource_type, c.source, c.anchor, c.book, c.chapter,
-                 c.verse_start, c.verse_end, c.key, c.text, c.text_checksum,
-                 1 if c.truncated else 0)
-                for c in chunks
+                (id_map[c.id], c.id, c.resource_type, c.source, c.anchor,
+                 c.book, c.chapter, c.verse_start, c.verse_end, c.key,
+                 c.text if include_text else None, c.text_checksum,
+                 1 if c.truncated else 0, bm25["doc_lengths"][c.id])
+                for c in ordered
             ],
         )
-        dst.executemany(
-            "INSERT INTO embedding VALUES (?,?,?)",
-            [(c.id, EMBED_DIM, vectors[c.id]) for c in chunks],
-        )
-
-        bm25 = build_bm25(chunks)
-        dst.executemany(
-            "INSERT INTO bm25_doc VALUES (?,?)",
-            sorted(bm25["doc_lengths"].items()),
-        )
-        term_ids: dict[str, int] = {}
         term_rows = []
+        n_postings = 0
         for tid, (term, df) in enumerate(bm25["terms"]):
-            term_ids[term] = tid
-            term_rows.append((tid, term, df))
-        dst.executemany("INSERT INTO bm25_term VALUES (?,?,?)", term_rows)
-        posting_rows = []
-        for term, _df in bm25["terms"]:
-            tid = term_ids[term]
-            for chunk_id in sorted(bm25["postings"][term]):
-                posting_rows.append((tid, chunk_id, bm25["postings"][term][chunk_id]))
-        dst.executemany("INSERT INTO bm25_posting VALUES (?,?,?)", posting_rows)
+            postings = sorted(
+                (id_map[cid], tf) for cid, tf in bm25["postings"][term].items())
+            n_postings += len(postings)
+            term_rows.append((tid, term, df, encode_postings(postings)))
+        dst.executemany("INSERT INTO bm25_term VALUES (?,?,?,?)", term_rows)
         dst.executemany(
             "INSERT INTO bm25_stats VALUES (?,?)",
             [
@@ -393,34 +432,71 @@ def _build_bundled_search(
                 ("b", BM25_B),
             ],
         )
+        meta_rows = [
+            ("schema_version", "2"),
+            ("format", SEARCH_PACK_FORMAT),
+            ("resource_type", "search"),
+            ("scope", scope),
+            ("bm25_tokenizer", "nfkc-casefold-alnum-no-stemming"),
+            ("posting_format", POSTING_FORMAT),
+            ("id_assignment", ID_ASSIGNMENT),
+            ("text_included", "1" if include_text else "0"),
+            ("n_chunks", str(len(ordered))),
+        ]
+        if vectors is not None:
+            dst.executescript(_EMBEDDING_SCHEMA_V2)
+            dst.executemany(
+                "INSERT INTO embedding VALUES (?,?,?)",
+                _vector_rows(ordered, vectors, id_map, vector_format))
+            meta_rows += _vector_meta(model_meta or {}, vector_format, len(ordered))
+        dst.executemany("INSERT INTO meta VALUES (?,?)", meta_rows)
+        dst.commit()
+        return {
+            "format": SEARCH_PACK_FORMAT,
+            "n_chunks": len(ordered),
+            "vocab_size": len(bm25["terms"]),
+            "n_postings": n_postings,
+            "posting_format": POSTING_FORMAT,
+            "text_included": include_text,
+            **({"vector_format": vector_format} if vectors is not None else {}),
+        }
+    finally:
+        dst.close()
+
+
+def _build_vectors_pack(
+    dst_path: Path,
+    chunks: list[Chunk],
+    vectors: dict[str, bytes],
+    id_map: dict[str, int],
+    *,
+    vector_format: str,
+    model_meta: dict,
+) -> dict:
+    """Write the v2 vectors pack (int8 by default; float32 behind the flag)."""
+    dst = _new_db(dst_path)
+    try:
+        dst.executescript(
+            "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+            + _EMBEDDING_SCHEMA_V2)
+        dst.executemany(
+            "INSERT INTO embedding VALUES (?,?,?)",
+            _vector_rows(chunks, vectors, id_map, vector_format))
         dst.executemany(
             "INSERT INTO meta VALUES (?,?)",
             [
-                ("schema_version", "1"),
-                ("resource_type", "embeddings"),
-                ("scope", "bundled (bsb-scripture + wsc-confession)"),
-                ("model_name", model_meta.get("model_name", "")),
-                ("model_revision", model_meta.get("model_revision", "")),
-                ("model_combined_sha256",
-                 model_meta.get("model_combined_sha256", "")),
-                ("embedding_dim", str(EMBED_DIM)),
-                ("vector_format", "float32-le"),
-                ("query_instruction",
-                 model_meta.get(
-                     "query_instruction",
-                     "Represent this sentence for searching relevant passages: ")),
-                ("bm25_tokenizer", "nfkc-casefold-alnum-no-stemming"),
-                ("n_chunks", str(len(chunks))),
-            ],
+                ("schema_version", "2"),
+                ("format", VECTORS_PACK_FORMAT),
+                ("resource_type", "vectors"),
+                ("id_assignment", ID_ASSIGNMENT),
+            ] + _vector_meta(model_meta, vector_format, len(chunks)),
         )
         dst.commit()
         return {
-            "n_chunks": len(chunks),
-            "n_scripture": sum(1 for c in chunks if c.resource_type == "scripture"),
-            "n_confession": sum(1 for c in chunks if c.resource_type == "confession"),
-            "vocab_size": len(bm25["terms"]),
-            "n_postings": len(posting_rows),
-            "avgdl": bm25["avgdl"],
+            "format": VECTORS_PACK_FORMAT,
+            "n_vectors": len(chunks),
+            "vector_format": vector_format,
+            "embedding_dim": EMBED_DIM,
         }
     finally:
         dst.close()
@@ -589,12 +665,21 @@ _ONDEMAND_OTHER_TRANSLATIONS = ["asv", "kjv", "web"]
 _ONDEMAND_CONFESSIONS = ["belgic", "dort", "heidelberg", "lbcf", "wcf", "wlc"]
 
 
-def package_corpus(output_dir: Path, packs_dir: Path) -> PackagingResult:
+def package_corpus(
+    output_dir: Path, packs_dir: Path, *, vector_format: str = VECTOR_FORMAT_INT8
+) -> PackagingResult:
     """Produce the bundled + on-demand packs and the corpus manifest (in memory).
 
     Writes the pack ``.sqlite`` files under ``packs_dir`` (gitignored) and returns
     a ``PackagingResult`` carrying per-file SHA-256 + sizes, the manifest dict, and
     any size FLAGs. The manifest is written to disk by the caller (CLI).
+
+    Pack-diet v2: the former ``ondemand_embeddings.sqlite`` byte-copy is replaced
+    by ``ondemand_search.sqlite`` (chunk metadata + display text + varint-delta
+    posting blobs over stable integer chunk ids) plus ``ondemand_vectors.sqlite``
+    (int8 vectors + per-vector scale by default; ``vector_format=VECTOR_FORMAT_FP32``
+    keeps float32). ``bundled_search.sqlite`` keeps its name but adopts the same
+    v2 encoding with its vectors embedded.
     """
     packs_dir.mkdir(parents=True, exist_ok=True)
     emb_meta = _emb_model_meta(output_dir / "embeddings.sqlite")
@@ -605,6 +690,12 @@ def package_corpus(output_dir: Path, packs_dir: Path) -> PackagingResult:
         files.append(PackFile(
             pack=pack, name=name, role=role,
             bytes=p.stat().st_size, sha256=_sha256_file(p), contents=contents))
+
+    # One integer-id space over the WHOLE corpus (bundled subset included), so a
+    # chunk keeps one id across every pack of a corpus version.
+    all_chunks, all_vectors = _read_chunks_for(
+        output_dir / "embeddings.sqlite", "1=1", ())
+    id_map = assign_int_ids([c.id for c in all_chunks])
 
     # --- Bundled pack ---
     c = _filter_bibles(
@@ -617,9 +708,16 @@ def package_corpus(output_dir: Path, packs_dir: Path) -> PackagingResult:
         packs_dir / "bundled_confessions.sqlite", [BUNDLED_CONFESSION])
     register("bundled", "bundled_confessions.sqlite", "confessions", c)
 
-    c = _build_bundled_search(
-        output_dir / "embeddings.sqlite",
-        packs_dir / "bundled_search.sqlite", emb_meta)
+    bundled_chunks = [
+        c for c in all_chunks
+        if (c.resource_type == "scripture" and c.source == BUNDLED_TRANSLATION)
+        or (c.resource_type == "confession" and c.source == BUNDLED_CONFESSION)
+    ]
+    c = _build_search_pack(
+        packs_dir / "bundled_search.sqlite", bundled_chunks, id_map,
+        scope="bundled (bsb-scripture + wsc-confession)",
+        vectors={ch.id: all_vectors[ch.id] for ch in bundled_chunks},
+        vector_format=vector_format, model_meta=emb_meta)
     register("bundled", "bundled_search.sqlite", "search", c)
 
     # --- On-demand packs ---
@@ -637,11 +735,26 @@ def package_corpus(output_dir: Path, packs_dir: Path) -> PackagingResult:
         ("commentaries", "commentaries.sqlite"),
         ("lexicons", "lexicons.sqlite"),
         ("crossrefs", "crossrefs.sqlite"),
-        ("search", "embeddings.sqlite"),
     ]:
         dst_name = f"ondemand_{fname}"
         _copy_whole_db(output_dir / fname, packs_dir / dst_name)
         register("on-demand", dst_name, role, {"copied_from": fname})
+
+    c = _build_search_pack(
+        packs_dir / "ondemand_search.sqlite", all_chunks, id_map,
+        scope="full corpus", model_meta=emb_meta)
+    register("on-demand", "ondemand_search.sqlite", "search", c)
+
+    c = _build_vectors_pack(
+        packs_dir / "ondemand_vectors.sqlite", all_chunks, all_vectors, id_map,
+        vector_format=vector_format, model_meta=emb_meta)
+    register("on-demand", "ondemand_vectors.sqlite", "vectors", c)
+
+    # The v1 pack this split supersedes; remove a stale copy so a mixed pack
+    # directory can never ship both formats.
+    stale = packs_dir / "ondemand_embeddings.sqlite"
+    if stale.exists():
+        stale.unlink()
 
     bundled_bytes = sum(f.bytes for f in files if f.pack == "bundled")
     ondemand_bytes = sum(f.bytes for f in files if f.pack == "on-demand")
@@ -651,6 +764,14 @@ def package_corpus(output_dir: Path, packs_dir: Path) -> PackagingResult:
         flags.append(
             f"BUNDLED pack total {bundled_bytes:,} B exceeds the "
             f"~{BUNDLED_TARGET_MAX // (1024*1024)} MB target — review the split.")
+    search_bytes = next(
+        f.bytes for f in files if f.name == "ondemand_search.sqlite")
+    if search_bytes > SEARCH_PACK_TARGET_MAX:
+        flags.append(
+            f"ondemand_search.sqlite is {search_bytes:,} B (> "
+            f"{SEARCH_PACK_TARGET_MAX // (1024*1024)} MB target WITH display "
+            f"text) — architect decision needed: drop chunk text from the "
+            f"search pack and resolve display text from the per-resource packs.")
 
     manifest = _build_manifest(output_dir, files, bundled_bytes, ondemand_bytes)
     return PackagingResult(
@@ -685,6 +806,16 @@ def _build_manifest(
          "CANDIDATE. The pipeline never marks a corpus version ship-ready — "
          "the architect's 23-point spot-check gates ship. Pack .sqlite files are "
          "gitignored (output/packs/); only this manifest is committed."),
+        ("format_migration",
+         "Pack diet v1→v2: ondemand_embeddings.sqlite (byte-copy of the built "
+         "embeddings.sqlite; float32 vectors + one SQL row per BM25 posting "
+         "keyed by TEXT chunk id) is REPLACED by ondemand_search.sqlite (chunk "
+         "metadata + display text + one varint-delta posting BLOB per term over "
+         "stable INTEGER chunk ids; bm25_doc folded into chunk.doc_len; "
+         "idx_posting_chunk dropped) and ondemand_vectors.sqlite (int8 vectors "
+         "+ per-vector scale, keyed by the same integer ids). "
+         "bundled_search.sqlite keeps its name but adopts the same v2 encoding "
+         "with its vectors embedded. Schema contract: docs/pack-diet.md."),
         ("embedding_dim", EMBED_DIM),
         ("packs", OrderedDict([
             ("bundled", OrderedDict([
@@ -700,7 +831,8 @@ def _build_manifest(
                 ("description",
                  "Free, downloaded on first launch. KJV/ASV/WEB, all "
                  "commentaries, the remaining confessions, lexicons + tagged "
-                 "text, cross-references, and the full embeddings index."),
+                 "text, cross-references, and the full search + vectors packs "
+                 "(pack-diet v2)."),
                 ("delivery", "first-launch-download"),
                 ("total_bytes", ondemand_total),
                 ("files", ondemand_files),
