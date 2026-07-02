@@ -1292,9 +1292,10 @@ def _build_eval_harness():
         print(f"  !! DENSE ARMS UNAVAILABLE — query encoder failed to load "
               f"({reason}); degrading to BM25-only.", file=sys.stderr)
     print(f"Caching per-query rankings over {len(gold['queries'])} gold queries "
-          f"(BM25{' + dense' if encoder else ' only'})...")
+          f"(BM25{' + dense fp32 + dense int8' if encoder else ' only'})...")
     harness = Harness.build(
-        OUTPUT_DIR / "embeddings.sqlite", gold["queries"], encode_queries=encoder)
+        OUTPUT_DIR / "embeddings.sqlite", gold["queries"], encode_queries=encoder,
+        int8_variant=True)
     return gold, harness, reason
 
 
@@ -1330,10 +1331,17 @@ def _evaluate_arms(gold: dict, harness, dense_reason: str | None) -> dict:
     }
     if dense_reason:
         results["dense_unavailable_reason"] = dense_reason
-    for arm in arm_order:
+    # Pack-diet quality probe: dense-bearing arms re-run against the int8-
+    # quantized vectors. Stored under arms{} (consumed by the pack-diet
+    # report) but listed in int8_arms — NOT arm_order — so the retrieval-eval
+    # report's arm sections and F5 verdict are unchanged.
+    int8_arms = (["dense-int8", "hybrid-int8"]
+                 if getattr(harness, "int8_available", False) else [])
+    results["int8_arms"] = int8_arms
+    for arm in arm_order + int8_arms:
         results["arms"][arm] = harness.evaluate_arm(arm, APP_CONFIG)
         o = results["arms"][arm]["overall"]
-        print(f"  {arm:9s} recall@20={o['recall_at_20']:.3f} "
+        print(f"  {arm:12s} recall@20={o['recall_at_20']:.3f} "
               f"MRR={o['mrr']:.3f} nDCG@10={o['ndcg_at_10']:.3f}")
     return results
 
@@ -1389,10 +1397,13 @@ PACKS_DIR = OUTPUT_DIR / "packs"
 CORPUS_MANIFEST = REPO_ROOT / "corpus_manifest.json"
 
 
-def cmd_package() -> None:
+def cmd_package(*, fp32: bool = False) -> None:
     """Split the built DBs into bundled + on-demand packs and write the manifest.
 
     Requires the per-resource DBs (incl. embeddings.sqlite) to be built first.
+    Pack-diet v2: vectors are int8-quantized by default; ``package fp32`` keeps
+    the exact float32 bytes. Also writes reports/pack_diet_v1.md (sizes + the
+    int8 quality delta when validate-retrieval has produced one).
     """
     required = [
         "bibles.sqlite", "confessions.sqlite", "commentaries.sqlite",
@@ -1404,8 +1415,12 @@ def cmd_package() -> None:
               + " — run the build-* commands first.", file=sys.stderr)
         sys.exit(2)
 
-    print(f"Packaging built DBs -> {PACKS_DIR} (gitignored)")
-    result = package_corpus(OUTPUT_DIR, PACKS_DIR)
+    from .package import VECTOR_FORMAT_FP32, VECTOR_FORMAT_INT8
+
+    vector_format = VECTOR_FORMAT_FP32 if fp32 else VECTOR_FORMAT_INT8
+    print(f"Packaging built DBs -> {PACKS_DIR} (gitignored; vectors "
+          f"{vector_format})")
+    result = package_corpus(OUTPUT_DIR, PACKS_DIR, vector_format=vector_format)
 
     print(f"\nBUNDLED pack ({result.bundled_bytes:,} B = "
           f"{result.bundled_bytes / (1024*1024):.1f} MB):")
@@ -1425,12 +1440,27 @@ def cmd_package() -> None:
     else:
         print("\nNo size flags (bundled pack is within target).")
 
-    # Manifest is the only committed artifact of this step.
+    # Manifest is a committed artifact of this step.
     CORPUS_MANIFEST.write_text(
         json.dumps(result.manifest, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8")
     print(f"\nWrote committed manifest {CORPUS_MANIFEST} "
           f"(corpus_version placeholder: {CORPUS_VERSION_PLACEHOLDER})")
+
+    # Pack-diet report (committed): sizes + int8 quality delta when measured.
+    from .eval_retrieval import RESULTS_FILENAME
+    from .pack_report import PACK_DIET_REPORT_FILENAME, render_pack_diet_report
+
+    results_path = OUTPUT_DIR / RESULTS_FILENAME
+    eval_results = (json.loads(results_path.read_text(encoding="utf-8"))
+                    if results_path.exists() else None)
+    report = render_pack_diet_report(
+        corpus_version=CORPUS_VERSION_PLACEHOLDER,
+        files=result.files, flags=result.flags, eval_results=eval_results)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    rp = REPORTS_DIR / PACK_DIET_REPORT_FILENAME
+    rp.write_text(report, encoding="utf-8")
+    print(f"Wrote {rp}")
     print("Candidate only — the architect's 23-point spot-check gates ship.")
 
 
@@ -1494,7 +1524,8 @@ def main(argv: list[str] | None = None) -> int:
     elif cmd == "sweep-retrieval":
         cmd_sweep_retrieval()
     elif cmd == "package":
-        cmd_package()
+        # `package fp32` keeps exact float32 vector bytes (no quantization).
+        cmd_package(fp32=("fp32" in argv[1:]))
     else:
         print(__doc__)
         return 1

@@ -325,34 +325,49 @@ class QueryCache:
     hard_negative: str | None
     bm25_types: dict[int, list[tuple[int, float]]]
     dense: list[tuple[int, float, int]] = field(default_factory=list)
+    # Dense ranking against the int8-quantized vectors (pack-diet quality
+    # probe); empty unless the harness was built with int8_variant=True.
+    dense_q: list[tuple[int, float, int]] = field(default_factory=list)
 
 
 class Harness:
     """Builds per-query caches once, then evaluates any FusionConfig cheaply."""
 
-    def __init__(self, index: EvalIndex, dense_available: bool) -> None:
+    def __init__(self, index: EvalIndex, dense_available: bool,
+                 int8_available: bool = False) -> None:
         self.index = index
         self.dense_available = dense_available
+        self.int8_available = int8_available
         self.caches: list[QueryCache] = []
 
     @classmethod
     def build(
-        cls, emb_db: Path, gold_queries: list[dict], *, encode_queries=None
+        cls, emb_db: Path, gold_queries: list[dict], *, encode_queries=None,
+        int8_variant: bool = False,
     ) -> Harness:
         """Cache BM25 + dense rankings for every gold query.
 
         ``encode_queries`` is a callable ``list[str] -> np.ndarray`` producing
         instruction-prefixed unit query vectors; None (or a load failure
-        upstream) degrades to BM25-only arms.
+        upstream) degrades to BM25-only arms. ``int8_variant`` additionally
+        scores against the int8 quantize→dequantize round-trip of the corpus
+        matrix — mathematically identical to scoring the int8 vectors pack —
+        so the pack diet's quality delta is measured by this same harness.
         """
         index = EvalIndex(emb_db)
-        h = cls(index, dense_available=encode_queries is not None)
+        h = cls(index, dense_available=encode_queries is not None,
+                int8_available=encode_queries is not None and int8_variant)
 
         sims_by_row: np.ndarray | None = None
+        sims_q_by_row: np.ndarray | None = None
         if encode_queries is not None:
             matrix = index.load_matrix()
             qvecs = encode_queries([q["query"] for q in gold_queries])
-            sims_by_row = qvecs.astype(np.float32) @ matrix.T
+            qvecs = qvecs.astype(np.float32)
+            sims_by_row = qvecs @ matrix.T
+            if int8_variant:
+                from .pack_codec import quantize_roundtrip_matrix
+                sims_q_by_row = qvecs @ quantize_roundtrip_matrix(matrix).T
             del matrix
 
         for row, q in enumerate(gold_queries):
@@ -369,6 +384,8 @@ class Harness:
             )
             if sims_by_row is not None:
                 cache.dense = index.dense_deduped(sims_by_row[row], exclude_idx)
+            if sims_q_by_row is not None:
+                cache.dense_q = index.dense_deduped(sims_q_by_row[row], exclude_idx)
             h.caches.append(cache)
         return h
 
@@ -376,13 +393,18 @@ class Harness:
     def ranked_ids(
         self, cache: QueryCache, arm: str, cfg: FusionConfig
     ) -> list[str]:
+        """Ranked chunk ids for one arm: ``bm25`` / ``dense`` / ``hybrid``, plus
+        the ``-int8`` variants of the dense-bearing arms, which rank against the
+        quantized vectors through the identical fusion path."""
         idx = self.index
+        base = arm.removesuffix("-int8")
+        dense_cache = cache.dense_q if arm.endswith("-int8") else cache.dense
         bm25_ids: list[int] = []
         dense_ids: list[int] = []
-        if arm in ("bm25", "hybrid"):
+        if base in ("bm25", "hybrid"):
             bm25_ids = bm25_ranking(cache.bm25_types, cfg.bm25_per_type, idx.dedup_key)
-        if arm in ("dense", "hybrid"):
-            dense_ids = dense_ranking(cache.dense, cfg.dense_raw_fetch, cfg.dense_depth)
+        if base in ("dense", "hybrid"):
+            dense_ids = dense_ranking(dense_cache, cfg.dense_raw_fetch, cfg.dense_depth)
         fused = rrf_fuse(
             bm25_ids, dense_ids, idx.anchors,
             rrf_k=cfg.rrf_k, dense_lambda=cfg.dense_lambda)
