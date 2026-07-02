@@ -132,6 +132,18 @@ def render_crossref_pack_report(
                  "from confession proof-texts and commentary anchors, "
                  "independent of TSK).")
         w.append("")
+        w.append("Reading (for the app lane): the equal-weight boost helps "
+                 "QUESTION-shaped queries (prooftext — doctrinal question → "
+                 "proof verse, where TSK adjacency genuinely bridges) and hurts "
+                 "QUOTE-shaped queries (commentary-anchor — the paragraph's own "
+                 "anchored pericope gets displaced by its TSK neighbors); the "
+                 "⅓-weight variant lands graph candidates in the tail and is a "
+                 "measurable no-op. Recommendation: do NOT re-rank the fused "
+                 "list wholesale — use the expansion as ADDITIVE Ask-grounding "
+                 "candidates (append below the fused hits, or gate the boost on "
+                 "query shape), and re-measure any chosen shape with "
+                 "`validate-retrieval` before shipping constants.")
+        w.append("")
     else:
         w.append("_Not yet measured — run `validate-retrieval` (graph arms run "
                  "automatically when crossrefs.sqlite is built), then re-run "

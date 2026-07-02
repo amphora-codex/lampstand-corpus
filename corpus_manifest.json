@@ -9,7 +9,7 @@
       "description": "Ships in the app binary. BSB Bible + Westminster Shorter Catechism + a BSB/WSC-scoped dense+BM25 search index.",
       "delivery": "app-binary",
       "license_class": "public-domain / CC0 only",
-      "total_bytes": 15106048,
+      "total_bytes": 18157568,
       "files": [
         {
           "name": "bundled_bibles.sqlite",
@@ -35,6 +35,21 @@
             ],
             "n_documents": 1,
             "n_sections": 107
+          }
+        },
+        {
+          "name": "bundled_crossrefs.sqlite",
+          "role": "crossrefs",
+          "bytes": 3051520,
+          "sha256": "08d5f0a6383ebf8766a4e7ccc562320c30966a0f6157214338b89c03903be0b5",
+          "contents": {
+            "format": "crossrefs-pack-v1",
+            "n_sources": 29363,
+            "n_edges": 344794,
+            "n_expanded_chunks": 13089,
+            "expansion_top_n": 8,
+            "license": "CC-BY 4.0 (www.openbible.info)",
+            "attribution": "Cross-reference data courtesy of www.openbible.info, used under CC-BY."
           }
         },
         {
@@ -174,9 +189,9 @@
     }
   },
   "totals": {
-    "bundled_bytes": 15106048,
+    "bundled_bytes": 18157568,
     "ondemand_bytes": 532942848,
-    "all_bytes": 548048896
+    "all_bytes": 551100416
   },
   "acknowledgements": [
     {
