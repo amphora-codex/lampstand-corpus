@@ -256,21 +256,35 @@ def build_expansion_rows(
     Archaic pairs ship bidirectionally; suffix classes all-to-all within a
     class; synonym pairs only once the tracked DRAFT file is APPROVED. When a
     ``repo_root`` is given and the DRAFT file is absent, the candidate file is
-    generated (tracked, for the advisor). Rows are unique and sorted.
+    generated (tracked, for the advisor).
+
+    The same (term, expansion) pair can arrive from MULTIPLE sources (e.g.
+    believeth↔believes is both a mined archaic pair and a suffix-class pair).
+    The table's primary key is (term, expansion), so pairs are deduped with a
+    DOCUMENTED, arrival-order-independent precedence: the higher ``weight``
+    wins; on a weight tie the kind wins by fixed rank synonym > archaic >
+    suffix (curated > mined > rule). Rows are unique and sorted.
     """
-    rows: set[tuple[str, str, str, float]] = set()
+    kind_rank = {"synonym": 0, "archaic": 1, "suffix": 2}
+    best: dict[tuple[str, str], tuple[float, str]] = {}
+
+    def add(term: str, exp: str, kind: str, weight: float) -> None:
+        cur = best.get((term, exp))
+        if cur is None or (-weight, kind_rank[kind]) < (-cur[0], kind_rank[cur[1]]):
+            best[(term, exp)] = (weight, kind)
+
     mined = mine_archaic_pairs(bibles_db)
     for p in mined:
         if not p["mechanical"]:
             continue
         w = float(p["score"])
-        rows.add((p["archaic"], p["modern"], "archaic", w))
-        rows.add((p["modern"], p["archaic"], "archaic", w))
+        add(p["archaic"], p["modern"], "archaic", w)
+        add(p["modern"], p["archaic"], "archaic", w)
     for _stem, members in suffix_classes(vocab_df).items():
         for a in members:
             for b in members:
                 if a != b:
-                    rows.add((a, b, "suffix", 1.0))
+                    add(a, b, "suffix", 1.0)
 
     # DRAFT candidates: strongest evidence first, both tokens content-shaped,
     # capped so the advisor's review stays tractable.
@@ -285,16 +299,19 @@ def build_expansion_rows(
             write_synonym_candidates(syn_path, candidates)
         for p in load_approved_synonyms(syn_path):
             w = float(p.get("score", 1.0))
-            rows.add((p["archaic"], p["modern"], "synonym", w))
-            rows.add((p["modern"], p["archaic"], "synonym", w))
+            add(p["archaic"], p["modern"], "synonym", w)
+            add(p["modern"], p["archaic"], "synonym", w)
 
+    rows = sorted(
+        (term, exp, kind, weight)
+        for (term, exp), (weight, kind) in best.items())
     stats = {
         "n_archaic_pairs": sum(1 for p in mined if p["mechanical"]),
         "n_synonym_candidates": len(candidates),
         "n_suffix_classes": len(suffix_classes(vocab_df)),
         "n_rows": len(rows),
     }
-    return sorted(rows), stats
+    return rows, stats
 
 
 def load_expansion_map(

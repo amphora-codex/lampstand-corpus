@@ -119,3 +119,22 @@ def test_load_expansion_map_shape():
             ("b", "a", "archaic", 0.9)]
     m = ex.load_expansion_map(rows)
     assert m == {"a": ["b", "c"], "b": ["a"]}
+
+
+def test_duplicate_pairs_across_sources_dedupe_with_precedence(tmp_path):
+    """believeth↔believes arrives from BOTH the archaic miner and the suffix
+    class (believe/believes/believeth) — the table PK is (term, expansion), so
+    exactly one row must survive, by documented precedence (weight desc, then
+    synonym > archaic > suffix), independent of arrival order."""
+    db = _parallel_fixture(tmp_path)
+    vocab = {"believe": 50, "believes": 22, "believeth": 9}
+    rows, _ = ex.build_expansion_rows(db, vocab, tmp_path)
+    keys = [(r[0], r[1]) for r in rows]
+    assert len(keys) == len(set(keys)), "duplicate (term, expansion) rows"
+    by_key = {(r[0], r[1]): (r[2], r[3]) for r in rows}
+    # Fixture archaic score is 1.0 == suffix weight 1.0 -> tie -> archaic wins
+    # (mined outranks rule-derived at equal weight).
+    assert by_key[("believeth", "believes")] == ("archaic", 1.0)
+    assert by_key[("believes", "believeth")] == ("archaic", 1.0)
+    # Pure suffix pairs (no archaic twin) stay suffix.
+    assert by_key[("believe", "believes")][0] == "suffix"
