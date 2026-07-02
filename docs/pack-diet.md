@@ -208,3 +208,13 @@ Key `meta` rows: `schema_version=2`, `format=vectors-pack-v2`,
 4. `ChunkRepository`: unchanged semantics; the Scripture translation dedup key
    is still (book, chapter, verse_start, verse_end).
 5. Never persist integer ids across corpus versions (see above).
+6. Download tiering (F5): `ondemand_vectors.sqlite` is **default-tier**, not a
+   separate opt-in. Read `corpus_manifest.json` → `packs.on_demand.files[]` and
+   fetch every file whose `tier == "default"` on first launch (all on-demand
+   packs today). `ondemand_search` + `ondemand_vectors` share
+   `download_group == "retrieval-index"` and should be treated as one unit; the
+   dense arm needs `ondemand_vectors`, BM25 needs only `ondemand_search`. If the
+   vectors pack is missing, retrieval degrades **gracefully to BM25-only** — the
+   search pack is self-sufficient and must never be gated on the vectors pack.
+   `packs.on_demand.default_note` / `app_reader` in the manifest state this
+   contract; `packs.on_demand.tiers.default.bytes` is the default-set size.

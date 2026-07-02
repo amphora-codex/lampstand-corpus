@@ -591,6 +591,42 @@ def test_preserve_models_subtree_carries_coreml_entries(tmp_path):
     assert fresh["packs"]["models"]["files"][0]["name"] == "BGEQuery.mlpackage"
 
 
+def test_ondemand_vectors_is_default_tier_grouped_with_search(tmp_path):
+    """F5: ondemand_vectors ships default-tier (not opt-in), grouped with
+    ondemand_search as the 'retrieval-index'; bundled files carry no tier."""
+    out = tmp_path / "output"
+    _build_fixture(out)
+    result = package_corpus(out, out / "packs")
+    od = result.manifest["packs"]["on_demand"]
+    by_name = {f["name"]: f for f in od["files"]}
+
+    # Vectors + search are default-tier and share the retrieval-index group.
+    for name in ("ondemand_vectors.sqlite", "ondemand_search.sqlite"):
+        assert by_name[name]["tier"] == "default", name
+        assert by_name[name]["download_group"] == "retrieval-index", name
+    # Every on-demand file is default tier today (no opt-in slot used).
+    assert all(f["tier"] == "default" for f in od["files"])
+    # Content packs are grouped separately from the retrieval index.
+    assert by_name["ondemand_commentaries.sqlite"]["download_group"] == "content"
+
+    # The default-set size is the sum of tier=default files.
+    assert od["tiers"]["default"]["bytes"] == sum(
+        f["bytes"] for f in od["files"] if f["tier"] == "default")
+    # The app-reader contract + graceful-degradation note are present.
+    assert "tier == \"default\"" in od["app_reader"]
+    assert "BM25-only" in od["default_note"]
+
+    # Bundled files carry NO tier (tiering is on-demand only).
+    for f in result.manifest["packs"]["bundled"]["files"]:
+        assert "tier" not in f and "download_group" not in f
+
+    # Grouping/metadata only: no pack bytes changed vs a run without reading
+    # the manifest (the .sqlite files are identical across the two packs dirs).
+    package_corpus(out, out / "packs_b")
+    for f in sorted((out / "packs").glob("*.sqlite")):
+        assert _sha(f) == _sha(out / "packs_b" / f.name), f.name
+
+
 def test_manifest_shape_and_acknowledgements(tmp_path):
     out = tmp_path / "output"
     _build_fixture(out)

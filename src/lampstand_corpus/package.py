@@ -691,6 +691,41 @@ def build_acknowledgements(output_dir: Path) -> list[dict]:
     return acks
 
 
+# --- On-demand download tiering (F5 decision) --------------------------------
+# The architect's F5 decision: ``ondemand_vectors.sqlite`` (int8 dense vectors)
+# ships as part of the DEFAULT on-demand download set — NOT a separate opt-in —
+# so the first-launch download yields full hybrid (BM25 + dense) retrieval out
+# of the box. The retrieval index is therefore two default-tier packs grouped
+# together: ``ondemand_search`` (BM25 + chunk metadata + display text) and
+# ``ondemand_vectors`` (the int8 vectors). If ``ondemand_vectors`` is ever
+# absent, retrieval degrades GRACEFULLY to BM25-only (the reverse fallback) —
+# ``ondemand_search`` is self-sufficient for lexical search. No pack bytes or
+# schema change: this is grouping/metadata only.
+#
+# tier: "default"  -> part of the first-launch default download set
+#       "optional" -> user opts in from Manage-downloads (none today)
+# download_group: coarse grouping for the app's Manage-downloads UI.
+_ONDEMAND_TIER: dict[str, str] = {
+    "ondemand_search.sqlite": "default",
+    "ondemand_vectors.sqlite": "default",   # F5: default, not opt-in
+    "ondemand_bibles.sqlite": "default",
+    "ondemand_confessions.sqlite": "default",
+    "ondemand_commentaries.sqlite": "default",
+    "ondemand_lexicons.sqlite": "default",
+    "ondemand_crossrefs.sqlite": "default",
+}
+_ONDEMAND_GROUP: dict[str, str] = {
+    # The default retrieval index: search + vectors move together.
+    "ondemand_search.sqlite": "retrieval-index",
+    "ondemand_vectors.sqlite": "retrieval-index",
+    "ondemand_bibles.sqlite": "content",
+    "ondemand_confessions.sqlite": "content",
+    "ondemand_commentaries.sqlite": "content",
+    "ondemand_lexicons.sqlite": "content",
+    "ondemand_crossrefs.sqlite": "content",
+}
+
+
 # --- Orchestration -----------------------------------------------------------
 @dataclass
 class PackFile:
@@ -700,6 +735,19 @@ class PackFile:
     bytes: int
     sha256: str
     contents: dict = field(default_factory=dict)
+
+    @property
+    def tier(self) -> str | None:
+        """On-demand download tier ('default'/'optional'); None for bundled."""
+        if self.pack != "on-demand":
+            return None
+        return _ONDEMAND_TIER.get(self.name, "default")
+
+    @property
+    def download_group(self) -> str | None:
+        if self.pack != "on-demand":
+            return None
+        return _ONDEMAND_GROUP.get(self.name, "content")
 
 
 @dataclass
@@ -865,19 +913,30 @@ def _build_manifest(
 ) -> dict:
     acks = build_acknowledgements(output_dir)
 
+    def _file_entry(f: PackFile) -> OrderedDict:
+        entry = OrderedDict([
+            ("name", f.name), ("role", f.role),
+            ("bytes", f.bytes), ("sha256", f.sha256),
+        ])
+        # On-demand files carry the F5 download tiering so the app's
+        # Manage-downloads model can decide what to fetch on first launch.
+        if f.tier is not None:
+            entry["tier"] = f.tier
+            entry["download_group"] = f.download_group
+        entry["contents"] = f.contents
+        return entry
+
     def pack_files(pack: str) -> tuple[int, list]:
         pf = [f for f in files if f.pack == pack]
         return sum(f.bytes for f in pf), [
-            OrderedDict([
-                ("name", f.name), ("role", f.role),
-                ("bytes", f.bytes), ("sha256", f.sha256),
-                ("contents", f.contents),
-            ])
-            for f in sorted(pf, key=lambda x: x.name)
+            _file_entry(f) for f in sorted(pf, key=lambda x: x.name)
         ]
 
     bundled_total, bundled_files = pack_files("bundled")
     ondemand_total, ondemand_files = pack_files("on-demand")
+    default_bytes = sum(
+        f.bytes for f in files
+        if f.pack == "on-demand" and f.tier == "default")
 
     return OrderedDict([
         ("corpus_version", CORPUS_VERSION_PLACEHOLDER),
@@ -914,6 +973,31 @@ def _build_manifest(
                  "text, cross-references, and the full search + vectors packs "
                  "(pack-diet v2)."),
                 ("delivery", "first-launch-download"),
+                # F5 decision: every on-demand pack is DEFAULT tier — in
+                # particular ondemand_vectors.sqlite (int8 dense vectors) ships
+                # in the default first-launch set, NOT as a separate opt-in — so
+                # the app has full hybrid (BM25+dense) retrieval out of the box.
+                ("default_note",
+                 "F5: the default first-launch download set = every file with "
+                 "tier=\"default\" (all on-demand packs today). ondemand_search "
+                 "+ ondemand_vectors form the default 'retrieval-index' group "
+                 "(download_group); ondemand_vectors is DEFAULT, not opt-in. If "
+                 "ondemand_vectors is absent, retrieval degrades GRACEFULLY to "
+                 "BM25-only — ondemand_search is self-sufficient for lexical "
+                 "search and is never gated on the vectors pack."),
+                ("app_reader",
+                 "To honor the default grouping: fetch every packs.on_demand."
+                 "files[] whose tier == \"default\". Treat download_group == "
+                 "\"retrieval-index\" (ondemand_search + ondemand_vectors) as one "
+                 "unit; the dense arm requires ondemand_vectors, BM25 requires "
+                 "only ondemand_search. tier == \"optional\" (none today) is the "
+                 "user-opt-in slot."),
+                ("tiers", OrderedDict([
+                    ("default", OrderedDict([
+                        ("bytes", default_bytes),
+                        ("groups", ["retrieval-index", "content"]),
+                    ])),
+                ])),
                 ("total_bytes", ondemand_total),
                 ("files", ondemand_files),
             ])),

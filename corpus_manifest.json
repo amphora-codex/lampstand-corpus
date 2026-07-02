@@ -73,6 +73,17 @@
     "on_demand": {
       "description": "Free, downloaded on first launch. KJV/ASV/WEB, all commentaries, the remaining confessions, lexicons + tagged text, cross-references, and the full search + vectors packs (pack-diet v2).",
       "delivery": "first-launch-download",
+      "default_note": "F5: the default first-launch download set = every file with tier=\"default\" (all on-demand packs today). ondemand_search + ondemand_vectors form the default 'retrieval-index' group (download_group); ondemand_vectors is DEFAULT, not opt-in. If ondemand_vectors is absent, retrieval degrades GRACEFULLY to BM25-only — ondemand_search is self-sufficient for lexical search and is never gated on the vectors pack.",
+      "app_reader": "To honor the default grouping: fetch every packs.on_demand.files[] whose tier == \"default\". Treat download_group == \"retrieval-index\" (ondemand_search + ondemand_vectors) as one unit; the dense arm requires ondemand_vectors, BM25 requires only ondemand_search. tier == \"optional\" (none today) is the user-opt-in slot.",
+      "tiers": {
+        "default": {
+          "bytes": 610537472,
+          "groups": [
+            "retrieval-index",
+            "content"
+          ]
+        }
+      },
       "total_bytes": 610537472,
       "files": [
         {
@@ -80,6 +91,8 @@
           "role": "bibles",
           "bytes": 20398080,
           "sha256": "7014a42d262d6eed25ec19a9d204e9b48e01bdb338af6b024c1b056a95e8d455",
+          "tier": "default",
+          "download_group": "content",
           "contents": {
             "translations": [
               "asv",
@@ -95,6 +108,8 @@
           "role": "commentaries",
           "bytes": 132046848,
           "sha256": "03c0f27486919ecb9f86825f3a9eb902d5773a7f2aa9d01867bbf8e9b0a3adf7",
+          "tier": "default",
+          "download_group": "content",
           "contents": {
             "copied_from": "commentaries.sqlite"
           }
@@ -104,6 +119,8 @@
           "role": "confessions",
           "bytes": 1368064,
           "sha256": "f43160d49632db30701a5d5c44834a611c87844ff547aac243559bcce0ae9e69",
+          "tier": "default",
+          "download_group": "content",
           "contents": {
             "documents": [
               "belgic",
@@ -122,6 +139,8 @@
           "role": "crossrefs",
           "bytes": 25362432,
           "sha256": "ba499adefce419bf5b2ec07659588fdc9111cebc4d249d03a834263068fc671f",
+          "tier": "default",
+          "download_group": "content",
           "contents": {
             "copied_from": "crossrefs.sqlite"
           }
@@ -131,6 +150,8 @@
           "role": "lexicons",
           "bytes": 68857856,
           "sha256": "213203a8b527643d87dcb4d179f6f34fb6736da350c2afd608d01c7b25de5a90",
+          "tier": "default",
+          "download_group": "content",
           "contents": {
             "copied_from": "lexicons.sqlite"
           }
@@ -140,6 +161,8 @@
           "role": "search",
           "bytes": 276205568,
           "sha256": "68f4e85845e446e4ced6e57b3f7711ba0799da469f3bf4dc464466ebad5af9ab",
+          "tier": "default",
+          "download_group": "retrieval-index",
           "contents": {
             "format": "search-pack-v2",
             "n_chunks": 317204,
@@ -160,6 +183,8 @@
           "role": "vectors",
           "bytes": 86298624,
           "sha256": "bddd6e3dc865d6fd2b390338644d87fe7b37bec116856ad5ccc8e9d98ca042a7",
+          "tier": "default",
+          "download_group": "retrieval-index",
           "contents": {
             "format": "vectors-pack-v2",
             "n_vectors": 210123,
