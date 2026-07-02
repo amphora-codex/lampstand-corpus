@@ -133,8 +133,14 @@ def test_commentary_chunks_match_db_rows():
     n_nonempty = conn.execute(
         "SELECT count(*) FROM comment WHERE trim(text) <> ''").fetchone()[0]
     conn.close()
-    assert len(chunks) == n_nonempty
-    assert len(chunks) + len(skipped) >= n_nonempty
+    # Every non-empty paragraph yields >= 1 chunk (encoder-oversized paragraphs
+    # split into '#s<i>' siblings sharing the verse anchor — Rank 8c).
+    assert len(chunks) >= n_nonempty
+    n_base = len({c.anchor.split("#s")[0] for c in chunks})
+    assert n_base == n_nonempty
+    # No sibling index text may exceed the split budget.
+    assert all(len(c.index_text) <= embeddings.COMMENT_SPLIT_CHARS
+               for c in chunks if "#s" in c.anchor)
 
 
 @db_required

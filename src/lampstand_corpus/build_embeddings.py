@@ -43,13 +43,22 @@ CREATE TABLE chunk (
     verse_start   INTEGER,
     verse_end     INTEGER,
     key           TEXT,            -- lexicon Strong's / confession section key
-    text          TEXT NOT NULL,
-    text_checksum TEXT NOT NULL,   -- SHA-256 of text (chunk-stability audit)
-    truncated     INTEGER NOT NULL DEFAULT 0
+    text          TEXT NOT NULL,   -- display body (header NOT included)
+    text_checksum TEXT NOT NULL,   -- SHA-256 of header+text (stability audit)
+    truncated     INTEGER NOT NULL DEFAULT 0,
+    header        TEXT NOT NULL DEFAULT '',  -- structural header (Rank 8e)
+    parent_id     TEXT,            -- pericope parent for Scripture verse children
+    indexed       INTEGER NOT NULL DEFAULT 1, -- 0 = context-only parent
+    question      INTEGER,         -- Rank 14 catechism metadata (nullable)
+    lords_day     INTEGER,
+    conf_chapter  INTEGER,
+    conf_section  INTEGER,
+    article       INTEGER
 );
 CREATE INDEX idx_chunk_resource ON chunk (resource_type);
 CREATE INDEX idx_chunk_source ON chunk (source);
 CREATE INDEX idx_chunk_ref ON chunk (book, chapter, verse_start);
+CREATE INDEX idx_chunk_parent ON chunk (parent_id);
 
 CREATE TABLE embedding (
     chunk_id TEXT PRIMARY KEY REFERENCES chunk(id),
@@ -102,8 +111,10 @@ def _vector_blob(vec: np.ndarray) -> bytes:
 
 
 def build_bm25(chunks: list[Chunk]) -> dict:
-    """Compute the BM25 index over chunk texts (deterministic).
+    """Compute the BM25 index over the chunks' INDEX text (deterministic).
 
+    Callers pass the retrieval units only (``c.indexed``); the indexed text is
+    ``Chunk.index_text`` (structural header + body — Rank 8e).
     Returns a dict of the tables to write:
       doc_lengths : {chunk_id: token_count}
       terms       : sorted [(term, doc_freq)]  (term_id == index, assigned later)
@@ -114,7 +125,7 @@ def build_bm25(chunks: list[Chunk]) -> dict:
     postings: dict[str, dict[str, int]] = defaultdict(dict)
     total_tokens = 0
     for c in chunks:
-        toks = tokenize(c.text)
+        toks = tokenize(c.index_text)
         doc_lengths[c.id] = len(toks)
         total_tokens += len(toks)
         tf: dict[str, int] = defaultdict(int)
@@ -146,24 +157,32 @@ def write_embeddings(
 ) -> dict:
     """Write the chunk table, vector blobs, and BM25 index to ``out_path``.
 
-    ``vectors`` is an ``(len(chunks), EMBED_DIM)`` float32 array aligned to
-    ``chunks`` by index. Returns BM25 stats for the report.
+    ``vectors`` is an ``(n_embeddable, EMBED_DIM)`` float32 array aligned by
+    index to the EMBEDDABLE subset (``[c for c in chunks if c.embed]`` — BSB
+    Scripture children + all non-scripture retrieval units). The BM25 index is
+    built over the INDEXED subset (retrieval units; context-only parents carry
+    neither postings nor vectors). Returns BM25 stats for the report.
     """
-    if vectors.shape[0] != len(chunks):
+    embeddable = [c for c in chunks if c.embed]
+    indexed = [c for c in chunks if c.indexed]
+    if vectors.shape[0] != len(embeddable):
         raise ValueError(
-            f"vector/chunk count mismatch: {vectors.shape[0]} != {len(chunks)}")
-    if chunks and vectors.shape[1] != EMBED_DIM:
+            f"vector/chunk count mismatch: {vectors.shape[0]} != "
+            f"{len(embeddable)} embeddable")
+    if embeddable and vectors.shape[1] != EMBED_DIM:
         raise ValueError(f"unexpected embedding dim {vectors.shape[1]} != {EMBED_DIM}")
 
     conn = _connect(out_path)
     try:
         # Chunks + embeddings in the order given (already canonical).
         conn.executemany(
-            "INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 (c.id, c.resource_type, c.source, c.anchor, c.book, c.chapter,
                  c.verse_start, c.verse_end, c.key, c.text, c.text_checksum,
-                 1 if c.truncated else 0)
+                 1 if c.truncated else 0, c.header, c.parent,
+                 1 if c.indexed else 0, c.question, c.lords_day,
+                 c.conf_chapter, c.conf_section, c.article)
                 for c in chunks
             ],
         )
@@ -171,11 +190,11 @@ def write_embeddings(
             "INSERT INTO embedding VALUES (?,?,?)",
             [
                 (c.id, EMBED_DIM, _vector_blob(vectors[i]))
-                for i, c in enumerate(chunks)
+                for i, c in enumerate(embeddable)
             ],
         )
 
-        bm25 = build_bm25(chunks)
+        bm25 = build_bm25(indexed)
         conn.executemany(
             "INSERT INTO bm25_doc VALUES (?,?)",
             sorted(bm25["doc_lengths"].items()),
@@ -209,7 +228,7 @@ def write_embeddings(
         n_truncated = sum(1 for c in chunks if c.truncated)
         n_skipped = sum(len(v) for v in (skipped or {}).values())
         meta_rows = [
-            ("schema_version", "1"),
+            ("schema_version", "2"),
             ("resource_type", "embeddings"),
             ("model_name", model_provenance["name"]),
             ("model_revision", model_provenance["revision"]),
@@ -220,6 +239,8 @@ def write_embeddings(
              "Represent this sentence for searching relevant passages: "),
             ("bm25_tokenizer", "nfkc-casefold-alnum-no-stemming"),
             ("n_chunks", str(len(chunks))),
+            ("n_indexed", str(len(indexed))),
+            ("n_embedded", str(len(embeddable))),
             ("n_truncated", str(n_truncated)),
             ("n_skipped", str(n_skipped)),
         ]
@@ -227,6 +248,8 @@ def write_embeddings(
         conn.commit()
         return {
             "n_chunks": len(chunks),
+            "n_indexed": len(indexed),
+            "n_embedded": len(embeddable),
             "vocab_size": len(bm25["terms"]),
             "n_postings": len(posting_rows),
             "avgdl": bm25["avgdl"],

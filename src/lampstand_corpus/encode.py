@@ -143,9 +143,11 @@ def encode_texts(model, texts: list[str], *, batch_size: int = BATCH_SIZE) -> np
 def encode_chunks(
     chunks: list[Chunk], *, device: str = "cpu", batch_size: int = BATCH_SIZE
 ) -> np.ndarray:
-    """Encode chunk texts in order; returns ``(len(chunks), EMBED_DIM)`` float32."""
+    """Encode chunk INDEX texts (header + body) in order.
+
+    Returns ``(len(chunks), EMBED_DIM)`` float32."""
     model = load_model(device=device)
-    texts = [c.text for c in chunks]
+    texts = [c.index_text for c in chunks]
     if not texts:
         return np.empty((0, EMBED_DIM), dtype=np.float32)
     return encode_texts(model, texts, batch_size=batch_size)
@@ -248,7 +250,7 @@ def encode_chunks_incremental(
     res.n_encoded = len(to_encode_idx)
     if to_encode_idx:
         model = load_model(device=device)
-        texts = [chunks[i].text for i in to_encode_idx]
+        texts = [chunks[i].index_text for i in to_encode_idx]
         encoded = encode_texts(model, texts, batch_size=batch_size)
         for row, i in enumerate(to_encode_idx):
             out[i] = encoded[row]

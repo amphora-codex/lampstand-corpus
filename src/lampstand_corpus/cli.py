@@ -850,16 +850,22 @@ def cmd_build_embeddings(*, full: bool = False) -> None:
     prov = model_provenance()
     out = OUTPUT_DIR / "embeddings.sqlite"
     inc = None
+    # Only the EMBEDDABLE subset is encoded (BSB Scripture children + all
+    # non-scripture retrieval units — Rank 8d); context-only parents and the
+    # KJV/ASV/WEB children are BM25-only.
+    embeddable = [c for c in ec.chunks if c.embed]
+    print(f"  {len(embeddable)} embeddable of "
+          f"{sum(1 for c in ec.chunks if c.indexed)} indexed chunks")
     t0 = time.perf_counter()
     if full or not out.exists():
         mode = "full re-encode" if full else "full encode (no prior DB)"
         print(f"Encoding with {prov['name']} @ {prov['revision'][:12]} on CPU "
               f"(deterministic, {mode})...")
-        vectors = encode_chunks(ec.chunks, device="cpu")
+        vectors = encode_chunks(embeddable, device="cpu")
     else:
         print(f"Incremental encode with {prov['name']} @ {prov['revision'][:12]} "
               f"on CPU (reusing unchanged vectors from {out.name})...")
-        inc = encode_chunks_incremental(ec.chunks, out, device="cpu")
+        inc = encode_chunks_incremental(embeddable, out, device="cpu")
         vectors = inc.vectors
         for note in inc.notes:
             print(f"  note: {note}")
@@ -870,7 +876,7 @@ def cmd_build_embeddings(*, full: bool = False) -> None:
 
     # Determinism (Option A): re-encode a deterministic sample on CPU and accept
     # within cosine-tolerance, locked by model revision + input checksums.
-    det = _check_determinism(ec.chunks, vectors)
+    det = _check_determinism(embeddable, vectors)
 
     print(f"Building {out} ...")
     from .build_embeddings import write_embeddings

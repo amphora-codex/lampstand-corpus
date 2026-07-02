@@ -5,22 +5,39 @@ commentaries, confessions, lexicons) and turns them into the retrieval chunks th
 app's hybrid (dense + sparse) retriever consumes. Cross-references are a graph,
 not prose, and are deliberately excluded (spec §4.3).
 
-Chunk granularity (spec §4.3):
-  * Scripture   — pericope-level (natural reading units, ~5-15 verses). The built
-    ``bibles.sqlite`` carries no paragraph/heading markers, so we derive pericopes
-    with a deterministic verse-window fallback (``PERICOPE_TARGET`` verses, never
-    crossing a chapter boundary, with a small-remainder merge). Documented below.
-  * Commentary  — paragraph-level (the rows already in ``commentaries.sqlite``).
-  * Confessions — section / Q&A level (the rows already in ``confessions.sqlite``).
+Chunk granularity (the Rank-8 re-chunk; the ONE id-changing release):
+  * Scripture   — DUAL granularity. PARENTS are real pericopes delimited by the
+    BSB's ``\\s`` section headings (bibles.sqlite ``heading`` table; boundaries
+    shared across all four translations so parents stay range-aligned for the
+    translation dedup), with the deterministic ``PERICOPE_TARGET``-verse window
+    as the per-chapter fallback where no headings exist, and an oversized-
+    section sub-split at ``PARENT_MAX`` verses. Parents are CONTEXT-ONLY
+    (``indexed=False``): no BM25 postings, no vectors. CHILDREN are single
+    verse rows (bridges kept as-is), retrieval-precise, each linked to its
+    parent via ``Chunk.parent`` — retrieve at verse precision, expand to the
+    parent for LLM context. Only BSB children carry dense vectors (``embed``);
+    KJV/ASV/WEB children stay BM25-only (Rank 8d).
+  * Commentary  — paragraph-level; paragraphs that would exceed the encoder's
+    512-wordpiece window are split at sentence boundaries into SIBLINGS sharing
+    the verse anchor (Rank 8c; ``COMMENT_SPLIT_CHARS``).
+  * Confessions — section / Q&A level, carrying the catechism metadata
+    (question / Lord's Day / chapter.section / article — Rank 14).
   * Lexicons    — entry-level (Strong's / BDB / TBESG definitions).
+
+Every indexed chunk carries a deterministic STRUCTURAL HEADER built purely from
+curated fields ("Psalms 23:1 — ", "Calvin on Genesis 1:1 — ", "Strong's Greek
+G26 — ", "Westminster Shorter Catechism Q. 33 — "); the embedded and
+BM25-indexed text is ``Chunk.index_text`` = header + body (Rank 8e). The body
+``text`` stays clean for display.
 
 Every chunk carries its provenance anchor (resource type, source id, and a
 VerseRef or key) so a retrieval hit resolves back to a real location.
 
-Determinism: chunk *id*s are stable content-addressed strings, chunks are emitted
+Determinism: chunk *id*s are stable content-addressed strings (the checksum
+covers header + body, so a header change re-keys the chunk), chunks are emitted
 in a fixed canonical order, and encoding is run on CPU with fixed seeds (see
-``encode_chunks``). The BM25 tokenizer is a plain lowercase word tokenizer with no
-stemming — the same text always yields the same tokens.
+``encode_chunks``). The BM25 tokenizer is a plain lowercase word tokenizer with
+no stemming — the same text always yields the same tokens.
 """
 
 from __future__ import annotations
@@ -45,15 +62,26 @@ EMBED_DIM = 384  # BGE-small hidden size
 # We store passage (chunk) vectors here; the app prepends this to user queries.
 QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
 
-# Deterministic pericope window for Scripture chunking (verses per chunk).
+# Deterministic pericope window for Scripture chunking (verses per PARENT) in
+# chapters with no BSB section headings.
 PERICOPE_TARGET = 10
 # A trailing remainder smaller than this is folded into the previous window so we
 # don't emit 1-2 verse orphan chunks at chapter ends.
 PERICOPE_MIN_TAIL = 4
+# A heading-delimited section longer than this many verses is sub-split into
+# PERICOPE_TARGET windows so an LLM-context parent stays a readable unit.
+PARENT_MAX = 25
 
 # Cap on chunk text length fed to the encoder (characters). BGE truncates at 512
 # tokens internally; we record any chunk we hard-truncate so it's auditable.
 MAX_CHARS = 6000
+
+# Commentary paragraphs whose header+body exceeds this many characters are split
+# at sentence boundaries into siblings (Rank 8c). Calibrated against the pinned
+# BGE tokenizer on the real corpus: long commentary prose runs ≥ 4.0 chars per
+# wordpiece at the 5th percentile, so 1800 chars ≈ ≤ 450 wordpieces — safely
+# under the encoder's 512 window including the structural header.
+COMMENT_SPLIT_CHARS = 1800
 
 
 @dataclass(frozen=True)
@@ -69,9 +97,29 @@ class Chunk:
     verse_start: int | None
     verse_end: int | None
     key: str | None       # lexicon Strong's / confession section key, else None
-    text: str             # embeddable text (already trimmed)
-    text_checksum: str    # SHA-256 of ``text`` (chunk-stability audit)
+    text: str             # display body text (already trimmed)
+    text_checksum: str    # SHA-256 of header + body (chunk-stability audit)
     truncated: bool = False
+    # Rank 8: structural header ("Psalms 23:1 — "); index_text = header + text.
+    header: str = ""
+    # Scripture dual granularity: children link to their pericope parent's id.
+    parent: str | None = None
+    # False for context-only parents: no BM25 postings, no vector, never ranked.
+    indexed: bool = True
+    # True when this chunk gets a dense vector (indexed AND (non-scripture OR
+    # the BSB spine) — Rank 8d).
+    embed: bool = True
+    # Rank 14 catechism metadata (confession chunks only; None elsewhere).
+    question: int | None = None
+    lords_day: int | None = None
+    conf_chapter: int | None = None
+    conf_section: int | None = None
+    article: int | None = None
+
+    @property
+    def index_text(self) -> str:
+        """The text actually embedded and BM25-indexed (header + body)."""
+        return f"{self.header}{self.text}" if self.header else self.text
 
 
 def _checksum(text: str) -> str:
@@ -96,13 +144,27 @@ def _mk_chunk(
     verse_start: int | None = None,
     verse_end: int | None = None,
     key: str | None = None,
+    header: str = "",
+    parent: str | None = None,
+    indexed: bool = True,
+    embed: bool | None = None,
+    question: int | None = None,
+    lords_day: int | None = None,
+    conf_chapter: int | None = None,
+    conf_section: int | None = None,
+    article: int | None = None,
 ) -> Chunk:
     trimmed = text.strip()
     truncated = False
     if len(trimmed) > MAX_CHARS:
         trimmed = trimmed[:MAX_CHARS]
         truncated = True
-    cs = _checksum(trimmed)
+    # The checksum covers the INDEXED text (header + body): a header-format
+    # change re-keys the chunk, so an incremental encode can never wrongly
+    # reuse a vector embedded under a different header.
+    cs = _checksum(f"{header}{trimmed}" if header else trimmed)
+    if embed is None:
+        embed = indexed
     return Chunk(
         id=_chunk_id(resource_type, source, anchor, cs),
         resource_type=resource_type,
@@ -116,6 +178,15 @@ def _mk_chunk(
         text=trimmed,
         text_checksum=cs,
         truncated=truncated,
+        header=header,
+        parent=parent,
+        indexed=indexed,
+        embed=embed and indexed,
+        question=question,
+        lords_day=lords_day,
+        conf_chapter=conf_chapter,
+        conf_section=conf_section,
+        article=article,
     )
 
 
@@ -143,17 +214,56 @@ def _window_chapter(verses: list[tuple[int, int, str]]) -> Iterator[tuple[int, i
         i = end
 
 
-def scripture_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
-    """Pericope chunks for all four translations from ``bibles.sqlite``.
+def _heading_windows(
+    verses: list[tuple[int, int, str]], boundaries: set[int]
+) -> Iterator[tuple[int, int, str]]:
+    """Group one chapter's verses into BSB-heading-delimited windows.
 
-    Returns ``(chunks, skipped)``. ``skipped`` lists anchors whose window had no
-    body text at all (e.g. a window made entirely of omitted critical-text verses)
-    — flagged, not silently dropped.
+    ``boundaries`` are verse numbers that OPEN a section (a heading precedes
+    them). The window before the first boundary (when a chapter doesn't start
+    with a heading) is kept as its own window. Oversized sections are sub-split
+    with the deterministic PERICOPE_TARGET window (tail-merged) so a parent
+    stays a readable LLM-context unit.
+    """
+    segments: list[list[tuple[int, int, str]]] = []
+    cur: list[tuple[int, int, str]] = []
+    for row in verses:
+        if row[0] in boundaries and cur:
+            segments.append(cur)
+            cur = []
+        cur.append(row)
+    if cur:
+        segments.append(cur)
+    for seg in segments:
+        if len(seg) > PARENT_MAX:
+            yield from _window_chapter(seg)
+        else:
+            text = " ".join(t for (_s, _e, t) in seg if t)
+            yield seg[0][0], seg[-1][1], text
+
+
+def scripture_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
+    """Dual-granularity Scripture chunks for all four translations.
+
+    Parents: BSB-heading pericopes (fallback ``PERICOPE_TARGET`` windows),
+    context-only. Children: single verse rows, BM25-indexed, linked to their
+    parent; only BSB children carry vectors. Returns ``(chunks, skipped)`` —
+    ``skipped`` lists anchors with no body text (omitted critical-text verses),
+    flagged, not silently dropped.
     """
     conn = sqlite3.connect(db)
     chunks: list[Chunk] = []
     skipped: list[str] = []
     try:
+        book_names = dict(conn.execute("SELECT id, name FROM book"))
+        # Pericope boundaries come from the BSB heading apparatus and are shared
+        # by every translation, so parents stay range-aligned across the four.
+        boundaries: dict[tuple[str, int], set[int]] = {}
+        for b, ch, vs in conn.execute(
+                "SELECT book, chapter, verse_start FROM heading "
+                "WHERE translation='bsb'"):
+            boundaries.setdefault((b, ch), set()).add(vs)
+
         translations = [r[0] for r in conn.execute(
             "SELECT id FROM translation ORDER BY id")]
         for tid in translations:
@@ -166,34 +276,106 @@ def scripture_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
                 ).fetchall()
                 if not rows:
                     continue
-                # Group by chapter, preserving order.
+                bname = book_names.get(book_id, book_id)
                 by_chapter: dict[int, list[tuple[int, int, str]]] = {}
                 for ch, vs, ve, text, omitted in rows:
                     body = "" if omitted else (text or "")
                     by_chapter.setdefault(ch, []).append((vs, ve, body))
                 for ch in sorted(by_chapter):
-                    for win_start, win_end, text in _window_chapter(by_chapter[ch]):
-                        anchor = (f"{book_id} {ch}:{win_start}"
-                                  + (f"-{win_end}" if win_end != win_start else ""))
+                    ch_verses = by_chapter[ch]
+                    bset = boundaries.get((book_id, ch))
+                    windows = (
+                        _heading_windows(ch_verses, bset) if bset
+                        else _window_chapter(ch_verses)
+                    )
+                    for win_start, win_end, text in windows:
+                        ref = (f"{ch}:{win_start}"
+                               + (f"-{win_end}" if win_end != win_start else ""))
+                        anchor = f"{book_id} {ref}"
                         if not text.strip():
                             skipped.append(f"{tid}:{anchor} (empty window)")
                             continue
-                        chunks.append(_mk_chunk(
-                            "scripture", tid, f"{tid}:{anchor}", text,
+                        # The "pericope" anchor prefix keeps a single-verse
+                        # parent distinct from its own child (same source,
+                        # range, and text would otherwise collide to one id).
+                        parent = _mk_chunk(
+                            "scripture", tid, f"{tid}:pericope {anchor}", text,
                             book=book_id, chapter=ch,
                             verse_start=win_start, verse_end=win_end,
-                        ))
+                            header=f"{bname} {ref} — ",
+                            indexed=False,
+                        )
+                        chunks.append(parent)
+                        # Children: the verse rows inside this window.
+                        for vs, ve, body in ch_verses:
+                            if not (win_start <= vs <= win_end):
+                                continue
+                            if not body.strip():
+                                continue  # omitted rows: parent covers the ref
+                            vref = f"{ch}:{vs}" + (f"-{ve}" if ve != vs else "")
+                            chunks.append(_mk_chunk(
+                                "scripture", tid, f"{tid}:{book_id} {vref}", body,
+                                book=book_id, chapter=ch,
+                                verse_start=vs, verse_end=ve,
+                                header=f"{bname} {vref} — ",
+                                parent=parent.id,
+                                indexed=True,
+                                embed=(tid == "bsb"),
+                            ))
     finally:
         conn.close()
     return chunks, skipped
 
 
-# --- Commentary: paragraph chunks (already chunked) --------------------------
+# --- Commentary: paragraph chunks, sentence-split when encoder-oversized -----
+# Sentence boundary: terminal punctuation, optional close-quote, whitespace,
+# then an upper-case/numeral/open-quote start. Deterministic, no NLP.
+_SENTENCE_RE = re.compile(r"(?<=[.!?])[\"'’”\)\]]*\s+(?=[\"'“‘(\[]?[A-Z0-9])")
+
+
+def split_sentences_to_limit(text: str, limit: int) -> list[str]:
+    """Pack sentences into segments of at most ``limit`` characters.
+
+    A single sentence longer than ``limit`` is hard-split at the last word
+    boundary at/below the limit (never mid-word). Deterministic.
+    """
+    if len(text) <= limit:
+        return [text]
+    sentences: list[str] = []
+    for s in _SENTENCE_RE.split(text):
+        while len(s) > limit:
+            cut = s.rfind(" ", 0, limit + 1)
+            if cut <= 0:
+                cut = limit
+            sentences.append(s[:cut].strip())
+            s = s[cut:].strip()
+        if s:
+            sentences.append(s)
+    segments: list[str] = []
+    cur: list[str] = []
+    cur_len = 0
+    for s in sentences:
+        extra = len(s) + (1 if cur else 0)
+        if cur and cur_len + extra > limit:
+            segments.append(" ".join(cur))
+            cur, cur_len = [], 0
+            extra = len(s)
+        cur.append(s)
+        cur_len += extra
+    if cur:
+        segments.append(" ".join(cur))
+    return segments
+
+
 def commentary_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
     conn = sqlite3.connect(db)
     chunks: list[Chunk] = []
     skipped: list[str] = []
     try:
+        # Header uses the curated AUTHOR field ("John Calvin"), not the long
+        # work title ("John Calvin's Commentaries (NT + Psalms + Genesis)").
+        commentator_names = dict(conn.execute("SELECT id, author FROM commentator"))
+        book_names = dict(conn.execute("SELECT id, name FROM book"))
         rows = conn.execute(
             "SELECT commentator, key, ord, book, chapter, verse_start, verse_end, "
             "passage, text FROM comment ORDER BY commentator, ord"
@@ -203,14 +385,25 @@ def commentary_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
             if not (text and text.strip()):
                 skipped.append(f"{commentator}:{anchor} (empty paragraph)")
                 continue
+            cname = commentator_names.get(commentator, commentator)
+            bname = book_names.get(book, book)
+            if vs:
+                ref = f"{chapter}:{vs}" + (f"-{ve}" if ve and ve != vs else "")
+            else:
+                ref = str(chapter)  # chapter-introduction note
+            header = f"{cname} on {bname} {ref} — "
             # ord makes the per-paragraph anchor unique within a passage.
             uniq = f"{commentator}:{key}#{ordn}"
-            chunks.append(_mk_chunk(
-                "commentary", commentator, uniq, text,
-                book=book, chapter=chapter,
-                verse_start=vs or None, verse_end=ve or None,
-                key=key,
-            ))
+            segments = split_sentences_to_limit(
+                text.strip(), COMMENT_SPLIT_CHARS - len(header))
+            for si, seg in enumerate(segments, start=1):
+                seg_anchor = uniq if len(segments) == 1 else f"{uniq}#s{si}"
+                chunks.append(_mk_chunk(
+                    "commentary", commentator, seg_anchor, seg,
+                    book=book, chapter=chapter,
+                    verse_start=vs or None, verse_end=ve or None,
+                    key=key, header=header,
+                ))
     finally:
         conn.close()
     return chunks, skipped
@@ -222,23 +415,39 @@ def confession_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
     chunks: list[Chunk] = []
     skipped: list[str] = []
     try:
-        # Shortcode per document for a readable anchor (e.g. "WCF 11.1").
-        shortcodes = {r[0]: r[1] for r in conn.execute(
-            "SELECT id, shortcode FROM document")}
+        # Shortcode per document for a readable anchor (e.g. "WCF 11.1"), and
+        # the full name for the structural header.
+        docs = {r[0]: (r[1], r[2]) for r in conn.execute(
+            "SELECT id, shortcode, name FROM document")}
         rows = conn.execute(
-            "SELECT document, key, ord, title, text FROM section "
-            "ORDER BY document, ord"
+            "SELECT document, key, ord, title, text, chapter, section, "
+            "question, article, lords_day FROM section ORDER BY document, ord"
         ).fetchall()
-        for (document, key, _ordn, title, text) in rows:
-            sc = shortcodes.get(document, document.upper())
+        for (document, key, _ordn, title, text, conf_chapter, conf_section,
+             question, article, lords_day) in rows:
+            sc, dname = docs.get(document, (document.upper(), document))
             anchor = f"{sc} {key}"
             if not (text and text.strip()):
                 skipped.append(f"{anchor} (empty section)")
                 continue
+            # Header from curated fields: "Westminster Shorter Catechism
+            # Q. 33 — ", "Belgic Confession Article 22 — ", "Westminster
+            # Confession of Faith 11.1 — ".
+            if question:
+                ref = f"Q. {question}"
+            elif article:
+                ref = f"Article {article}"
+            else:
+                ref = key
+            header = f"{dname} {ref} — "
             # Prepend the section title so the heading is searchable alongside body.
             embed_text = f"{title}\n{text}" if title else text
             chunks.append(_mk_chunk(
                 "confession", document, anchor, embed_text, key=key,
+                header=header,
+                question=question, lords_day=lords_day,
+                conf_chapter=conf_chapter, conf_section=conf_section,
+                article=article,
             ))
     finally:
         conn.close()
@@ -258,6 +467,7 @@ def lexicon_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
     chunks: list[Chunk] = []
     skipped: list[str] = []
     try:
+        lex_names = dict(conn.execute("SELECT id, name FROM lexicon"))
         rows = conn.execute(
             "SELECT lexicon, strongs, raw_key, lemma, translit, definition, "
             "derivation, kjv_def FROM entry "
@@ -277,8 +487,12 @@ def lexicon_chunks(db: Path) -> tuple[list[Chunk], list[str]]:
                 continue
             head = " ".join(p for p in (lemma, translit) if p and p.strip())
             embed_text = f"{head} — {english}" if head else english
+            # Header from curated fields: "Strong's Greek G26 — ".
+            lname = lex_names.get(lexicon, lexicon)
+            header = f"{lname} {key} — " if key else f"{lname} — "
             chunks.append(_mk_chunk(
                 "lexicon", lexicon, anchor, embed_text, key=key or None,
+                header=header,
             ))
     finally:
         conn.close()

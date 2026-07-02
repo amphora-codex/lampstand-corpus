@@ -1051,10 +1051,22 @@ def parse_dort(
             letter = "r" if is_rejection else "a"
 
             seen_nums: set[int] = set()
+            # Inline <scripRef> citations attach as proof-texts to the article
+            # (or rejection paragraph) whose <p> carries them; refs in a
+            # continuation paragraph attach to the most recent article. The
+            # citation TEXT stays in the body verbatim (get_text includes it),
+            # so recovering the refs changes no chunk text.
+            cur_proofs: list | None = None
             for p in d2.find_all("p"):
                 ptext = _norm_ws(p.get_text(" ", strip=True))
                 m = marker_re.match(ptext)
                 if not m:
+                    if cur_proofs is not None:
+                        for sr in p.find_all("scripRef"):
+                            vr = _osis_to_verseref(sr.get("osisRef", ""))
+                            if vr is not None:
+                                cur_proofs.append(
+                                    vr.model_dump(exclude_none=True))
                     continue
                 num = int(m.group(1))
                 body = m.group(2).strip()
@@ -1065,12 +1077,30 @@ def parse_dort(
                     continue
                 seen_nums.add(num)
                 key = f"h{slug}.{letter}{num}"
+                cur_proofs = [
+                    vr.model_dump(exclude_none=True)
+                    for sr in p.find_all("scripRef")
+                    if (vr := _osis_to_verseref(sr.get("osisRef", ""))) is not None
+                ]
                 chunks.append(_make_chunk(
                     src, prov, key=key, text=body,
                     meta={"head": slug, "head_title": head_title,
                           "kind": kind, "number": num,
-                          "subsection": sub_title, "proof_texts": []},
+                          "subsection": sub_title,
+                          "proof_texts": cur_proofs},
                 ))
+
+    # Dedupe each section's proof refs deterministically (first-seen order) —
+    # a ref cited twice in one article must not double-count downstream.
+    for c in chunks:
+        seen: set[tuple] = set()
+        unique: list[dict] = []
+        for d in c.meta.get("proof_texts", []):
+            k = (d.get("book"), d.get("chapter"), d.get("verse_start"))
+            if k not in seen:
+                seen.add(k)
+                unique.append(d)
+        c.meta["proof_texts"] = unique
 
     # Validate per-head article / rejection counts against the known spine.
     for slug, (exp_a, exp_r) in DORT_HEAD_COUNTS.items():
