@@ -57,7 +57,7 @@ from .pack_codec import assign_int_ids, encode_postings, quantize_int8
 # §4b), and the packs.reranker Core ML asset. Chunk ids are UNCHANGED from v2.0
 # where the underlying text is unchanged (content-addressed). Freeze handoff:
 # docs/pack-handoff-v2.1.md. The architect tags `corpus-v2.1.0` at ship.
-CORPUS_VERSION_PLACEHOLDER = "corpus-v2.1.0-candidate"
+CORPUS_VERSION_PLACEHOLDER = "corpus-v2.1.1-candidate"
 
 # Bundled-pack scope (architect-locked).
 BUNDLED_TRANSLATION = "bsb"

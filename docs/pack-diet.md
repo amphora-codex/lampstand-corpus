@@ -80,6 +80,12 @@ CREATE TABLE expansion (              -- Rank 7 query expansion (expansion-v1)
     weight    REAL NOT NULL,          -- mining containment (informational)
     PRIMARY KEY (term, expansion)
 );
+CREATE TABLE gloss (                  -- Rank 7 tap-to-gloss (gloss-v1) DISPLAY-ONLY
+    term         TEXT PRIMARY KEY,    -- archaic surface form (pipeline tokenizer form)
+    modern_gloss TEXT NOT NULL,       -- plain modern gloss (archaic -> modern, ONE WAY)
+    kind         TEXT NOT NULL,       -- archaic | synonym (approved only)
+    weight       REAL NOT NULL        -- mining containment (informational)
+);
 -- bundled_search.sqlite ONLY additionally contains the `embedding` table below.
 ```
 
@@ -129,6 +135,37 @@ inflection classes), `synonym` (theological pairs — present only once the
 tracked DRAFT file `data/eval/theological_synonyms_v1.json` is APPROVED by the
 advisor).
 
+### Directional gloss (`gloss` table — `gloss_format = "gloss-v1"`)
+
+`gloss` is the **one-way, display-only** companion to the symmetric `expansion`
+table, added for **tap-to-gloss**. The `expansion` table ships every mined pair
+in BOTH directions (so a modern query can match archaic text and vice versa),
+which is correct for retrieval but ambiguous for a lookup UX. `gloss` resolves
+that: `term` is an **archaic surface form**, `modern_gloss` is its **plain
+modern gloss**, and ONLY the archaic→modern direction is stored.
+
+- **Read it directly on a tap:** `SELECT modern_gloss, kind FROM gloss WHERE
+  term = ?` (PK lookup). Safe on ANY translation the user is reading — the key
+  is always the archaic form, so it never mis-maps modern text.
+- **Never enters scoring.** The retriever does not read `gloss`; it does not
+  affect BM25/dense/RRF at all. (Query expansion for retrieval stays OFF — see
+  the handoff doc.)
+- **Provenance = `expansion`.** Rows come from the SAME `mine_archaic_pairs`
+  directional data: `kind="archaic"` for mechanical inflection/orthography
+  residue (`believeth→believes`), `kind="synonym"` for the non-mechanical
+  lexical residue, folded in ONLY once the theological advisor has approved
+  `data/eval/theological_synonyms_v1.json` (identical gate to the expansion
+  table's synonym rows). Every `term` is, by construction, absent from the BSB
+  spine — a genuinely archaic form. Pairs absent from the mined data are NOT
+  fabricated.
+- Count today: **411 rows** (311 mechanical archaic + 100 advisor-approved
+  synonyms). Present examples: `sepulchre→tomb`, `candlestick→lampstand`,
+  `devils→demons`, `oblation→offering`, `fornication→immorality`,
+  `believeth→believes`. Legitimately ABSENT (not in the mined data):
+  `charity→love` (BSB retains "charity" in one verse, so it fails the
+  "absent-from-BSB" candidacy test), and `saith`/`thee`/`thou` (their best
+  modern partner does not clear the mining lift/score thresholds).
+
 `bm25_stats` keys are unchanged: `n_docs`, `avgdl`, `vocab_size`,
 `total_tokens`, `k1`, `b`. BM25 statistics are still scope-correct (the bundled
 pack's stats are recomputed over the BSB+WSC subset, exactly as v1 did).
@@ -136,7 +173,9 @@ pack's stats are recomputed over the BSB+WSC subset, exactly as v1 did).
 Key `meta` rows: `schema_version=2`, `format=search-pack-v2`, `scope`,
 `bm25_tokenizer=nfkc-casefold-alnum-no-stemming`,
 `posting_format=uvarint-gap-tf-v1`, `id_assignment`, `text_included` ("1"/"0"),
-`n_chunks`. The bundled pack also carries the vector meta block (below).
+`n_chunks`, `expansion_format=expansion-v1`, `n_expansion_rows`,
+`gloss_format=gloss-v1`, `n_gloss_rows`. The bundled pack also carries the
+vector meta block (below).
 
 ### Posting blob encoding (`uvarint-gap-tf-v1`)
 

@@ -5,15 +5,101 @@ set.** The corpus lane is FROZEN at this version. It tells you EXACTLY what to
 fetch, what changed since the app's last sync (Rank-13), and the final per-pack
 sizes + checksums to verify against.
 
-- **Corpus version:** `corpus-v2.1.0-candidate` (the architect tags
-  `corpus-v2.1.0` at ship; the pipeline never self-marks ship-ready —
-  `manifest.ship_ready = false` until the 23-point spot-check passes).
+- **Corpus version:** `corpus-v2.1.1-candidate` (the architect tags
+  `corpus-v2.1.1` at ship; the pipeline never self-marks ship-ready —
+  `manifest.ship_ready = false` until the 23-point spot-check passes). See the
+  **v2.1.1 delta** section immediately below for the two-pack targeted fix on
+  top of v2.1.0.
 - **Manifest of record:** `corpus_manifest.json` (committed). Pack `.sqlite` /
   `.mlpackage` files are gitignored and synced, never committed.
 - **Rebuild determinism:** VERIFIED bit-identical. Re-running `package` three
   times (incl. across the version-string bump) produced byte-identical pack
   checksums — the tree hashes below are stable. Same source snapshots → same
   bytes (no timestamps, fixed seeds).
+
+## v2.1.1 delta — re-sync exactly these two packs
+
+`corpus-v2.1.1-candidate` is a **targeted fix** on top of `v2.1.0`; two packs
+change, and only their new tables need to land app-side. Everything else
+(sizes/sha256s in the tables below, minus these two files) is unchanged.
+
+**Re-sync `bundled_bibles.sqlite` and both search packs** (`bundled_search` +
+`ondemand_search`). Also re-sync `ondemand_bibles.sqlite` (it now carries the
+22 KJV headings). No reader-contract break: both changes are ADDITIVE tables.
+
+### GAP 1 — `bundled_bibles` now carries the `heading` table (the important one)
+
+A packaging bug dropped the USFM `\s` section headings: the re-chunk ingested
+~3,086 BSB headings into the build DB (`bibles.sqlite`), but the bibles-pack
+builder created the `heading` table in each pack and **never copied the rows**,
+so the app's synced `bundled_bibles.sqlite` had an EMPTY `heading` table. Fixed:
+the builder now carries the `heading` table, scoped per translation.
+
+- **Which pack carries headings: `bundled_bibles.sqlite`** — it holds BSB, and
+  **only BSB carries headings** (3,086 rows). `ondemand_bibles.sqlite` (KJV/ASV/
+  WEB) carries KJV's 22 headings; ASV/WEB have none. So the app's heading UI is
+  effectively a **BSB-only** feature today.
+- **Table name + columns** (match `BibleStore.headings`):
+
+  ```sql
+  CREATE TABLE heading (
+      translation  TEXT NOT NULL,     -- 'bsb' (only BSB in the bundled pack)
+      book         TEXT NOT NULL,     -- USFM id, 'GEN'..'REV'
+      chapter      INTEGER NOT NULL,
+      verse_start  INTEGER NOT NULL,  -- the verse the heading ANCHORS to
+      text         TEXT NOT NULL,     -- heading text, e.g. "The Creation"
+      PRIMARY KEY (translation, book, chapter, verse_start)
+  );
+  ```
+
+  Read path: `SELECT verse_start, text FROM heading WHERE translation=? AND
+  book=? AND chapter=? ORDER BY verse_start` — render `text` above the verse at
+  `verse_start`. Manifest confirms the count via
+  `packs.bundled.files[bundled_bibles].contents.n_headings` (3086) and
+  `packs.on_demand.files[ondemand_bibles].contents.n_headings` (22).
+
+### GAP 2 — directional `gloss` table for tap-to-gloss (search packs)
+
+Tap-to-gloss read the search pack's `expansion` table, which is **symmetric**
+(no direction) — safe only on archaic translations and mis-mapping on modern
+text. New **one-way `gloss` table** (archaic surface form → plain modern gloss),
+in `bundled_search.sqlite` + `ondemand_search.sqlite`:
+
+```sql
+CREATE TABLE gloss (
+    term         TEXT PRIMARY KEY,  -- archaic surface form
+    modern_gloss TEXT NOT NULL,     -- plain modern gloss (archaic -> modern ONLY)
+    kind         TEXT NOT NULL,     -- archaic | synonym (advisor-approved only)
+    weight       REAL NOT NULL      -- mining containment (informational)
+);
+```
+
+- **App action:** on a tap, `SELECT modern_gloss, kind FROM gloss WHERE term=?`
+  Safe on any translation (key is always the archaic form). 411 rows today
+  (311 mechanical archaic + 100 advisor-approved synonyms);
+  `meta.gloss_format="gloss-v1"`, `meta.n_gloss_rows`.
+- **Retrieval scoring is UNCHANGED.** `gloss` is display-only; the retriever
+  never reads it. BM25 stats, vocab, postings, the `expansion` table, and dense
+  vectors are byte-for-byte identical to v2.1.0 (the search-pack sha256 changed
+  ONLY because the additive `gloss` table was appended). Query expansion for
+  retrieval stays OFF, exactly as decided in item 6 below.
+- **Present** (examples): `sepulchre→tomb`, `candlestick→lampstand`,
+  `devils→demons`, `oblation→offering`, `fornication→immorality`,
+  `believeth→believes`. **Legitimately absent** (not in the mined data, NOT
+  fabricated): `charity→love` (BSB keeps "charity" once, failing the
+  absent-from-BSB candidacy test), `saith`/`thee`/`thou` (partner fails the
+  mining lift/score thresholds).
+- Provenance is intact: same `mine_archaic_pairs` data as the expansion table;
+  synonyms gated on the same advisor approval of
+  `data/eval/theological_synonyms_v1.json`. Full contract: `docs/pack-diet.md`
+  (§"Directional gloss").
+
+> The size/sha256 tables below are the v2.1.0 baseline; for v2.1.1 the changed
+> files are `bundled_bibles.sqlite` (6,725,632 B), `ondemand_bibles.sqlite`
+> (20,398,080 B — bytes unchanged, headings added within slack),
+> `bundled_search.sqlite` (31,449,088 B), and `ondemand_search.sqlite`
+> (276,254,720 B). Verify against `corpus_manifest.json`, which is the manifest
+> of record for `corpus-v2.1.1-candidate`.
 
 ## What changed since the app's last sync (Rank-13 → v2.1)
 
