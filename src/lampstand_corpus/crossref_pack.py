@@ -184,12 +184,19 @@ class ScriptureChunkRef:
 
 
 def load_scripture_chunk_refs(emb_db: Path) -> list[ScriptureChunkRef]:
-    """All Scripture retrieval chunks from the built embeddings DB (id order)."""
+    """Scripture RETRIEVAL chunks (indexed verse children) in id order.
+
+    Context-only pericope parents are excluded — the expansion keys and its
+    neighbors are retrieval units (the app expands a hit to its parent via
+    ``chunk.parent_id`` separately). Neighbors are therefore BSB verse-level
+    chunks under the Rank-8 re-chunk.
+    """
     conn = sqlite3.connect(emb_db)
     try:
         rows = conn.execute(
             "SELECT id, source, book, chapter, verse_start, verse_end "
-            "FROM chunk WHERE resource_type='scripture' ORDER BY id"
+            "FROM chunk WHERE resource_type='scripture' AND indexed=1 "
+            "ORDER BY id"
         ).fetchall()
     finally:
         conn.close()

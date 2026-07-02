@@ -183,7 +183,10 @@ def _make_embeddings(path: Path) -> None:
         "CREATE TABLE chunk(id TEXT PRIMARY KEY, resource_type TEXT, source TEXT,"
         " anchor TEXT, book TEXT, chapter INTEGER, verse_start INTEGER,"
         " verse_end INTEGER, key TEXT, text TEXT, text_checksum TEXT,"
-        " truncated INTEGER);"
+        " truncated INTEGER, header TEXT NOT NULL DEFAULT '', parent_id TEXT,"
+        " indexed INTEGER NOT NULL DEFAULT 1, question INTEGER,"
+        " lords_day INTEGER, conf_chapter INTEGER, conf_section INTEGER,"
+        " article INTEGER);"
         "CREATE TABLE embedding(chunk_id TEXT PRIMARY KEY, dim INTEGER, vector BLOB);"
     )
     rows = [
@@ -201,7 +204,9 @@ def _make_embeddings(path: Path) -> None:
          "in the beginning was the word", "h6", 0),
     ]
     conn.executemany(
-        "INSERT INTO chunk VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+        "INSERT INTO chunk (id, resource_type, source, anchor, book, chapter,"
+        " verse_start, verse_end, key, text, text_checksum, truncated)"
+        " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     for i, r in enumerate(rows):
         conn.execute("INSERT INTO embedding VALUES(?,?,?)",
                      (r[0], EMBED_DIM, _vec(i)))
@@ -463,6 +468,44 @@ def test_bundled_crossrefs_pack_edges_and_expansion(tmp_path):
         (int_id["scr_j"],)).fetchone()[0] == 0
     sp.close()
     cp.close()
+
+
+def test_context_parent_rows_have_no_postings_or_vectors(tmp_path):
+    """A context-only pericope parent (indexed=0) lands in the search pack
+    with doc_len 0, no vector row, and its children carry parent_id."""
+    out = tmp_path / "output"
+    _build_fixture(out)
+    # Add a parent + re-point scr_a at it.
+    conn = sqlite3.connect(out / "embeddings.sqlite")
+    conn.execute(
+        "INSERT INTO chunk (id, resource_type, source, anchor, book, chapter,"
+        " verse_start, verse_end, key, text, text_checksum, truncated,"
+        " header, indexed) VALUES ('scr_p1','scripture','bsb',"
+        "'bsb:pericope GEN 1:1-2','GEN',1,1,2,NULL,"
+        "'in the beginning bsb light and more','hp',0,'Genesis 1:1-2 — ',0)")
+    conn.execute("UPDATE chunk SET parent_id='scr_p1' WHERE id='scr_a'")
+    conn.commit()
+    conn.close()
+    package_corpus(out, out / "packs")
+
+    sp = sqlite3.connect(out / "packs" / "ondemand_search.sqlite")
+    pid, doc_len, indexed = sp.execute(
+        "SELECT id, doc_len, indexed FROM chunk WHERE string_id='scr_p1'"
+    ).fetchone()
+    assert (doc_len, indexed) == (0, 0)
+    child_parent, = sp.execute(
+        "SELECT parent_id FROM chunk WHERE string_id='scr_a'").fetchone()
+    assert child_parent == pid
+    # The parent must appear in NO posting blob.
+    from lampstand_corpus.pack_codec import decode_postings
+    for blob, in sp.execute("SELECT postings FROM bm25_term"):
+        assert all(cid != pid for cid, _tf in decode_postings(blob))
+    sp.close()
+    vp = sqlite3.connect(out / "packs" / "ondemand_vectors.sqlite")
+    assert vp.execute(
+        "SELECT count(*) FROM embedding WHERE chunk_id=?", (pid,)
+    ).fetchone()[0] == 0
+    vp.close()
 
 
 def test_preserve_models_subtree_carries_coreml_entries(tmp_path):

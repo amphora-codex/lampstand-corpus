@@ -275,8 +275,9 @@ def _read_chunks_for(
         rows = conn.execute(
             "SELECT c.id, c.resource_type, c.source, c.anchor, c.book, c.chapter, "
             "c.verse_start, c.verse_end, c.key, c.text, c.text_checksum, "
-            "c.truncated, e.vector "
-            "FROM chunk c JOIN embedding e ON e.chunk_id = c.id "
+            "c.truncated, c.header, c.parent_id, c.indexed, c.question, "
+            "c.lords_day, c.conf_chapter, c.conf_section, c.article, e.vector "
+            "FROM chunk c LEFT JOIN embedding e ON e.chunk_id = c.id "
             f"WHERE {predicate_sql} "
             "ORDER BY c.id",
             params,
@@ -287,13 +288,19 @@ def _read_chunks_for(
     vectors: dict[str, bytes] = {}
     for r in rows:
         (cid, rtype, source, anchor, book, chapter, vs, ve, key, text,
-         tcs, trunc, vec) = r
+         tcs, trunc, header, parent_id, indexed, question, lords_day,
+         conf_chapter, conf_section, article, vec) = r
         chunks.append(Chunk(
             id=cid, resource_type=rtype, source=source, anchor=anchor,
             book=book, chapter=chapter, verse_start=vs, verse_end=ve,
             key=key, text=text, text_checksum=tcs, truncated=bool(trunc),
+            header=header or "", parent=parent_id, indexed=bool(indexed),
+            embed=vec is not None, question=question, lords_day=lords_day,
+            conf_chapter=conf_chapter, conf_section=conf_section,
+            article=article,
         ))
-        vectors[cid] = vec
+        if vec is not None:
+            vectors[cid] = vec
     return chunks, vectors
 
 
@@ -320,11 +327,20 @@ CREATE TABLE chunk (
     text          TEXT,                 -- display text (NULL when excluded)
     text_checksum TEXT NOT NULL,
     truncated     INTEGER NOT NULL DEFAULT 0,
-    doc_len       INTEGER NOT NULL      -- BM25 token count (was bm25_doc)
+    doc_len       INTEGER NOT NULL,     -- BM25 token count (0 for parents)
+    header        TEXT NOT NULL DEFAULT '', -- structural header (Rank 8e)
+    parent_id     INTEGER,              -- pericope parent int id (children)
+    indexed       INTEGER NOT NULL DEFAULT 1, -- 0 = context-only parent
+    question      INTEGER,              -- Rank 14 catechism metadata
+    lords_day     INTEGER,
+    conf_chapter  INTEGER,
+    conf_section  INTEGER,
+    article       INTEGER
 );
 CREATE INDEX idx_chunk_resource ON chunk (resource_type);
 CREATE INDEX idx_chunk_source ON chunk (source);
 CREATE INDEX idx_chunk_ref ON chunk (book, chapter, verse_start);
+CREATE INDEX idx_chunk_parent ON chunk (parent_id);
 CREATE TABLE bm25_term (
     term_id  INTEGER PRIMARY KEY,
     term     TEXT NOT NULL UNIQUE,
@@ -370,6 +386,8 @@ def _vector_rows(
     """(int_id, blob, scale) rows in int-id order, quantized per the format."""
     rows: list[tuple[int, bytes, float]] = []
     for c in sorted(chunks, key=lambda c: id_map[c.id]):
+        if c.id not in vectors:
+            continue  # BM25-only children / context parents carry no vector
         blob = vectors[c.id]
         if vector_format == VECTOR_FORMAT_INT8:
             q, scale = quantize_int8(np.frombuffer(blob, dtype="<f4"))
@@ -398,18 +416,22 @@ def _build_search_pack(
     ``vectors`` is given (the bundled pack) the embedding table is embedded in
     the same file so the bundled index stays a single file.
     """
-    bm25 = build_bm25(chunks)
+    indexed_chunks = [c for c in chunks if c.indexed]
+    bm25 = build_bm25(indexed_chunks)
     ordered = sorted(chunks, key=lambda c: id_map[c.id])
     dst = _new_db(dst_path)
     try:
         dst.executescript(_SEARCH_SCHEMA_V2)
         dst.executemany(
-            "INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 (id_map[c.id], c.id, c.resource_type, c.source, c.anchor,
                  c.book, c.chapter, c.verse_start, c.verse_end, c.key,
                  c.text if include_text else None, c.text_checksum,
-                 1 if c.truncated else 0, bm25["doc_lengths"][c.id])
+                 1 if c.truncated else 0, bm25["doc_lengths"].get(c.id, 0),
+                 c.header, id_map.get(c.parent) if c.parent else None,
+                 1 if c.indexed else 0, c.question, c.lords_day,
+                 c.conf_chapter, c.conf_section, c.article)
                 for c in ordered
             ],
         )
@@ -448,7 +470,8 @@ def _build_search_pack(
             dst.executemany(
                 "INSERT INTO embedding VALUES (?,?,?)",
                 _vector_rows(ordered, vectors, id_map, vector_format))
-            meta_rows += _vector_meta(model_meta or {}, vector_format, len(ordered))
+            n_vec = dst.execute("SELECT count(*) FROM embedding").fetchone()[0]
+            meta_rows += _vector_meta(model_meta or {}, vector_format, n_vec)
         dst.executemany("INSERT INTO meta VALUES (?,?)", meta_rows)
         dst.commit()
         return {
@@ -482,6 +505,7 @@ def _build_vectors_pack(
         dst.executemany(
             "INSERT INTO embedding VALUES (?,?,?)",
             _vector_rows(chunks, vectors, id_map, vector_format))
+        n_vec = dst.execute("SELECT count(*) FROM embedding").fetchone()[0]
         dst.executemany(
             "INSERT INTO meta VALUES (?,?)",
             [
@@ -489,12 +513,12 @@ def _build_vectors_pack(
                 ("format", VECTORS_PACK_FORMAT),
                 ("resource_type", "vectors"),
                 ("id_assignment", ID_ASSIGNMENT),
-            ] + _vector_meta(model_meta, vector_format, len(chunks)),
+            ] + _vector_meta(model_meta, vector_format, n_vec),
         )
         dst.commit()
         return {
             "format": VECTORS_PACK_FORMAT,
-            "n_vectors": len(chunks),
+            "n_vectors": n_vec,
             "vector_format": vector_format,
             "embedding_dim": EMBED_DIM,
         }
@@ -716,7 +740,8 @@ def package_corpus(
     c = _build_search_pack(
         packs_dir / "bundled_search.sqlite", bundled_chunks, id_map,
         scope="bundled (bsb-scripture + wsc-confession)",
-        vectors={ch.id: all_vectors[ch.id] for ch in bundled_chunks},
+        vectors={ch.id: all_vectors[ch.id] for ch in bundled_chunks
+                 if ch.id in all_vectors},
         vector_format=vector_format, model_meta=emb_meta)
     register("bundled", "bundled_search.sqlite", "search", c)
 

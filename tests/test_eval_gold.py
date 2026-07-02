@@ -18,15 +18,22 @@ from lampstand_corpus import eval_gold
 
 # --- fixture builders ------------------------------------------------------------
 def _mk_embeddings(path: Path, chunks: list[tuple]) -> None:
-    """chunks: (id, resource_type, source, anchor, book, chapter, vs, ve, key)."""
+    """chunks: (id, resource_type, source, anchor, book, chapter, vs, ve, key).
+
+    All fixture chunks are retrieval units (indexed=1); the schema carries the
+    Rank-8 columns the builder queries.
+    """
     conn = sqlite3.connect(path)
     conn.executescript(
         "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
         "CREATE TABLE chunk (id TEXT PRIMARY KEY, resource_type TEXT, source TEXT,"
         " anchor TEXT, book TEXT, chapter INTEGER, verse_start INTEGER,"
-        " verse_end INTEGER, key TEXT);"
+        " verse_end INTEGER, key TEXT, indexed INTEGER NOT NULL DEFAULT 1,"
+        " parent_id TEXT);"
     )
-    conn.executemany("INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?)", chunks)
+    conn.executemany(
+        "INSERT INTO chunk (id, resource_type, source, anchor, book, chapter,"
+        " verse_start, verse_end, key) VALUES (?,?,?,?,?,?,?,?,?)", chunks)
     conn.executemany("INSERT INTO meta VALUES (?,?)", [
         ("model_revision", "testrev"), ("n_chunks", str(len(chunks)))])
     conn.commit()

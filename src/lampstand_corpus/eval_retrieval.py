@@ -141,23 +141,34 @@ class EvalIndex:
 
         self._postings: dict[str, tuple[np.ndarray, np.ndarray, float] | None] = {}
         self._scores = np.zeros(n, dtype=np.float64)
+        # Matrix-row -> global chunk idx map; identity until load_matrix()
+        # replaces it with the real embedding-subset mapping.
+        self.emb_idx = np.arange(n, dtype=np.int64)
 
     def close(self) -> None:
         self._conn.close()
 
     # -- dense matrix ---------------------------------------------------------
     def load_matrix(self) -> np.ndarray:
-        """All vectors as an (n, dim) float32 matrix aligned to the id order."""
-        mat = np.empty((self.n_chunks, self.dim), dtype=np.float32)
-        i = 0
-        for cid, blob in self._conn.execute(
-                "SELECT chunk_id, vector FROM embedding ORDER BY chunk_id"):
-            if cid != self.ids[i]:
-                raise ValueError(f"embedding/chunk id misalignment at row {i}")
+        """Vectors for the EMBEDDED subset as an (n_emb, dim) float32 matrix.
+
+        Under the Rank-8 re-chunk only the BSB Scripture children + the
+        non-scripture retrieval units carry vectors, so the dense matrix is a
+        SUBSET of the BM25 index. Rows are ordered by chunk id ascending;
+        ``self.emb_idx[row]`` maps a matrix row to its global chunk index.
+        """
+        rows = self._conn.execute(
+            "SELECT chunk_id, vector FROM embedding ORDER BY chunk_id"
+        ).fetchall()
+        mat = np.empty((len(rows), self.dim), dtype=np.float32)
+        emb_idx = np.empty(len(rows), dtype=np.int64)
+        for i, (cid, blob) in enumerate(rows):
+            if cid not in self.id_to_idx:
+                raise ValueError(
+                    f"embedded chunk {cid} is not an indexed retrieval unit")
+            emb_idx[i] = self.id_to_idx[cid]
             mat[i] = np.frombuffer(blob, dtype="<f4")
-            i += 1
-        if i != self.n_chunks:
-            raise ValueError(f"embedding rows {i} != chunks {self.n_chunks}")
+        self.emb_idx = emb_idx
         return mat
 
     # -- BM25 -------------------------------------------------------------------
@@ -231,6 +242,9 @@ class EvalIndex:
     ) -> list[tuple[int, float, int]]:
         """Scripture-deduped dense ranking with raw-rank bookkeeping.
 
+        ``sims`` is aligned to the EMBEDDING-subset rows (see load_matrix);
+        outputs carry GLOBAL chunk indexes. ``exclude_idx`` is global.
+
         Returns ``[(chunk_idx, score, raw_rank)]`` where ``raw_rank`` is the
         1-based position in the RAW (pre-dedup) cosine ranking — so any
         ``(dense_raw_fetch, dense_depth)`` config at/below ``raw_depth`` can be
@@ -239,20 +253,26 @@ class EvalIndex:
         """
         s = sims.astype(np.float64, copy=True)
         if exclude_idx:
-            s[exclude_idx] = -np.inf
+            excl = set(exclude_idx)
+            mask = [r for r, g in enumerate(self.emb_idx) if int(g) in excl]
+            if mask:
+                s[mask] = -np.inf
         k = min(raw_depth, s.size)
         part = np.argpartition(-s, k - 1)[:k]
+        # Tie-break by matrix row ascending == chunk id ascending (rows are
+        # loaded ORDER BY chunk_id), matching the app's id-asc tie-break.
         order = np.lexsort((part, -s[part]))
         raw = part[order]
         out: list[tuple[int, float, int]] = []
         seen: set[str] = set()
-        for rank, i in enumerate(raw, start=1):
-            key = self.dedup_key[int(i)]
+        for rank, row in enumerate(raw, start=1):
+            i = int(self.emb_idx[row])
+            key = self.dedup_key[i]
             if key is not None:
                 if key in seen:
                     continue
                 seen.add(key)
-            out.append((int(i), float(s[i]), rank))
+            out.append((i, float(s[row]), rank))
         return out
 
 

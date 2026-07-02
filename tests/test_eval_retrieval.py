@@ -30,6 +30,9 @@ _CHUNKS = [
      "by faith apart from works of the law faith faith"),
     ("s_kjv1", "scripture", "kjv", "kjv:ROM 3:21-31", "ROM", 3, 21, 31,
      "by faith without the deeds of the law faith faith"),
+    # BM25-only chunk (no embedding row) — the Rank-8d subset world.
+    ("s_web1", "scripture", "web", "web:JHN 11:35", "JHN", 11, 35, 35,
+     "hope endures all things"),
 ]
 
 
@@ -99,7 +102,7 @@ def test_bm25_score_matches_hand_calculation(index):
     """Single-term score == IDF(term) * Okapi term factor, app formulas."""
     scores = index.bm25_scores("justification", [])
     i = index.id_to_idx["f_wsc33"]
-    df, n = 1, 4
+    df, n = 1, index.n_chunks
     idf = math.log((n - df + 0.5) / (df + 0.5) + 1.0)
     dl = index.doc_len[i]
     norm = 1.5 * (1 - 0.75 + 0.75 * dl / index.avgdl)
@@ -143,11 +146,18 @@ def test_bm25_ranking_dedups_scripture_translations(index):
 
 
 def test_dense_deduped_records_raw_ranks_and_dedups(index):
-    sims = np.array([0.1, 0.2, 0.9, 0.8], dtype=np.float32)  # id-order rows
+    mat = index.load_matrix()
+    # Only the 4 chunks WITH vectors form the dense matrix; the BM25-only
+    # s_web1 is absent from the embedding subset entirely.
+    assert mat.shape[0] == 4
+    emb_ids = {index.ids[int(g)] for g in index.emb_idx}
+    assert "s_web1" not in emb_ids
+    sims = np.array([0.1, 0.2, 0.9, 0.8], dtype=np.float32)  # emb-row order
     deduped = index.dense_deduped(sims, [], raw_depth=4)
     ids = [(index.ids[i], raw) for i, _s, raw in deduped]
     # s_bsb1 (0.9, raw rank 1) wins; s_kjv1 (raw 2) collapses into it.
     assert ids == [("s_bsb1", 1), ("f_wsc33", 3), ("c_com1", 4)]
+    assert all(index.ids[i] != "s_web1" for i, _s, _r in deduped)
 
 
 def test_dense_ranking_slices_by_raw_rank_exactly(index):

@@ -131,9 +131,12 @@ class ScriptureChunkIndex:
     def __init__(self, embeddings_db: Path) -> None:
         conn = sqlite3.connect(embeddings_db)
         try:
+            # RETRIEVAL units only (indexed=1): verse-level children.
+            # Context-only pericope parents are never ranked, so they must
+            # never be labeled relevant.
             rows = conn.execute(
                 "SELECT id, book, chapter, verse_start, verse_end FROM chunk "
-                "WHERE resource_type='scripture' ORDER BY id"
+                "WHERE resource_type='scripture' AND indexed=1 ORDER BY id"
             ).fetchall()
         finally:
             conn.close()
