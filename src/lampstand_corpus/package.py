@@ -386,6 +386,12 @@ CREATE TABLE expansion (
     weight    REAL NOT NULL,   -- mining containment (informational)
     PRIMARY KEY (term, expansion)
 );
+CREATE TABLE gloss (              -- Rank 7 tap-to-gloss (gloss-v1); DISPLAY-ONLY
+    term        TEXT PRIMARY KEY, -- archaic surface form (pipeline tokenizer form)
+    modern_gloss TEXT NOT NULL,   -- plain modern gloss (archaic -> modern, one way)
+    kind        TEXT NOT NULL,    -- archaic | synonym (approved only)
+    weight      REAL NOT NULL     -- mining containment (informational)
+);
 """
 
 # Embedding table shared by ondemand_vectors.sqlite and (embedded) the bundled
@@ -444,6 +450,7 @@ def _build_search_pack(
     model_meta: dict | None = None,
     bm25: dict | None = None,
     expansion_rows: list[tuple[str, str, str, float]] | None = None,
+    gloss_rows: list[tuple[str, str, str, float]] | None = None,
 ) -> dict:
     """Write a v2 search pack: chunk metadata + varint-delta BM25 posting blobs.
 
@@ -507,6 +514,9 @@ def _build_search_pack(
         if expansion_rows:
             dst.executemany(
                 "INSERT INTO expansion VALUES (?,?,?,?)", expansion_rows)
+        if gloss_rows:
+            dst.executemany(
+                "INSERT INTO gloss VALUES (?,?,?,?)", gloss_rows)
         meta_rows = [
             ("schema_version", "2"),
             ("format", SEARCH_PACK_FORMAT),
@@ -519,6 +529,8 @@ def _build_search_pack(
             ("n_chunks", str(len(ordered))),
             ("expansion_format", "expansion-v1"),
             ("n_expansion_rows", str(len(expansion_rows or []))),
+            ("gloss_format", "gloss-v1"),
+            ("n_gloss_rows", str(len(gloss_rows or []))),
         ]
         if vectors is not None:
             dst.executescript(_EMBEDDING_SCHEMA_V2)
@@ -536,6 +548,7 @@ def _build_search_pack(
             "n_postings": n_postings,
             "posting_format": POSTING_FORMAT,
             "text_included": include_text,
+            "n_gloss_rows": len(gloss_rows or []),
             **({"vector_format": vector_format} if vectors is not None else {}),
         }
     finally:
@@ -829,10 +842,14 @@ def package_corpus(
     # Rank 7: BM25 over the full indexed corpus is computed ONCE here (reused
     # by the on-demand search pack) so the expansion mining can see the real
     # vocabulary; the bundled pack still recomputes scope-correct stats.
-    from .expansion import build_expansion_rows
+    from .expansion import build_expansion_rows, build_gloss_rows
     bm25_full = build_bm25([c for c in all_chunks if c.indexed])
     expansion_rows, expansion_stats = build_expansion_rows(
         output_dir / "bibles.sqlite", dict(bm25_full["terms"]), repo_root)
+    # Rank 7 tap-to-gloss: DIRECTIONAL (archaic->modern), display-only. Same
+    # mined provenance as the expansion table; never enters query-time scoring.
+    gloss_rows, gloss_stats = build_gloss_rows(
+        output_dir / "bibles.sqlite", repo_root)
 
     # --- Bundled pack ---
     c = _filter_bibles(
@@ -856,7 +873,7 @@ def package_corpus(
         vectors={ch.id: all_vectors[ch.id] for ch in bundled_chunks
                  if ch.id in all_vectors},
         vector_format=vector_format, model_meta=emb_meta,
-        expansion_rows=expansion_rows)
+        expansion_rows=expansion_rows, gloss_rows=gloss_rows)
     register("bundled", "bundled_search.sqlite", "search", c)
 
     # TSK cross-reference layer (Rank 13): edge table + per-pericope expansion,
@@ -892,8 +909,9 @@ def package_corpus(
     c = _build_search_pack(
         packs_dir / "ondemand_search.sqlite", all_chunks, id_map,
         scope="full corpus", model_meta=emb_meta, bm25=bm25_full,
-        expansion_rows=expansion_rows)
+        expansion_rows=expansion_rows, gloss_rows=gloss_rows)
     c["expansion"] = expansion_stats
+    c["gloss"] = gloss_stats
     register("on-demand", "ondemand_search.sqlite", "search", c)
 
     c = _build_vectors_pack(

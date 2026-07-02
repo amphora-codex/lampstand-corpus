@@ -383,6 +383,12 @@ def test_ondemand_search_pack_v2_contract(tmp_path):
     tables = {r[0] for r in sp.execute(
         "SELECT name FROM sqlite_master WHERE type='table'")}
     assert "bm25_posting" not in tables and "bm25_doc" not in tables
+    # GAP 2: the directional tap-to-gloss table ships (display-only) alongside
+    # the symmetric expansion table; meta declares its format.
+    assert "gloss" in tables
+    gcols = [r[1] for r in sp.execute("PRAGMA table_info(gloss)")]
+    assert gcols == ["term", "modern_gloss", "kind", "weight"]
+    assert meta["gloss_format"] == "gloss-v1"
     sp.close()
 
 

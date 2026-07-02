@@ -44,6 +44,7 @@ from pathlib import Path
 from .embeddings import tokenize
 
 EXPANSION_FORMAT = "expansion-v1"
+GLOSS_FORMAT = "gloss-v1"
 SYNONYMS_RELPATH = Path("data") / "eval" / "theological_synonyms_v1.json"
 
 # Mining thresholds (documented; all deterministic).
@@ -325,6 +326,80 @@ def build_expansion_rows(
         "n_archaic_pairs": sum(1 for p in mined if p["mechanical"]),
         "n_synonym_candidates": len(candidates),
         "n_suffix_classes": len(suffix_classes(vocab_df)),
+        "n_rows": len(rows),
+    }
+    return rows, stats
+
+
+# --- directional gloss rows (tap-to-gloss; display-only) --------------------------
+def build_gloss_rows(
+    bibles_db: Path,
+    repo_root: Path | None = None,
+) -> tuple[list[tuple[str, str, str, float]], dict]:
+    """One-way ``(term, modern_gloss, kind, weight)`` rows for tap-to-gloss.
+
+    Unlike the symmetric ``expansion`` table (which ships both directions so a
+    modern query can match archaic text and vice versa), this is the DIRECTIONAL
+    slice the app's tap-to-gloss needs: the archaic surface form → its plain
+    modern gloss, and ONLY that direction. It is DISPLAY-ONLY and never enters
+    query-time scoring (the retriever never reads it).
+
+    Source is the SAME ``mine_archaic_pairs`` directional data that feeds the
+    expansion table, so provenance is identical:
+
+    - ``kind="archaic"`` — mechanical inflection/orthography residue
+      (``believeth→believes``, ``sepulchre`` stays a synonym below): the archaic
+      surface form and its mined modern partner.
+    - ``kind="synonym"`` — the non-mechanical lexical residue, folded in ONLY
+      once the advisor has approved ``theological_synonyms_v1.json`` (same gate
+      as the expansion table's synonym rows: ``load_approved_synonyms``).
+      ``sepulchre→tomb``, ``candlestick→lampstand``, ``devils→demons``, etc.
+
+    Every archaic key is, by construction of the mining, ABSENT from the BSB
+    spine (``a not in df_bsb``), so a gloss only ever maps a genuinely archaic
+    surface form forward — never a modern word. The primary key is ``term``
+    (one canonical gloss per surface form); on the rare collision the higher
+    mining ``weight`` wins, then kind rank synonym > archaic, then gloss asc —
+    fully deterministic. Pairs not present in the mined data are NOT fabricated.
+    """
+    kind_rank = {"synonym": 0, "archaic": 1}
+    best: dict[str, tuple[str, str, float]] = {}  # term -> (gloss, kind, weight)
+
+    def add(term: str, gloss: str, kind: str, weight: float) -> None:
+        if term == gloss:
+            return
+        cur = best.get(term)
+        if cur is None:
+            best[term] = (gloss, kind, weight)
+            return
+        cur_key = (-cur[2], kind_rank[cur[1]], cur[0])
+        new_key = (-weight, kind_rank[kind], gloss)
+        if new_key < cur_key:
+            best[term] = (gloss, kind, weight)
+
+    mined = mine_archaic_pairs(bibles_db)
+    n_mechanical = 0
+    for p in mined:
+        if not p["mechanical"]:
+            continue
+        add(p["archaic"], p["modern"], "archaic", float(p["score"]))
+        n_mechanical += 1
+
+    n_synonym = 0
+    if repo_root is not None:
+        syn_path = repo_root / SYNONYMS_RELPATH
+        for p in load_approved_synonyms(syn_path):
+            add(p["archaic"], p["modern"], "synonym", float(p.get("score", 1.0)))
+            n_synonym += 1
+
+    rows = sorted(
+        (term, gloss, kind, weight)
+        for term, (gloss, kind, weight) in best.items())
+    stats = {
+        "format": GLOSS_FORMAT,
+        "direction": "archaic-to-modern",
+        "n_mechanical": n_mechanical,
+        "n_synonym_approved": n_synonym,
         "n_rows": len(rows),
     }
     return rows, stats

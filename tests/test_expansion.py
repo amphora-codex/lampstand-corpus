@@ -171,3 +171,50 @@ def test_duplicate_pairs_across_sources_dedupe_with_precedence(tmp_path):
     assert by_key[("believes", "believeth")] == ("archaic", 1.0)
     # Pure suffix pairs (no archaic twin) stay suffix.
     assert by_key[("believe", "believes")][0] == "suffix"
+
+
+# --- directional gloss (GAP 2: tap-to-gloss) --------------------------------------
+def test_gloss_rows_are_one_way_archaic_to_modern(tmp_path):
+    """The gloss table is DIRECTIONAL: the archaic surface form -> modern gloss,
+    and ONLY that direction (unlike the symmetric expansion table)."""
+    db = _parallel_fixture(tmp_path)
+    rows, stats = ex.build_gloss_rows(db, tmp_path)
+    by = {r[0]: (r[1], r[2]) for r in rows}
+    # Mechanical mined pair: archaic -> modern present, reverse ABSENT.
+    assert by["believeth"] == ("believes", "archaic")
+    assert "believes" not in by
+    # Term is the primary key: at most one gloss per surface form.
+    assert len({r[0] for r in rows}) == len(rows)
+    assert stats["direction"] == "archaic-to-modern"
+    # Deterministic.
+    assert ex.build_gloss_rows(db, tmp_path) == (rows, stats)
+
+
+def test_gloss_folds_in_advisor_approved_synonyms_one_way(tmp_path):
+    db = _parallel_fixture(tmp_path)
+    syn = tmp_path / "data" / "eval" / "theological_synonyms_v1.json"
+    syn.parent.mkdir(parents=True)
+    syn.write_text(json.dumps({
+        "status": "APPROVED by advisor",
+        "pairs": [{"archaic": "sepulchre", "modern": "tomb", "score": 0.9}],
+    }), encoding="utf-8")
+    rows, stats = ex.build_gloss_rows(db, tmp_path)
+    by = {r[0]: (r[1], r[2]) for r in rows}
+    assert by["sepulchre"] == ("tomb", "synonym")
+    # One-way only — the modern term does NOT gloss back to the archaic.
+    assert "tomb" not in by
+    assert stats["n_synonym_approved"] == 1
+
+
+def test_gloss_excludes_unapproved_synonyms(tmp_path):
+    """DRAFT (advisor-unsigned) synonyms must NOT appear in the gloss table."""
+    db = _parallel_fixture(tmp_path)
+    syn = tmp_path / "data" / "eval" / "theological_synonyms_v1.json"
+    syn.parent.mkdir(parents=True)
+    syn.write_text(json.dumps({
+        "status": "DRAFT",
+        "pairs": [{"archaic": "sepulchre", "modern": "tomb", "score": 0.9}],
+    }), encoding="utf-8")
+    rows, _ = ex.build_gloss_rows(db, tmp_path)
+    assert all(r[2] != "synonym" for r in rows)
+    assert "sepulchre" not in {r[0] for r in rows}
