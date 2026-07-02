@@ -6,7 +6,7 @@ Corpus reference: `corpus-v2.0.0-candidate`.
 
 ## 1. Pack size + home
 
-`bundled_crossrefs.sqlite` = **7,368,704 B (7.0 MB)** — 344,794 resolving TSK edges over 29,363 source verses, plus a top-8 expansion for 117,265 Scripture chunks.
+`bundled_crossrefs.sqlite` = **7,389,184 B (7.0 MB)** — 344,794 resolving TSK edges over 29,363 source verses, plus a top-8 expansion for 117,265 Scripture chunks.
 
 Pack home decision: a **separate tiny bundled pack**, not `bundled_search.sqlite` — small enough to always ship, the reader is single-purpose (never touches BM25/vector tables), and the crossref layer serves the reading panel + Ask grounding, not the search index. The full-fidelity `ondemand_crossrefs.sqlite` (24.2 MB, unchanged v1 schema) still ships on-demand.
 
@@ -20,9 +20,9 @@ Post-fusion TSK boost over the hybrid arm at the app's constants: the top-5 Scri
 
 | arm | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| hybrid | 451 | 0.129 | 0.224 | 0.297 | 0.084 | 0.042 |
-| hybrid-graph | 451 | 0.118 | 0.182 | 0.295 | 0.088 | 0.038 |
-| hybrid-graph-weak | 451 | 0.129 | 0.224 | 0.297 | 0.084 | 0.042 |
+| hybrid | 452 | 0.128 | 0.223 | 0.296 | 0.084 | 0.042 |
+| hybrid-graph | 452 | 0.117 | 0.181 | 0.292 | 0.088 | 0.038 |
+| hybrid-graph-weak | 452 | 0.128 | 0.223 | 0.296 | 0.084 | 0.042 |
 
 ### crossref (CIRCULAR — see below)
 
@@ -36,9 +36,9 @@ Post-fusion TSK boost over the hybrid arm at the app's constants: the top-5 Scri
 
 | arm | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| hybrid | 149 | 0.000 | 0.027 | 0.094 | 0.008 | 0.002 |
-| hybrid-graph | 149 | 0.020 | 0.047 | 0.114 | 0.020 | 0.006 |
-| hybrid-graph-weak | 149 | 0.000 | 0.027 | 0.094 | 0.008 | 0.002 |
+| hybrid | 150 | 0.000 | 0.027 | 0.093 | 0.008 | 0.002 |
+| hybrid-graph | 150 | 0.020 | 0.047 | 0.107 | 0.019 | 0.006 |
+| hybrid-graph-weak | 150 | 0.000 | 0.027 | 0.093 | 0.008 | 0.002 |
 
 ### commentary-anchor
 

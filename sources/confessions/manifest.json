@@ -2,6 +2,11 @@
   "retrieved": "2026-07-02",
   "sources": {
     "belgic": {
+      "aux_file": "sources/confessions/belgic/creeds3.xml",
+      "aux_note": "CCEL schaff/creeds3 (Schaff, Creeds of Christendom vol. III) \u2014 public domain; used ONLY for the Belgic proof-text apparatus (French-column <scripRef> notes anchored to the per-article 'Art. N' table markers). Article text remains the 1840 RPDC Wikisource snapshot.",
+      "aux_retrieved": "2026-07-02",
+      "aux_sha256": "756adf1ddd466d237221c76b99d25d55cab7e83d08914f28a289c3b90dccddf3",
+      "aux_url": "https://ccel.org/ccel/schaff/creeds3.xml",
       "file": "sources/confessions/belgic/belgic-1840-rpdc.parse.json",
       "license": "Public domain (PD-old; 1840 translation)",
       "name": "Belgic Confession",

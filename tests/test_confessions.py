@@ -16,6 +16,8 @@ import pytest
 
 from lampstand_corpus.confessions import (
     CONFESSION_SOURCES,
+    _belgic_osis_verserefs,
+    _extract_belgic_proofs,
     _osis_to_verseref,
     parse_confession,
 )
@@ -167,6 +169,91 @@ def test_parse_belgic_articles_roman_to_int():
     assert "one only God" in pc.chunks[0].text
     assert pc.chunks[1].meta["article_title"].startswith("By what means")
     assert pc.chunks[0].meta["shortcode"] == "BC"
+
+
+# --- Belgic proof-texts (CCEL schaff/creeds3) --------------------------------
+def test_belgic_osis_verserefs_single_range_and_multi():
+    # Single ref.
+    refs, un = _belgic_osis_verserefs("Bible:Eph.4.5")
+    assert un == [] and len(refs) == 1
+    assert (refs[0].book, refs[0].chapter, refs[0].verse_start) == ("EPH", 4, 5)
+    # Same-chapter range collapses into verse_end.
+    refs, un = _belgic_osis_verserefs("Bible:2Tim.3.15-2Tim.3.17")
+    assert un == [] and refs[0].verse_end == 17
+    # Multiple refs packed in ONE osisRef (space separated).
+    refs, un = _belgic_osis_verserefs("Bible:Rom.7.8 Bible:Rom.7.10")
+    assert un == [] and [r.verse_start for r in refs] == [8, 10]
+
+
+def test_belgic_osis_verserefs_flags_unresolvable_never_guesses():
+    # Chapter-only (no verse), unknown book, and OCR garbage -> unparsed, no ref.
+    refs, un = _belgic_osis_verserefs("Bible:Ps.3")
+    assert refs == [] and un == ["Ps.3"]
+    refs, un = _belgic_osis_verserefs("Bible:Tob.1.1")
+    assert refs == [] and un == ["Tob.1.1"]
+
+
+_BELGIC_CREEDS3_FIXTURE = """<?xml version="1.0"?>
+<ThML><ThML.body><div1>
+<div2 title="The Belgic Confession. A.D. 1561. Revised 1619.">
+ <table>
+  <tr>
+   <td><span lang="fr">A<span class="sc">rt.</span> I</span></td>
+   <td>A<span class="sc">rt.</span> I.</td>
+  </tr>
+  <tr>
+   <td><span lang="fr">Nous croyons<note n="1">
+       <scripRef osisRef="Bible:Eph.4.5">Eph. iv. 5</scripRef>;
+       <scripRef osisRef="Bible:Deut.6.4">Deut. vi. 4</scripRef>.</note></span></td>
+   <td>We all believe<note n="1">
+       <scripRef osisRef="Bible:Eph.4.5">Eph. iv. 5</scripRef></note></td>
+  </tr>
+  <tr>
+   <td><span lang="fr">A<span class="sc">rt.</span> II</span></td>
+   <td>A<span class="sc">rt.</span> II.</td>
+  </tr>
+  <tr>
+   <td><span lang="fr">Par deux moyens<note n="2">
+       <scripRef osisRef="Bible:Ps.19.2 Bible:Rom.1.20">two refs</scripRef>;
+       <scripRef osisRef="Bible:Ps.3">bad</scripRef>.</note></span></td>
+   <td>By two means</td>
+  </tr>
+ </table>
+</div2>
+</div1></ThML.body></ThML>"""
+
+
+def test_extract_belgic_proofs_anchors_to_french_column_articles():
+    flags: list[str] = []
+    proofs = _extract_belgic_proofs(_BELGIC_CREEDS3_FIXTURE, flags)
+    # Article 1: two French-column refs (English-column duplicate NOT double-counted
+    # into a different article; French cell is the source of record).
+    a1 = proofs[1]
+    assert [(p["book"], p["chapter"], p["verse_start"]) for p in a1] == [
+        ("EPH", 4, 5), ("DEU", 6, 4)]
+    # Article 2: the multi-ref osisRef expands to two refs; the bad "Ps.3"
+    # chapter-only token is FLAGGED and NOT attached.
+    a2 = proofs[2]
+    assert [(p["book"], p["chapter"], p["verse_start"]) for p in a2] == [
+        ("PSA", 19, 2), ("ROM", 1, 20)]
+    assert any("Ps.3" in f for f in flags)
+    assert any("attached" in f for f in flags)
+
+
+def test_extract_belgic_proofs_flags_ref_before_first_marker():
+    # A note that appears before any "Art." marker is article-ambiguous ->
+    # left UNATTACHED and flagged, never guessed onto article 1.
+    xml = (
+        '<?xml version="1.0"?><ThML><ThML.body><div1>'
+        '<div2 title="The Belgic Confession. A.D. 1561.">'
+        '<table><tr><td><span lang="fr">preface'
+        '<note><scripRef osisRef="Bible:Gen.1.1">Gen 1:1</scripRef></note>'
+        '</span></td></tr></table></div2></div1></ThML.body></ThML>'
+    )
+    flags: list[str] = []
+    proofs = _extract_belgic_proofs(xml, flags)
+    assert all(not v for v in proofs.values())  # nothing attached
+    assert any("before any Art. marker" in f for f in flags)
 
 
 # --- Heidelberg parser -------------------------------------------------------
@@ -363,6 +450,26 @@ class TestConfessionsDB:
         )
         assert nums == list(range(1, 38))
 
+    def test_belgic_proof_texts_supplemented_from_creeds3(self, conn):
+        # The Belgic proof apparatus is merged from CCEL schaff/creeds3.
+        n_with, n_refs = conn.execute(
+            "SELECT COUNT(*) FILTER (WHERE proof_texts IS NOT NULL), "
+            "COALESCE(SUM(json_array_length(proof_texts)),0) "
+            "FROM section WHERE document='belgic'").fetchone()
+        assert n_with == 34  # 34 of 37 articles carry proofs
+        assert n_refs > 700  # ~799 stored refs
+        # Articles 4,5,6 (the canon list) legitimately carry NO proofs.
+        zero = sorted(r[0] for r in conn.execute(
+            "SELECT article FROM section WHERE document='belgic' "
+            "AND proof_texts IS NULL"))
+        assert zero == [4, 5, 6]
+        # Article 1 carries the DE NATURA DEI proofs (Eph 4:5 leads).
+        a1 = json.loads(conn.execute(
+            "SELECT proof_texts FROM section WHERE document='belgic' AND key='1'"
+        ).fetchone()[0])
+        assert (a1[0]["book"], a1[0]["chapter"], a1[0]["verse_start"]) == (
+            "EPH", 4, 5)
+
     def test_wsc_q1_text(self, conn):
         t = conn.execute(
             "SELECT text FROM section WHERE document='wsc' AND key='1'"
@@ -400,5 +507,13 @@ class TestConfessionsDB:
         #   * lbcf 5.4 -> PSA 1:21 (1689 source typo, known since P2)
         #   * wsc 1 -> 1CO 6:31 (Westminster-Standards JSON collapsed
         #     "1 Cor. 6:20; 10:31" into "6:20, 31", losing the chapter change)
-        known = {"lbcf:5.4 PSA 1:21", "wsc:1 1CO 6:31"}
+        #   * belgic -> 8 CCEL schaff/creeds3 osisRef OCR defects (mis-numbered
+        #     Ps./Gal. chapters/verses in the source's own osisRef attributes;
+        #     carried faithfully and FLAGGED, never silently corrected).
+        known = {
+            "lbcf:5.4 PSA 1:21", "wsc:1 1CO 6:31",
+            "belgic:3 PSA 2:19", "belgic:7 GAL 30:15", "belgic:12 PSA 4:10",
+            "belgic:12 PSA 3:20", "belgic:13 PSA 4:9", "belgic:13 PSA 5:25",
+            "belgic:14 PSA 49:21", "belgic:37 PSA 62:13",
+        }
         assert set(unresolved) <= known, unresolved

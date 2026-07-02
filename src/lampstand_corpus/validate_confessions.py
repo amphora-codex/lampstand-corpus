@@ -331,8 +331,45 @@ def prooftext_summary(parsed: dict) -> list[str]:
         n_refs = sum(len(c.meta.get("proof_texts") or []) for c in pc.chunks)
         lines.append(f"  {did:10s} sections-with-proofs={n_with}/{len(pc.chunks)}"
                      f"  stored-refs={n_refs}")
-    lines.append("  (belgic: proof apparatus NOT in the Wikisource 1840 source; "
-                 "coverable via CCEL schaff/creeds3 — architect decision pending)")
+    # Belgic proof-text sanity (Rank 14 supplement, CCEL schaff/creeds3).
+    if "belgic" in parsed:
+        bpc = parsed["belgic"]
+        counts = {c.meta.get("article"): len(c.meta.get("proof_texts") or [])
+                  for c in bpc.chunks}
+        zero = sorted(a for a, n in counts.items() if n == 0)
+        n_ref = sum(counts.values())
+        n_art = sum(1 for n in counts.values() if n)
+        lines.append("")
+        lines.append("## BELGIC PROOF-TEXTS (CCEL schaff/creeds3 supplement)")
+        lines.append(f"  articles-with-proofs={n_art}/{len(bpc.chunks)}  "
+                     f"stored-refs={n_ref}")
+        lines.append(f"  articles with ZERO proofs: {zero or 'none'} "
+                     "(4,5,6 = the canon-list articles; no proofs in this "
+                     "edition — a REAL gap, not fabricated)")
+        # Per-article sanity: no article should carry an implausibly large count.
+        hot = sorted(((n, a) for a, n in counts.items() if n > 60), reverse=True)
+        if hot:
+            lines.append("  unusually large per-article counts (review): "
+                         + ", ".join(f"art {a}={n}" for n, a in hot))
+        lines.append("  Proofs anchor to the FRENCH-column <scripRef> notes via "
+                     "the per-article 'Art. N' table markers; refs that do not "
+                     "resolve to a real verse are listed under each document's "
+                     "'PROOF-TEXT REFS OUTSIDE CANON' block above (CCEL osisRef "
+                     "OCR defects — flagged, not corrected).")
+        lines.append("")
+        lines.append("## ADVISOR SPOT-CHECK (Belgic proof-text supplement)")
+        lines.append("  Hand-verify these Belgic articles against a printed "
+                     "edition (proof refs, not just presence):")
+        lines.append("    Art. 1 (one only God), Art. 2 (God known by two means),")
+        lines.append("    Art. 7 (sufficiency of Scripture), Art. 12 (creation),")
+        lines.append("    Art. 14 (creation & fall of man), Art. 22-23 "
+                     "(justification by faith),")
+        lines.append("    Art. 24 (sanctification / good works), Art. 34 (baptism),")
+        lines.append("    Art. 35 (Lord's Supper), Art. 37 (last judgment; the "
+                     "largest apparatus).")
+        lines.append("    Confirm articles 4-6 (canon list) legitimately carry no "
+                     "proofs, and review every Belgic entry in the OUTSIDE-CANON")
+        lines.append("    block (Ps./Gal. mis-numbered osisRefs from the source).")
     lines.append("")
     lines.append("## ADVISOR SPOT-CHECK (Westminster proof-text supplement)")
     lines.append("  Hand-verify these loci against a printed Westminster edition")

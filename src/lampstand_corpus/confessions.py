@@ -30,9 +30,15 @@ never silently resolved — CLAUDE.md):
   paragraph-for-paragraph against the JSON; any divergence is FLAGGED).
 * **Belgic Confession — ADDED** (Wikisource, the 1840 RPDC public-domain English
   translation). All **37 articles** (I-XXXVII), Roman numerals normalized to
-  integers. The 1840 edition carries only occasional inline scripture mentions,
-  not a structured proof-text apparatus, so article proof_texts are empty (not
-  fabricated).
+  integers. The 1840 body edition carries no structured proof apparatus, so
+  proof-texts are supplemented from **CCEL schaff/creeds3** (Schaff, *Creeds of
+  Christendom* vol. III; architect-approved): its machine-readable
+  ``<scripRef osisRef=…>`` notes anchor to the FRENCH column of the two-column
+  table and are keyed to articles by the per-article "Art. N" row markers.
+  Article body text is unchanged (chunk ids unchanged); only the proofs are
+  merged. Articles 4-6 (the canon list) carry no proofs in this edition — that
+  gap is real, not fabricated. Refs that don't resolve to a real verse are
+  FLAGGED, never guessed.
 * **Heidelberg** (CCEL ``heidelberg.xml``) — KEPT from P2: 129 Q across 52 Lord's
   Days, machine-readable ``<scripRef osisRef=…>`` proof-texts. Unchanged.
 * **Canons of Dort** (CCEL ``canonsofdort.xml``) — KEPT from P2: a clean English
@@ -263,6 +269,25 @@ CONFESSION_SOURCES: dict[str, ConfessionSource] = {
                 "37 articles I-XXXVII",
         license="Public domain (PD-old; 1840 translation)",
         repo_license="Wikisource (CC BY-SA wrapper; underlying text PD-old)",
+        # ARCHITECT-APPROVED proof-text supplement: Schaff's *Creeds of
+        # Christendom* vol. III (CCEL schaff/creeds3) carries the Belgic
+        # Confession's Assembly proof-texts as machine-readable
+        # <scripRef osisRef=…> notes. In that edition the notes anchor to the
+        # FRENCH column of the two-column (French/English) table, keyed off the
+        # per-article "Art. N" row markers rather than any per-note article
+        # label; parse_belgic walks that table to attach each proof to the
+        # correct article. Article body TEXT still comes from the 1840 RPDC
+        # Wikisource snapshot (chunk ids unchanged); ONLY the proof apparatus
+        # is merged. Refs that don't resolve to a real verse are FLAGGED, never
+        # guessed. creeds3.xml is the whole-volume ThML (shared with Dort/
+        # Heidelberg upstream), snapshotted under sources/confessions/belgic/.
+        aux_url="https://ccel.org/ccel/schaff/creeds3.xml",
+        aux_filename="creeds3.xml",
+        aux_note="CCEL schaff/creeds3 (Schaff, Creeds of Christendom vol. III) "
+                 "— public domain; used ONLY for the Belgic proof-text "
+                 "apparatus (French-column <scripRef> notes anchored to the "
+                 "per-article 'Art. N' table markers). Article text remains the "
+                 "1840 RPDC Wikisource snapshot.",
     ),
     "heidelberg": ConfessionSource(
         id="heidelberg", name="Heidelberg Catechism", shortcode="HC",
@@ -922,6 +947,144 @@ def _belgic_paragraphs(html: str) -> list[str]:
     return paras
 
 
+# --- Belgic proof-texts (CCEL schaff/creeds3) --------------------------------
+# The proof apparatus lives in Schaff's Creeds vol. III, NOT in the 1840 RPDC
+# body snapshot. In that ThML edition the Belgic Confession renders as a
+# two-column (French | English) table; the Assembly proof-texts are
+# <scripRef osisRef=…> notes attached to the FRENCH column, and articles are
+# delimited by "Art. N" marker rows (both columns show the same numeral in
+# document order). There is no per-note article label, so we anchor by walking
+# the table and tracking the current "Art. N" marker.
+_BELGIC_ART_MARKER_RE = re.compile(r"^Art\.([IVXLC]+)\.?$")
+
+
+def _belgic_osis_verserefs(osis_attr: str) -> tuple[list[VerseRef], list[str]]:
+    """Parse a Belgic ``osisRef`` attribute into VerseRefs.
+
+    One ``<scripRef>`` may carry SEVERAL refs in its ``osisRef`` — space
+    separated, each ``Bible:Book.C.V`` or a ``Book.C.V-Book.C.V2`` range
+    (e.g. ``Bible:Rom.7.8 Bible:Rom.7.10`` or ``Bible:2Tim.3.15-2Tim.3.17``).
+    Each token that resolves to (book, chapter, verse) becomes a VerseRef; a
+    range keeps ``verse_end`` when it stays within one chapter. A token we
+    cannot map (unknown book, chapter-only like ``Ps.3``, or OCR garbage like
+    ``Gal.50``) is returned in ``unparsed`` for the caller to FLAG — never
+    guessed at (CLAUDE.md).
+    """
+    refs: list[VerseRef] = []
+    unparsed: list[str] = []
+    for tok in osis_attr.split():
+        tok = tok.removeprefix("Bible:").strip()
+        if not tok:
+            continue
+        left = tok.split("-", 1)[0]
+        parts = left.split(".")
+        if len(parts) < 3:
+            unparsed.append(tok)  # chapter-only / malformed — no verse to resolve
+            continue
+        book_osis, chap, verse = parts[0], parts[1], parts[2]
+        usfm = OSIS_TO_USFM.get(book_osis)
+        if usfm is None or not chap.isdigit() or not verse.isdigit():
+            unparsed.append(tok)
+            continue
+        ve: int | None = None
+        if "-" in tok:
+            rparts = tok.split("-", 1)[1].split(".")
+            # Only collapse a same-chapter range into verse_end; a cross-chapter
+            # range has no single (chapter, verse_start..verse_end) — keep start.
+            if (len(rparts) == 3 and rparts[0] == book_osis
+                    and rparts[1] == chap and rparts[2].isdigit()):
+                ve = int(rparts[2])
+        refs.append(VerseRef(
+            book=usfm, chapter=int(chap), verse_start=int(verse), verse_end=ve))
+    return refs, unparsed
+
+
+def _load_belgic_proofs(
+    src: ConfessionSource, flags: list[str]
+) -> dict[int, list[dict]]:
+    """Proof-texts per article from the CCEL schaff/creeds3 aux snapshot.
+
+    Walks the Belgic two-column table: an ``Art. N`` marker cell opens an
+    article; each FRENCH-column ``<scripRef>`` note between markers attaches to
+    that article. Refs are deduped first-seen per article. Unresolvable
+    scripRefs (no ``osisRef``, chapter-only, unmapped book) are FLAGGED with
+    their article; article attribution that is genuinely ambiguous (a note
+    before the first ``Art.`` marker) is left UNATTACHED and flagged — never
+    guessed.
+    """
+    aux = src.aux_dest
+    if aux is None or not aux.exists():
+        flags.append(
+            f"belgic: proof-text source not present ({src.aux_filename}); "
+            "articles ingested without proof-texts — run snapshot-confessions")
+        return {}
+    return _extract_belgic_proofs(aux.read_text(encoding="utf-8"), flags)
+
+
+def _extract_belgic_proofs(
+    creeds3_xml: str, flags: list[str]
+) -> dict[int, list[dict]]:
+    """Pure creeds3-ThML → per-article proof map (testable without the snapshot)."""
+    soup = BeautifulSoup(creeds3_xml, "lxml-xml")
+    div2 = None
+    for d in soup.find_all("div2"):
+        if "Belgic Confession" in (d.get("title") or ""):
+            div2 = d
+            break
+    if div2 is None:
+        flags.append("belgic: Belgic div2 not found in creeds3 aux — review")
+        return {}
+
+    per_article: dict[int, list[dict]] = {}
+    seen: dict[int, set[tuple]] = {}
+    cur: int | None = None
+    n_unattached = 0
+    n_unresolved = 0
+    for td in div2.find_all("td"):
+        marker = _BELGIC_ART_MARKER_RE.match(td.get_text("", strip=True))
+        if marker is not None:
+            num = _roman_to_int(marker.group(1))
+            if num is not None:
+                cur = num
+                per_article.setdefault(cur, [])
+                seen.setdefault(cur, set())
+            continue
+        # Only the FRENCH column carries the proof apparatus in this edition.
+        if td.find(attrs={"lang": "fr"}) is None:
+            continue
+        for sr in td.find_all("scripRef"):
+            osis = sr.get("osisRef")
+            if not osis:
+                n_unresolved += 1
+                flags.append(
+                    f"belgic: unresolvable scripRef (no osisRef) "
+                    f"{sr.get('passage')!r} near article {cur} — not attached")
+                continue
+            if cur is None:
+                n_unattached += 1
+                flags.append(
+                    f"belgic: scripRef {osis!r} appears before any Art. marker "
+                    "— article ambiguous, left UNATTACHED")
+                continue
+            refs, unparsed = _belgic_osis_verserefs(osis)
+            for u in unparsed:
+                n_unresolved += 1
+                flags.append(
+                    f"belgic: unresolvable osisRef token {u!r} in article "
+                    f"{cur} — not attached")
+            for vr in refs:
+                k = (vr.book, vr.chapter, vr.verse_start, vr.verse_end)
+                if k not in seen[cur]:
+                    seen[cur].add(k)
+                    per_article[cur].append(vr.model_dump(exclude_none=True))
+    n_refs = sum(len(v) for v in per_article.values())
+    n_arts = sum(1 for v in per_article.values() if v)
+    flags.append(
+        f"belgic: attached {n_refs} proof-text refs across {n_arts} articles "
+        f"from creeds3 (unresolved {n_unresolved}, unattached {n_unattached})")
+    return per_article
+
+
 def parse_belgic(
     src: ConfessionSource, prov: Provenance, content: str
 ) -> ParsedConfession:
@@ -931,6 +1094,8 @@ def parse_belgic(
     except (KeyError, TypeError, ValueError):
         flags.append("belgic: unexpected parse-API JSON shape — review")
         return ParsedConfession(id=src.id, chunks=[], flags=flags)
+
+    proofs_by_article = _load_belgic_proofs(src, flags)
 
     paras = _belgic_paragraphs(html)
 
@@ -951,7 +1116,8 @@ def parse_belgic(
         title = cur_title or ""
         chunks.append(_make_chunk(
             src, prov, key=str(cur_num), text=body,
-            meta={"article": cur_num, "article_title": title, "proof_texts": []},
+            meta={"article": cur_num, "article_title": title,
+                  "proof_texts": proofs_by_article.get(cur_num, [])},
         ))
         cur_num, cur_title, cur_body = None, None, []
 

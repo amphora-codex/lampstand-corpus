@@ -12,8 +12,26 @@ fix. The pipeline never marks a corpus ship-ready.
   Dort=5 heads of doctrine (59 articles + 34 rejection paragraphs; 3rd & 4th heads combined) + Conclusion
 
 ## BELGIC
-  articles=37/37  proof-texts=0
-  count_ok=True  errors=0  flags=0
+  articles=37/37  proof-texts=799
+  count_ok=True  errors=8  flags=8
+  PROOF-TEXT REFS OUTSIDE CANON (review) (8):
+    - belgic:3 -> PSA 2:19
+    - belgic:7 -> GAL 30:15
+    - belgic:12 -> PSA 4:10
+    - belgic:12 -> PSA 3:20
+    - belgic:13 -> PSA 4:9
+    - belgic:13 -> PSA 5:25
+    - belgic:14 -> PSA 49:21
+    - belgic:37 -> PSA 62:13
+  PARSER / PROOF-TEXT AMBIGUITY FLAGS (review) (8):
+    - belgic: unresolvable scripRef (no osisRef) 'Epphesians 2:8,9,10' near article 16 — not attached
+    - belgic: unresolvable osisRef token 'Ps.3' in article 16 — not attached
+    - belgic: unresolvable scripRef (no osisRef) 'Fal. ii. 6' near article 22 — not attached
+    - belgic: unresolvable scripRef (no osisRef) 'Philippians l:1,29' near article 24 — not attached
+    - belgic: unresolvable osisRef token 'Gal.5' in article 32 — not attached
+    - belgic: unresolvable osisRef token 'Gal.50' in article 32 — not attached
+    - belgic: unresolvable osisRef token 'Luke.20' in article 35 — not attached
+    - belgic: attached 799 proof-text refs across 34 articles from creeds3 (unresolved 7, unattached 0)
 
 ## DORT
   head-sections=4/4 (= 5 canonical heads, 3rd & 4th combined)  articles=59  rejections=34  chunks=94 (incl. Conclusion)
@@ -163,14 +181,29 @@ fix. The pipeline never marks a corpus ship-ready.
   wcf prose cross-checked vs Wikisource Burges-1646: 14 sampled sections, 0 divergence(s) (incl. forced ch.23.1 & ch.24.1)
 
 ## PROOF-TEXT APPARATUS (Rank 14 supplement)
-  belgic     sections-with-proofs=0/37  stored-refs=0
+  belgic     sections-with-proofs=34/37  stored-refs=799
   dort       sections-with-proofs=42/94  stored-refs=80
   heidelberg sections-with-proofs=124/129  stored-refs=1645
   lbcf       sections-with-proofs=159/160  stored-refs=1121
   wcf        sections-with-proofs=172/172  stored-refs=2465
   wlc        sections-with-proofs=194/196  stored-refs=2449
   wsc        sections-with-proofs=107/107  stored-refs=632
-  (belgic: proof apparatus NOT in the Wikisource 1840 source; coverable via CCEL schaff/creeds3 — architect decision pending)
+
+## BELGIC PROOF-TEXTS (CCEL schaff/creeds3 supplement)
+  articles-with-proofs=34/37  stored-refs=799
+  articles with ZERO proofs: [4, 5, 6] (4,5,6 = the canon-list articles; no proofs in this edition — a REAL gap, not fabricated)
+  unusually large per-article counts (review): art 37=69
+  Proofs anchor to the FRENCH-column <scripRef> notes via the per-article 'Art. N' table markers; refs that do not resolve to a real verse are listed under each document's 'PROOF-TEXT REFS OUTSIDE CANON' block above (CCEL osisRef OCR defects — flagged, not corrected).
+
+## ADVISOR SPOT-CHECK (Belgic proof-text supplement)
+  Hand-verify these Belgic articles against a printed edition (proof refs, not just presence):
+    Art. 1 (one only God), Art. 2 (God known by two means),
+    Art. 7 (sufficiency of Scripture), Art. 12 (creation),
+    Art. 14 (creation & fall of man), Art. 22-23 (justification by faith),
+    Art. 24 (sanctification / good works), Art. 34 (baptism),
+    Art. 35 (Lord's Supper), Art. 37 (last judgment; the largest apparatus).
+    Confirm articles 4-6 (canon list) legitimately carry no proofs, and review every Belgic entry in the OUTSIDE-CANON
+    block (Ps./Gal. mis-numbered osisRefs from the source).
 
 ## ADVISOR SPOT-CHECK (Westminster proof-text supplement)
   Hand-verify these loci against a printed Westminster edition
@@ -185,12 +218,20 @@ fix. The pipeline never marks a corpus ship-ready.
     defects: leading 1/2 dropped from numbered books, stray words).
 
 ## PROOF-TEXT CROSS-CHECK vs bibles.sqlite (refs must resolve in our own Bibles)
-  proof-text refs cross-checked against bibles.sqlite under the canonical-spine versification map: 8392 refs across translations ['asv', 'bsb', 'kjv', 'web']
-    asv: 2 proof ref(s) do not resolve in this translation
-    bsb: 2 proof ref(s) do not resolve in this translation
-    kjv: 2 proof ref(s) do not resolve in this translation
-    web: 5 proof ref(s) do not resolve in this translation
-  proof refs that resolve in NO bundled translation (2) — these are genuine bad/typo refs to adjudicate (NOT renumbered):
+  proof-text refs cross-checked against bibles.sqlite under the canonical-spine versification map: 9191 refs across translations ['asv', 'bsb', 'kjv', 'web']
+    asv: 10 proof ref(s) do not resolve in this translation
+    bsb: 10 proof ref(s) do not resolve in this translation
+    kjv: 10 proof ref(s) do not resolve in this translation
+    web: 13 proof ref(s) do not resolve in this translation
+  proof refs that resolve in NO bundled translation (10) — these are genuine bad/typo refs to adjudicate (NOT renumbered):
+      - belgic:3 -> PSA 2:19 (resolves in NO bundled translation)
+      - belgic:7 -> GAL 30:15 (resolves in NO bundled translation)
+      - belgic:12 -> PSA 4:10 (resolves in NO bundled translation)
+      - belgic:12 -> PSA 3:20 (resolves in NO bundled translation)
+      - belgic:13 -> PSA 4:9 (resolves in NO bundled translation)
+      - belgic:13 -> PSA 5:25 (resolves in NO bundled translation)
+      - belgic:14 -> PSA 49:21 (resolves in NO bundled translation)
+      - belgic:37 -> PSA 62:13 (resolves in NO bundled translation)
       - lbcf:5.4 -> PSA 1:21 (resolves in NO bundled translation)
       - wsc:1 -> 1CO 6:31 (resolves in NO bundled translation)
   NOTE (architect): the BSB Hebrew Psalm-superscription numbering is now handled by the canonical-spine versification map (lampstand_corpus.versification). DATA-VERIFIED CORRECTION to the earlier '+1 offset' framing: BSB body verse numbers match KJV (offset 0), not +1 — BSB folds the superscription INTO verse 1, it does not shift the body. The earlier 'Psalm N:1 misses in BSB' failures were a separate ingestion bug (BSB's \d \v 1 line was dropped, so verse 1 had no row); that is fixed in usfm.py and BSB now carries a verse 1 for every superscribed psalm. Remaining no-resolve refs above (if any) are genuine source typos, NOT versification.

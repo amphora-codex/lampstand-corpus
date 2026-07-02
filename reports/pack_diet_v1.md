@@ -35,14 +35,14 @@ Dense-bearing arms re-ranked against the int8 quantize→dequantize round-trip o
 
 | arm | set | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 | Δ vs fp32 (r@20 / MRR / nDCG@10) |
 |---|---|---:|---:|---:|---:|---:|---:|
-| dense-int8 | OVERALL | 0.115 | 0.155 | 0.220 | 0.079 | 0.030 | -0.004 / -0.000 / +0.000 |
+| dense-int8 | OVERALL | 0.115 | 0.155 | 0.219 | 0.079 | 0.030 | -0.004 / -0.000 / +0.000 |
 | dense-int8 | commentary-anchor | 0.112 | 0.158 | 0.211 | 0.078 | 0.035 | +0.000 / +0.000 / +0.000 |
 | dense-int8 | crossref | 0.220 | 0.260 | 0.373 | 0.149 | 0.051 | -0.013 / -0.002 / +0.000 |
-| dense-int8 | prooftext | 0.013 | 0.047 | 0.074 | 0.010 | 0.004 | +0.000 / +0.000 / +0.000 |
-| hybrid-int8 | OVERALL | 0.124 | 0.222 | 0.297 | 0.084 | 0.042 | +0.000 / -0.000 / -0.001 |
+| dense-int8 | prooftext | 0.013 | 0.047 | 0.073 | 0.010 | 0.004 | +0.000 / +0.000 / +0.000 |
+| hybrid-int8 | OVERALL | 0.124 | 0.221 | 0.296 | 0.084 | 0.042 | +0.000 / -0.000 / -0.001 |
 | hybrid-int8 | commentary-anchor | 0.138 | 0.322 | 0.408 | 0.085 | 0.058 | +0.000 / -0.001 / -0.001 |
 | hybrid-int8 | crossref | 0.233 | 0.313 | 0.387 | 0.159 | 0.064 | +0.000 / +0.000 / -0.001 |
-| hybrid-int8 | prooftext | 0.000 | 0.027 | 0.094 | 0.008 | 0.002 | +0.000 / -0.000 / -0.000 |
+| hybrid-int8 | prooftext | 0.000 | 0.027 | 0.093 | 0.008 | 0.002 | +0.000 / -0.000 / -0.000 |
 
 ## 5. Schema contract
 
