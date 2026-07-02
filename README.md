@@ -94,6 +94,14 @@ The sweep grid covers the fusion constants the app hard-codes (rrfK, per-type
 BM25 limit, dense depth); it **recommends** constants in the committed report
 and never changes the app. Same built DBs → byte-identical gold set and report.
 
+**Pack diet (v2 packs).** `package` splits the former ~1.9 GB
+`ondemand_embeddings.sqlite` into `ondemand_search.sqlite` (chunk metadata +
+display text + varint-delta BM25 posting blobs over stable integer chunk ids)
+and `ondemand_vectors.sqlite` (int8 vectors + per-vector scale; `package fp32`
+keeps float32), and shrinks `bundled_search.sqlite` with the same encoding.
+Schema contract for the app-side reader: `docs/pack-diet.md`; measured sizes +
+int8 quality delta: `reports/pack_diet_v1.md`.
+
 ---
 
 *LampStand · An Amphora Company.* See the app repo (`lampstand-ios`, private) for the consuming side.
