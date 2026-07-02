@@ -219,3 +219,59 @@ def test_no_superscription_psalm_unaffected():
     v1 = next(v for v in pb.verses if v.verse_start == 1)
     assert v1.text == "Blessed is the man."
     assert v1.superscription is None
+
+
+# --- Rank 8a: section headings + paragraph starts -------------------------------
+def test_heading_attaches_to_next_verse():
+    raw = (
+        "\\id GEN\n\\c 1\n\\s1 The Creation\n\\p\n"
+        "\\v 1 In the beginning God created the heavens and the earth.\n"
+        "\\v 2 Now the earth was formless and void.\n"
+        "\\s1 The First Day\n\\p\n"
+        "\\v 3 And God said, Let there be light.\n"
+    )
+    pb = parse_usfm(raw)
+    assert pb.headings == [(1, 1, "The Creation"), (1, 3, "The First Day")]
+
+
+def test_heading_text_is_cleaned_of_inline_markup():
+    raw = ("\\id PSA\n\\c 119\n\\s \\tl א ALEPH.\\tl* \n\\q1\n"
+           "\\v 1 Blessed are the undefiled in the way.\n")
+    pb = parse_usfm(raw)
+    assert pb.headings == [(119, 1, "א ALEPH.")]
+
+
+def test_para_start_flags_paragraph_opening_verses():
+    raw = (
+        "\\id GEN\n\\c 1\n\\p\n"
+        "\\v 1 In the beginning.\n"
+        "\\v 2 Now the earth was formless.\n"
+        "\\p\n"
+        "\\v 3 And God said.\n"
+    )
+    pb = parse_usfm(raw)
+    flags = {v.verse_start: v.para_start for v in pb.verses}
+    assert flags == {1: True, 2: False, 3: True}
+
+
+def test_mid_verse_paragraph_break_does_not_flag_next_verse():
+    # \p carrying continuation text is a mid-verse break: verse 2 does NOT open
+    # a paragraph.
+    raw = (
+        "\\id GEN\n\\c 1\n\\p\n"
+        "\\v 1 First part of the verse\n"
+        "\\p and its continuation after a break.\n"
+        "\\v 2 The next verse.\n"
+    )
+    pb = parse_usfm(raw)
+    v1 = next(v for v in pb.verses if v.verse_start == 1)
+    v2 = next(v for v in pb.verses if v.verse_start == 2)
+    assert "continuation" in v1.text
+    assert v1.para_start is True and v2.para_start is False
+
+
+def test_heading_verse_text_unchanged():
+    # Ingesting \s must not leak heading words into verse body text.
+    raw = ("\\id GEN\n\\c 1\n\\s1 The Creation\n\\p\n\\v 1 In the beginning.\n")
+    pb = parse_usfm(raw)
+    assert pb.verses[0].text == "In the beginning."

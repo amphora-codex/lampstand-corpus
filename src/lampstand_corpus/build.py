@@ -60,11 +60,24 @@ CREATE TABLE verse (
     omitted      INTEGER NOT NULL DEFAULT 0,  -- 0/1: critical-text omission, empty body
     source_note  TEXT,              -- textual footnote on an omitted verse, or NULL
     superscription TEXT,            -- Hebrew Psalm superscription (\d) on this verse, or NULL
+    para_start   INTEGER NOT NULL DEFAULT 0,  -- 0/1: verse opens a prose paragraph (\p)
     PRIMARY KEY (translation, book, chapter, verse_start)
 );
 
 CREATE INDEX idx_verse_ref ON verse (book, chapter, verse_start);
 CREATE INDEX idx_verse_translation ON verse (translation);
+
+-- Section headings (\s-family) attached to the verse they precede (Rank 8a).
+-- Only the BSB carries a real heading apparatus (3,096 headings); the other
+-- translations' stray heading lines are kept verbatim, never judged.
+CREATE TABLE heading (
+    translation  TEXT NOT NULL REFERENCES translation(id),
+    book         TEXT NOT NULL REFERENCES book(id),
+    chapter      INTEGER NOT NULL,
+    verse_start  INTEGER NOT NULL,
+    text         TEXT NOT NULL,
+    PRIMARY KEY (translation, book, chapter, verse_start)
+);
 """
 
 
@@ -93,7 +106,7 @@ def write_bibles(
         conn.executemany(
             "INSERT INTO meta (key, value) VALUES (?, ?)",
             [
-                ("schema_version", "1"),
+                ("schema_version", "2"),
                 ("resource_type", "scripture"),
                 ("canon", "protestant-66"),
             ],
@@ -147,6 +160,7 @@ def write_bibles(
                         v.text, 1 if spans else 0,
                         json.dumps(spans, separators=(",", ":")) if spans else None,
                         omitted, v.source_note, v.superscription,
+                        1 if v.para_start else 0,
                     ))
 
                 # Inject omitted=1 empty rows for variants this translation dropped
@@ -157,14 +171,27 @@ def write_bibles(
                 # and the validator flags it for human review.
                 injected = [
                     (tid, b, ch, vs, vs, "", 0, None, 1,
-                     pb.omission_notes.get((ch, vs)), None)
+                     pb.omission_notes.get((ch, vs)), None, 0)
                     for (b, ch, vs) in books.OMITTED_VARIANTS
                     if b == book_id and (b, ch, vs) not in present_variants
                 ]
                 rows.extend(injected)
                 rows.sort(key=lambda r: (r[2], r[3]))  # (chapter, verse_start)
                 conn.executemany(
-                    "INSERT INTO verse VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+                    "INSERT INTO verse VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+                # Section headings, deduped per (chapter, verse) keeping the
+                # first (multiple \s levels before one verse join with ' · ').
+                by_ref: dict[tuple[int, int], list[str]] = {}
+                for ch, vs, text in pb.headings:
+                    by_ref.setdefault((ch, vs), []).append(text)
+                conn.executemany(
+                    "INSERT INTO heading VALUES (?,?,?,?,?)",
+                    [
+                        (tid, book_id, ch, vs, " · ".join(texts))
+                        for (ch, vs), texts in sorted(by_ref.items())
+                    ],
+                )
         conn.commit()
     finally:
         conn.close()

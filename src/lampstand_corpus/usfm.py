@@ -57,6 +57,10 @@ class ParsedVerse:
     # the superscription prose here (so the app can render it distinctly) while the
     # verse's ``text`` holds the body line(s). NULL when there is no superscription.
     superscription: str | None = None
+    # True when this verse OPENS a new prose paragraph (a ``\p``-family marker
+    # immediately precedes its ``\v``). Mid-verse paragraph breaks are not
+    # captured (see the parser note on ``pending_para``).
+    para_start: bool = False
 
     @property
     def is_bridge(self) -> bool:
@@ -77,6 +81,11 @@ class ParsedBook:
     # Empty for translations that render the omitted row directly. See
     # :func:`extract_bsb_omission_notes`.
     omission_notes: dict[tuple[int, int], str] = field(default_factory=dict)
+    # Section headings (``\s``/``\s1``..``\s3``) attached to the verse they
+    # precede: ``(chapter, verse_start, text)`` in document order. Only the BSB
+    # carries a real heading apparatus (3,096 headings); KJV/ASV/WEB have none
+    # or only stray artifacts, which are kept verbatim (never silently judged).
+    headings: list[tuple[int, int, str]] = field(default_factory=list)
 
 
 # --- regexes -----------------------------------------------------------------
@@ -119,16 +128,26 @@ _PARA_TAGS = {"p", "m", "pi", "pi1", "pi2", "q", "q1", "q2", "q3", "q4", "qr",
               "qc", "qm", "qm1", "qm2", "li", "li1", "li2", "pc", "pmo", "pm",
               "pmc", "pmr", "nb", "b", "tr", "th1", "th2", "tc1", "tc2"}
 
-# Markers whose *whole line* is discarded (headings, titles, references, intro).
+# Section headings (``\s``-family): captured as structural data and attached to
+# the verse they precede (Rank 8a). Handled BEFORE the drop-line set below.
+_HEADING_TAGS = {"s", "s1", "s2", "s3"}
+
+# Prose-paragraph openers: a verse whose ``\v`` immediately follows one of these
+# OPENS a new paragraph (``ParsedVerse.para_start``). Poetry (``\q*``) and table
+# markers are content layout, not prose paragraphs, and are excluded.
+_PARA_START_TAGS = {"p", "m", "pi", "pi1", "pi2", "pc", "pmo", "pm", "pmc", "nb"}
+
+# Markers whose *whole line* is discarded (titles, references, intro).
 # NOTE: ``\d`` (descriptive title / Hebrew Psalm superscription) is handled
 # SEPARATELY below — not here — because the BSB numbers the superscription as
 # ``\d \v 1 …`` (the superscription carries the verse-1 marker). Dropping the whole
 # ``\d`` line would discard BSB's verse 1 entirely (both the superscription text and
 # the first body line that follows). We instead drop only the superscription *text*
 # and keep processing any ``\v`` on the line, so BSB's verse 1 survives.
+# ``\s``-family headings are no longer dropped (see _HEADING_TAGS).
 _DROP_LINE_TAGS = {"id", "usfm", "ide", "h", "toc1", "toc2", "toc3", "toca1",
                    "toca2", "toca3", "mt", "mt1", "mt2", "mt3", "mte", "ms",
-                   "ms1", "ms2", "mr", "s", "s1", "s2", "s3", "sr", "r", "rq",
+                   "ms1", "ms2", "mr", "sr", "r", "rq",
                    "sp", "cl", "cp", "cd", "rem", "sts", "imt", "is",
                    "ip", "im", "io", "io1", "io2", "iot", "ie", "iex", "qa",
                    "periph"}
@@ -312,17 +331,25 @@ def parse_usfm(content: str) -> ParsedBook:
         raise ValueError(f"\\id {book_id!r} is not in the 66-book canon")
 
     verses: list[ParsedVerse] = []
+    headings: list[tuple[int, int, str]] = []
     chapter = 0
     cur_v_start: int | None = None
     cur_v_end: int | None = None
     cur_buf: list[str] = []
+    cur_para = False
     # Superscription (\d) text waiting to attach to the next verse it numbers. In
     # the BSB the superscription IS verse 1 (``\d \v 1 …``); we hold its prose here
     # and attach it to that verse while keeping the verse's body text separate.
     pending_superscription: list[str] = []
+    # Section-heading text (\s-family) waiting to attach to the NEXT verse.
+    pending_heading: list[str] = []
+    # A \p-family marker was seen with no verse text after it — the NEXT verse
+    # opens a prose paragraph. A \p carrying mid-verse continuation text is a
+    # mid-verse break and deliberately does NOT flag the next verse.
+    pending_para = False
 
     def flush() -> None:
-        nonlocal cur_v_start, cur_v_end, cur_buf, pending_superscription
+        nonlocal cur_v_start, cur_v_end, cur_buf, pending_superscription, cur_para
         if cur_v_start is None:
             cur_buf = []
             return
@@ -338,9 +365,11 @@ def parse_usfm(content: str) -> ParsedBook:
             verse_start=cur_v_start, verse_end=cur_v_end or cur_v_start,
             text=text, wj_spans=spans, source_note=note,
             superscription=sup or None,
+            para_start=cur_para,
         ))
         cur_v_start = cur_v_end = None
         cur_buf = []
+        cur_para = False
         pending_superscription = []
 
     # Set when a \d superscription opened a verse whose inline text is the
@@ -399,6 +428,15 @@ def parse_usfm(content: str) -> ParsedBook:
                     break
                 cur_v_start = int(vm.group(1))
                 cur_v_end = int(vm.group(2)) if vm.group(2) else cur_v_start
+                # Consume any pending structural markers for this verse: a
+                # section heading attaches here; a \p opener flags para_start.
+                if pending_heading:
+                    htext = _clean_inline(" ".join(pending_heading))
+                    if htext:
+                        headings.append((chapter, cur_v_start, htext))
+                    pending_heading = []
+                cur_para = pending_para
+                pending_para = False
                 # If a \d superscription opened this verse, its inline text is the
                 # superscription, not the body — route it to the superscription
                 # buffer. The body line(s) follow on later \q markers with no \v and
@@ -447,14 +485,32 @@ def parse_usfm(content: str) -> ParsedBook:
                     idx = 0
                     continue
                 break
+            elif tag in _HEADING_TAGS:
+                # Section heading: capture its text (up to any \c/\v on the same
+                # line) and attach it to the NEXT verse that opens. A heading also
+                # implies the next verse starts a new unit of prose.
+                rest = s[after:]
+                nxt = re.search(r"\\[cv]\b", rest)
+                pending_heading.append(rest[:nxt.start()] if nxt else rest)
+                pending_para = True
+                if nxt:
+                    s = rest[nxt.start():]
+                    idx = 0
+                    continue
+                break
             elif tag in _DROP_LINE_TAGS:
                 break  # discard whole line
             elif tag in _PARA_TAGS:
                 # paragraph/poetry marker: text after it belongs to current verse
                 rest = s[after:]
                 nxt = re.search(r"\\[cv]\b", rest)
+                seg = rest[:nxt.start()] if nxt else rest
+                if tag in _PARA_START_TAGS and not seg.strip():
+                    # Empty prose-paragraph opener: the NEXT verse starts a
+                    # paragraph. (A \p with trailing text is a mid-verse break.)
+                    pending_para = True
                 if cur_v_start is not None:
-                    cur_buf.append(rest[:nxt.start()] if nxt else rest)
+                    cur_buf.append(seg)
                 if nxt:
                     s = rest[nxt.start():]
                     idx = 0
@@ -484,5 +540,5 @@ def parse_usfm(content: str) -> ParsedBook:
 
     return ParsedBook(
         book=book_id, verses=verses, warnings=warnings,
-        omission_notes=omission_notes,
+        omission_notes=omission_notes, headings=headings,
     )
