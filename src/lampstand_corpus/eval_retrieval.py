@@ -198,15 +198,29 @@ class EvalIndex:
         self._postings[term] = out
         return out
 
-    def bm25_scores(self, query: str, exclude_idx: list[int]) -> np.ndarray:
+    def bm25_scores(
+        self, query: str, exclude_idx: list[int],
+        expansion: dict[str, list[str]] | None = None,
+        expansion_weight: float = 0.3,
+    ) -> np.ndarray:
         """Okapi BM25 scores over all chunks (0 = unmatched), app-identical.
 
         Terms are deduplicated (the app tokenizes into a Set); a term with
-        idf <= 0 is skipped (unreachable with the +1 IDF form, kept for parity).
+        idf <= 0 is skipped (unreachable with the +1 IDF form, kept for
+        parity). With ``expansion``, each query term also scores its expansion
+        terms at ``expansion_weight`` (a real query term is never down-weighted
+        by also being someone's expansion).
         """
+        base_terms = sorted(set(tokenize(query)))
+        weights: dict[str, float] = {t: 1.0 for t in base_terms}
+        if expansion:
+            for t in base_terms:
+                for e in expansion.get(t, ()):
+                    if e not in weights:
+                        weights[e] = expansion_weight
         scores = self._scores
         scores[:] = 0.0
-        for term in sorted(set(tokenize(query))):
+        for term in sorted(weights):
             p = self._term_postings(term)
             if p is None:
                 continue
@@ -214,16 +228,18 @@ class EvalIndex:
             if idf <= 0:
                 continue
             norm = self.k1 * (1.0 - self.b + self.b * self.doc_len[idx] / self.avgdl)
-            scores[idx] += idf * (tf * (self.k1 + 1.0)) / (tf + norm)
+            scores[idx] += (weights[term] * idf
+                            * (tf * (self.k1 + 1.0)) / (tf + norm))
         if exclude_idx:
             scores[exclude_idx] = 0.0
         return scores
 
     def bm25_type_lists(
-        self, query: str, exclude_idx: list[int], depth: int = CACHE_BM25_PER_TYPE
+        self, query: str, exclude_idx: list[int], depth: int = CACHE_BM25_PER_TYPE,
+        expansion: dict[str, list[str]] | None = None,
     ) -> dict[int, list[tuple[int, float]]]:
         """Per-resource-type top-``depth`` matched chunks (score desc, id asc)."""
-        scores = self.bm25_scores(query, exclude_idx)
+        scores = self.bm25_scores(query, exclude_idx, expansion=expansion)
         matched = scores > 0
         out: dict[int, list[tuple[int, float]]] = {}
         for t in range(len(RESOURCE_TYPES)):
@@ -351,6 +367,9 @@ class QueryCache:
     # Self-hit exclusions (chunk idx) — kept so post-fusion steps (the TSK
     # graph boost) can never reintroduce an excluded chunk.
     exclude_idx: list[int] = field(default_factory=list)
+    # BM25 lists with Rank-7 query expansion applied (down-weighted terms);
+    # empty unless the harness loaded an expansion table.
+    bm25_types_x: dict[int, list[tuple[int, float]]] = field(default_factory=dict)
 
 
 # TSK graph boost (Rank 13 measurement): how many top-ranked Scripture hits
@@ -371,6 +390,9 @@ class Harness:
         # chunk idx -> TSK-adjacent chunk idx list (weight order), mirroring
         # the bundled chunk_crossref table exactly (same builder).
         self.expansion: dict[int, list[int]] = {}
+        # Rank 7: term -> expansion terms (the shipped expansion table's map).
+        self.term_expansion: dict[str, list[str]] = {}
+        self.expand_available = False
         self.caches: list[QueryCache] = []
 
     def load_expansion(self, crossrefs_db: Path, emb_db: Path) -> None:
@@ -386,10 +408,21 @@ class Harness:
         }
         self.graph_available = True
 
+    def load_term_expansion(self, bibles_db: Path) -> None:
+        """Build the Rank-7 expansion map exactly as the pack builder does."""
+        from .expansion import build_expansion_rows, load_expansion_map
+
+        vocab_df = dict(self.index._conn.execute(
+            "SELECT term, doc_freq FROM bm25_term"))
+        rows, _stats = build_expansion_rows(bibles_db, vocab_df, None)
+        self.term_expansion = load_expansion_map(rows)
+        self.expand_available = True
+
     @classmethod
     def build(
         cls, emb_db: Path, gold_queries: list[dict], *, encode_queries=None,
         int8_variant: bool = False, crossrefs_db: Path | None = None,
+        bibles_db: Path | None = None,
     ) -> Harness:
         """Cache BM25 + dense rankings for every gold query.
 
@@ -407,6 +440,8 @@ class Harness:
                 int8_available=encode_queries is not None and int8_variant)
         if crossrefs_db is not None and crossrefs_db.exists():
             h.load_expansion(crossrefs_db, emb_db)
+        if bibles_db is not None and bibles_db.exists():
+            h.load_term_expansion(bibles_db)
 
         sims_by_row: np.ndarray | None = None
         sims_q_by_row: np.ndarray | None = None
@@ -433,6 +468,9 @@ class Harness:
                 bm25_types=index.bm25_type_lists(q["query"], exclude_idx),
                 exclude_idx=exclude_idx,
             )
+            if h.expand_available:
+                cache.bm25_types_x = index.bm25_type_lists(
+                    q["query"], exclude_idx, expansion=h.term_expansion)
             if sims_by_row is not None:
                 cache.dense = index.dense_deduped(sims_by_row[row], exclude_idx)
             if sims_q_by_row is not None:
@@ -455,12 +493,14 @@ class Harness:
         """
         idx = self.index
         graph = arm in ("hybrid-graph", "hybrid-graph-weak")
-        base = "hybrid" if graph else arm.removesuffix("-int8")
+        expand = arm.endswith("-expand")
+        base = "hybrid" if graph else arm.removesuffix("-int8").removesuffix("-expand")
         dense_cache = cache.dense_q if arm.endswith("-int8") else cache.dense
+        bm25_cache = cache.bm25_types_x if expand else cache.bm25_types
         bm25_ids: list[int] = []
         dense_ids: list[int] = []
         if base in ("bm25", "hybrid"):
-            bm25_ids = bm25_ranking(cache.bm25_types, cfg.bm25_per_type, idx.dedup_key)
+            bm25_ids = bm25_ranking(bm25_cache, cfg.bm25_per_type, idx.dedup_key)
         if base in ("dense", "hybrid"):
             dense_ids = dense_ranking(dense_cache, cfg.dense_raw_fetch, cfg.dense_depth)
         fused = rrf_fuse(

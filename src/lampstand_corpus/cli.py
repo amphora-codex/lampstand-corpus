@@ -1301,10 +1301,14 @@ def _build_eval_harness():
           f"(BM25{' + dense fp32 + dense int8' if encoder else ' only'})...")
     harness = Harness.build(
         OUTPUT_DIR / "embeddings.sqlite", gold["queries"], encode_queries=encoder,
-        int8_variant=True, crossrefs_db=OUTPUT_DIR / "crossrefs.sqlite")
+        int8_variant=True, crossrefs_db=OUTPUT_DIR / "crossrefs.sqlite",
+        bibles_db=OUTPUT_DIR / "bibles.sqlite")
     if harness.graph_available:
         print(f"  TSK expansion loaded for {len(harness.expansion):,} Scripture "
               "chunks (graph-boost arms enabled)")
+    if harness.expand_available:
+        print(f"  query-expansion map loaded ({len(harness.term_expansion):,} "
+              "terms; -expand arms enabled)")
     return gold, harness, reason
 
 
@@ -1353,7 +1357,14 @@ def _evaluate_arms(gold: dict, harness, dense_reason: str | None) -> dict:
                   if (harness.dense_available
                       and getattr(harness, "graph_available", False)) else [])
     results["graph_arms"] = graph_arms
-    for arm in arm_order + int8_arms + graph_arms:
+    # Rank 7 query-expansion arms (down-weighted expansion terms) — also
+    # outside arm_order; rendered in the eval report's expansion section.
+    expand_arms = ["bm25-expand"] if getattr(
+        harness, "expand_available", False) else []
+    if expand_arms and harness.dense_available:
+        expand_arms.append("hybrid-expand")
+    results["expand_arms"] = expand_arms
+    for arm in arm_order + int8_arms + graph_arms + expand_arms:
         results["arms"][arm] = harness.evaluate_arm(arm, APP_CONFIG)
         o = results["arms"][arm]["overall"]
         print(f"  {arm:17s} recall@20={o['recall_at_20']:.3f} "
@@ -1435,7 +1446,8 @@ def cmd_package(*, fp32: bool = False) -> None:
     vector_format = VECTOR_FORMAT_FP32 if fp32 else VECTOR_FORMAT_INT8
     print(f"Packaging built DBs -> {PACKS_DIR} (gitignored; vectors "
           f"{vector_format})")
-    result = package_corpus(OUTPUT_DIR, PACKS_DIR, vector_format=vector_format)
+    result = package_corpus(
+        OUTPUT_DIR, PACKS_DIR, vector_format=vector_format, repo_root=REPO_ROOT)
 
     print(f"\nBUNDLED pack ({result.bundled_bytes:,} B = "
           f"{result.bundled_bytes / (1024*1024):.1f} MB):")

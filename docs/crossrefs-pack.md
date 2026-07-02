@@ -88,9 +88,11 @@ hit's chunk id resolves), the top-8 TSK-adjacent pericopes:
 [ neighbor_chunk_id uvarint ][ weight uvarint ]   × n_neighbors
 ```
 
-- Neighbors are **BSB pericope chunks** (int ids from the search pack); the
-  app's translation dedup treats them as the same row as their KJV/ASV/WEB
-  twins, so the rows work against both the bundled and full indexes.
+- Neighbors are **BSB retrieval chunks** (int ids from the search pack; under
+  the Rank-8 dual granularity these are verse-level children — expand to the
+  pericope parent via `chunk.parent_id` for display/context). The app's
+  translation dedup treats them as the same row as their KJV/ASV/WEB twins, so
+  the rows work against both the bundled and full indexes.
 - `weight` = the SUM of signed votes of all TSK edges from the source chunk's
   verse window landing in that neighbor pericope; self-range excluded;
   net-non-positive targets dropped (weight ≥ 1 always). Order: weight desc,

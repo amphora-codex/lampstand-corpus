@@ -238,6 +238,25 @@ def render_report(gold: dict, results: dict, sweep: dict | None) -> str:
                      "do not lower bm25PerType on this evidence alone.")
             w.append("")
 
+    # -- query expansion ------------------------------------------------------------
+    if results.get("expand_arms"):
+        w.append("## 4b. Query expansion (Rank 7, measured)")
+        w.append("")
+        w.append("BM25 query terms also score their mined expansions (archaic↔"
+                 "modern pairs + suffix classes; approved theological synonyms "
+                 "only) at a flat 0.3 weight. Baseline arms repeated for "
+                 "comparison:")
+        w.append("")
+        pairs = [("bm25", "bm25-expand")]
+        if "hybrid-expand" in results["expand_arms"]:
+            pairs.append(("hybrid", "hybrid-expand"))
+        rows = []
+        for base, ex in pairs:
+            rows.append((base, results["arms"][base]["overall"]))
+            rows.append((ex, results["arms"][ex]["overall"]))
+        w.extend(_metrics_table(rows))
+        w.append("")
+
     # -- parity + flags -------------------------------------------------------------
     w.append("## 5. retrieve.py ↔ app parity notes")
     w.append("")

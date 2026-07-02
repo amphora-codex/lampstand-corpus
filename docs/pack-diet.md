@@ -50,13 +50,22 @@ CREATE TABLE chunk (
     book          TEXT, chapter INTEGER, verse_start INTEGER, verse_end INTEGER,
     key           TEXT,
     text          TEXT,                 -- display text (NULL when meta.text_included = "0")
-    text_checksum TEXT NOT NULL,
+    text_checksum TEXT NOT NULL,        -- sha256 of header+text
     truncated     INTEGER NOT NULL DEFAULT 0,
-    doc_len       INTEGER NOT NULL      -- BM25 token count (was bm25_doc.length)
+    doc_len       INTEGER NOT NULL,     -- BM25 token count (0 for parents)
+    header        TEXT NOT NULL DEFAULT '', -- structural header ("Psalms 23:1 — ")
+    parent_id     INTEGER,              -- pericope parent int id (Scripture children)
+    indexed       INTEGER NOT NULL DEFAULT 1, -- 0 = context-only pericope parent
+    question      INTEGER,              -- catechism metadata (confession chunks)
+    lords_day     INTEGER,
+    conf_chapter  INTEGER,
+    conf_section  INTEGER,
+    article       INTEGER
 );
 CREATE INDEX idx_chunk_resource ON chunk (resource_type);
 CREATE INDEX idx_chunk_source   ON chunk (source);
 CREATE INDEX idx_chunk_ref      ON chunk (book, chapter, verse_start);
+CREATE INDEX idx_chunk_parent   ON chunk (parent_id);
 CREATE TABLE bm25_term (
     term_id  INTEGER PRIMARY KEY,
     term     TEXT NOT NULL UNIQUE,
@@ -64,8 +73,37 @@ CREATE TABLE bm25_term (
     postings BLOB NOT NULL               -- see "Posting blob encoding"
 );
 CREATE TABLE bm25_stats (key TEXT PRIMARY KEY, value REAL NOT NULL);
+CREATE TABLE expansion (              -- Rank 7 query expansion (expansion-v1)
+    term      TEXT NOT NULL,          -- query token (pipeline tokenizer form)
+    expansion TEXT NOT NULL,          -- token to ALSO score, down-weighted
+    kind      TEXT NOT NULL,          -- archaic | suffix | synonym (approved only)
+    weight    REAL NOT NULL,          -- mining containment (informational)
+    PRIMARY KEY (term, expansion)
+);
 -- bundled_search.sqlite ONLY additionally contains the `embedding` table below.
 ```
+
+### Dual granularity (Rank 8)
+
+Scripture rows come in two populations: **children** (single verses,
+`indexed=1`, `parent_id` set — the ONLY rankable Scripture rows) and
+**pericope parents** (`indexed=0`, `parent_id NULL`, `doc_len 0`, present in no
+posting blob and no vectors pack). Retrieve at verse precision; expand a hit to
+its parent's `text` for LLM context via one `chunk` lookup on `parent_id`.
+Every indexed chunk's EMBEDDED/BM25 text was `header || text` — query-side
+scoring needs no change, but display should render `text` (and may show
+`header` as an eyebrow label). Dense vectors exist for BSB children +
+non-scripture only (KJV/ASV/WEB children are BM25-only).
+
+### Query expansion (`expansion` table)
+
+At query time, for each tokenized query term look up `expansion` rows and ALSO
+score those tokens at a flat down-weight (the corpus eval uses **0.3**; the
+`weight` column is informational per-pair mining confidence). Kinds: `archaic`
+(mined KJV/ASV↔BSB pairs, bidirectional), `suffix` (vocabulary-validated
+inflection classes), `synonym` (theological pairs — present only once the
+tracked DRAFT file `data/eval/theological_synonyms_v1.json` is APPROVED by the
+advisor).
 
 `bm25_stats` keys are unchanged: `n_docs`, `avgdl`, `vocab_size`,
 `total_tokens`, `k1`, `b`. BM25 statistics are still scope-correct (the bundled
