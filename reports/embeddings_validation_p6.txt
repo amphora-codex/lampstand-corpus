@@ -15,21 +15,21 @@ EMBEDDING MODEL (provenance)
 ERROR / FLAG SUMMARY
 ----------------------------------------------------------------
   total errors: 1
-  total flags:  4618
+  total flags:  4619
 
 CHUNKS EMBEDDED
 ----------------------------------------------------------------
-  total chunks: 175442
+  total chunks: 317204
   by resource type:
-    commentary   128885
+    commentary   145581
     confession   895
     lexicon      32561
-    scripture    13101
+    scripture    138167
   by source:
-    commentary/calvin          41694
-    commentary/henry           31347
-    commentary/jfb             44452
-    commentary/spurgeon        11392
+    commentary/calvin          45100
+    commentary/henry           40391
+    commentary/jfb             44817
+    commentary/spurgeon        15273
     confession/belgic          37
     confession/dort            94
     confession/heidelberg      129
@@ -41,10 +41,10 @@ CHUNKS EMBEDDED
     lexicon/strongs-greek      5523
     lexicon/strongs-hebrew     8674
     lexicon/tbesg              11035
-    scripture/asv              3275
-    scripture/bsb              3275
-    scripture/kjv              3275
-    scripture/web              3276
+    scripture/asv              34535
+    scripture/bsb              34535
+    scripture/kjv              34551
+    scripture/web              34546
 
 SKIPPED CHUNKS (flagged, NOT dropped from their source DB)
 ----------------------------------------------------------------
@@ -70,86 +70,72 @@ SKIPPED CHUNKS (flagged, NOT dropped from their source DB)
     bdb:a.an.ad (no English definition; lemma-only stub)
     bdb:a.ao.aa (no English definition; lemma-only stub)
     ... (+4597 more)
+  scripture: 1
+    web:ROM 16:25 (empty window)
 
-  hard-truncated at char cap: 485
-    calvin:GEN.1.1#p8#70
-    calvin:GEN.1.6#p1#105
-    calvin:GEN.2.4#p1#244
-    calvin:GEN.4.23#p1#629
-    calvin:GEN.10.1#p1#1122
-    calvin:GEN.14.18#p6#1460
-    calvin:GEN.17.7#p1#1699
-    calvin:GEN.25.1#p1#2526
-    calvin:GEN.25.23#p3#2554
-    calvin:GEN.45.8#p1#4455
-    calvin:GEN.49.1#p1#4778
-    calvin:GEN.49.10#p9#4816
-    calvin:PSA.11.6#p5#5441
-    calvin:PSA.39.10#p3#6848
-    calvin:PSA.49.14#p1#7240
-    calvin:PSA.51.4#p5#7342
-    calvin:PSA.52.8#p3#7403
-    calvin:PSA.60.8#p1#7638
-    calvin:PSA.68.4#p1#7868
-    calvin:PSA.68.13#p1#7892
-    ... (+465 more)
+  hard-truncated at char cap: 10
+    HC 19
+    HC 21
+    HC 26
+    HC 54
+    HC 80
+    HC 94
+    HC 129
+    tbesg:G1537
+    tbesg:G1909
+    tbesg:G2532
 
 BM25 KEYWORD INDEX
 ----------------------------------------------------------------
   tokenizer:     NFKC + casefold + [a-z0-9']+ ; no stemming
-  vocabulary:    145281 terms
-  postings:      10831300
-  avg doc len:   112.46 tokens
+  vocabulary:    174383 terms
+  postings:      14231622
+  avg doc len:   72.15 tokens
 
 RETRIEVAL SMOKE TEST (dense top-k; eyeball only)
 ----------------------------------------------------------------
   [PASS] "justification by faith"
           expect: Romans 3-5 / Galatians (and Reformed confessions on justification)
-    1. (0.835) commentary/jfb jfb:ROM.4.16#p1#33718 — 16, 17. Therefore, &c.—A general summary: "Thus justification is by fa
-    2. (0.829) commentary/jfb jfb:GAL.2.16#p4#36870 — justified by the faith of Christ —that is, by Christ, the object of fa
-    3. (0.826) commentary/henry henry:ROM.3.19-31#p2#27888 — From all this Paul infers that it is in vain to look for justification
-    4. (0.826) confession/wlc WLC 72 — Q72. What is justifying faith? A72. Justifying faith is a saving grace
-    5. (0.825) confession/wcf WCF 11.2 — Of Justification Faith, thus receiving and resting on Christ and His r
+    1. (0.851) commentary/jfb jfb:ROM.4.16#p1#33718 — 16, 17. Therefore, &c.—A general summary: "Thus justification is by fa
+    2. (0.841) commentary/jfb jfb:GAL.2.16#p4#36870 — justified by the faith of Christ —that is, by Christ, the object of fa
+    3. (0.825) commentary/henry henry:ROM.3.19-31#p2#27888 — From all this Paul infers that it is in vain to look for justification
+    4. (0.824) commentary/calvin calvin:ROM.3.27#p5#24095 — 28. Therefore we conclude that a man is justified by faith without the
+    5. (0.823) confession/wlc WLC 72 — Q72. What is justifying faith? A72. Justifying faith is a saving grace
 
   [PASS] "the LORD is my shepherd"
           expect: Psalm 23
-    1. (0.816) scripture/bsb bsb:PSA 23:1-6 — The LORD is my shepherd; I shall not want. He makes me lie down in gre
-    2. (0.805) commentary/spurgeon spurgeon:PSA.23.0#expo1#1463 — EXPOSITION. THE Lord is my shepherd ; I shall not want, 2 He maketh me
-    3. (0.804) commentary/spurgeon spurgeon:PSA.23.1#expo1#1472 — 1. " The Lord is my shepherd,** What condescension is this, that the I
-    4. (0.803) commentary/spurgeon spurgeon:PSA.23.1#work3#1480 — Verse 1. — " The Lord is my shepherd.^* Now the reasons of this resemb
-    5. (0.802) scripture/kjv kjv:PSA 23:1-6 — The LORD is my shepherd; I shall not want. He maketh me to lie down in
+    1. (0.839) commentary/spurgeon spurgeon:PSA.23.1#expo1#1472#s1 — 1. " The Lord is my shepherd,** What condescension is this, that the I
+    2. (0.825) scripture/bsb bsb:PSA 23:1 — The LORD is my shepherd; I shall not want.
+    3. (0.810) scripture/bsb bsb:JHN 10:14 — I am the good shepherd. I know My sheep and My sheep know Me,
+    4. (0.794) commentary/spurgeon spurgeon:PSA.23.1#note2#1474 — Verse 1. — ''^ The Lord is my shepherd; 1 want nothing r"" thus it mny
+    5. (0.791) commentary/spurgeon spurgeon:PSA.23.1#work3#1480#s1 — Verse 1. — " The Lord is my shepherd.^* Now the reasons of this resemb
 
   [PASS] "in the beginning God created the heavens and the earth"
           expect: Genesis 1
-    1. (0.919) commentary/calvin calvin:GEN.1.0#p2#1 — 1. In the beginning God created the heaven and the earth.
-    2. (0.916) commentary/calvin calvin:JHN.1.1#p6#17118 — in the beginning God created the heaven and the earth, ( Genesis 1:1 )
-    3. (0.867) scripture/web web:GEN 1:1-10 — In the beginning, God created the heavens and the earth. The earth was
-    4. (0.864) scripture/asv asv:GEN 1:1-10 — In the beginning God created the heavens and the earth. And the earth 
-    5. (0.860) scripture/bsb bsb:GEN 1:1-10 — In the beginning God created the heavens and the earth. Now the earth 
+    1. (0.938) scripture/bsb bsb:GEN 1:1 — In the beginning God created the heavens and the earth.
+    2. (0.855) commentary/calvin calvin:GEN.1.0#p2#1 — 1. In the beginning God created the heaven and the earth.
+    3. (0.833) commentary/henry henry:GEN.1.1-2#p1#2 — 1 In the beginning God created the heaven and the earth. 2 And the ear
+    4. (0.827) commentary/calvin calvin:JHN.1.1#p6#17118 — in the beginning God created the heaven and the earth, ( Genesis 1:1 )
+    5. (0.826) scripture/bsb bsb:GEN 2:4 — This is the account of the heavens and the earth when they were create
 
 INCREMENTAL RE-ENCODE
 ----------------------------------------------------------------
-  mode: incremental (reused unchanged vectors)
-  total chunks:  175442
-  reused:        162917  (vectors copied verbatim from prior DB)
-  re-encoded:    12525  (changed / new chunks)
-  dropped:       12525  (prior chunk ids no longer present)
-  prior model revision: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
-  reuse key: content-addressed chunk id (resource_type+source+anchor+text_checksum); an id match guarantees byte-identical text under the pinned model.
+  (full encode — no prior-vector reuse recorded this run)
 
 DETERMINISM
 ----------------------------------------------------------------
   method:   cosine-tolerance
   identical: False
   max abs diff: 1.490e-07
-  min cosine:   1.00000000
+  min cosine:   0.99999994
   note: 400-chunk CPU re-encode differed in bytes; FLAGGED for architect (CLAUDE.md rule 6)
-  encode wall-time: 101.9s (CPU, deterministic)
+  encode wall-time: 8631.9s (CPU, deterministic)
 
 FLAGGED FOR HUMAN REVIEW
 ----------------------------------------------------------------
   1. 4516 BDB lexicon entries skipped from embedding — lemma-only stubs with no English definition (a bare Hebrew lemma is noise to an English encoder). They remain in lexicons.sqlite; confirm none should instead be merged into a linked Strong's entry.
   2. 101 Strong's entries skipped from embedding — 'Not Used' placeholder numbers (Strong assigned but never populated; the new CC0 Greek edition ships them explicitly where the prior CC-BY-SA edition omitted them). No English text to embed; kept in lexicons.sqlite so the coverage span is explicit.
-  3. 485 chunks exceeded the character cap and were truncated before encoding (the encoder also truncates at 512 tokens). Confirm no long commentary block lost material it needed for retrieval.
-  4. Embeddings were NOT bit-for-bit reproducible across two CPU runs (min cosine 1.00000000, max abs diff 1.490e-07). Recorded as within-tolerance and flagged for the architect per CLAUDE.md rule 6 — do not accept silently.
+  3. 1 Scripture pericope windows were empty (made entirely of omitted critical-text verses) and skipped; verify these are the expected omitted-variant gaps, not a chunking error.
+  4. 10 chunks exceeded the character cap and were truncated before encoding (the encoder also truncates at 512 tokens). Confirm no long commentary block lost material it needed for retrieval.
+  5. Embeddings were NOT bit-for-bit reproducible across two CPU runs (min cosine 0.99999994, max abs diff 1.490e-07). Recorded as within-tolerance and flagged for the architect per CLAUDE.md rule 6 — do not accept silently.
 

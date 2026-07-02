@@ -2,11 +2,11 @@
 
 **CANDIDATE MEASUREMENT — corpus half only.** The app lane builds the UI panel + the hybridContext graph boost against `docs/crossrefs-pack.md`.
 
-Corpus reference: `corpus-v1.0.0-candidate`.
+Corpus reference: `corpus-v2.0.0-candidate`.
 
 ## 1. Pack size + home
 
-`bundled_crossrefs.sqlite` = **3,051,520 B (2.9 MB)** — 344,794 resolving TSK edges over 29,363 source verses, plus a top-8 expansion for 13,089 Scripture chunks.
+`bundled_crossrefs.sqlite` = **7,282,688 B (6.9 MB)** — 344,794 resolving TSK edges over 29,363 source verses, plus a top-8 expansion for 117,265 Scripture chunks.
 
 Pack home decision: a **separate tiny bundled pack**, not `bundled_search.sqlite` — small enough to always ship, the reader is single-purpose (never touches BM25/vector tables), and the crossref layer serves the reading panel + Ask grounding, not the search index. The full-fidelity `ondemand_crossrefs.sqlite` (24.2 MB, unchanged v1 schema) still ships on-demand.
 
@@ -20,33 +20,33 @@ Post-fusion TSK boost over the hybrid arm at the app's constants: the top-5 Scri
 
 | arm | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| hybrid | 452 | 0.088 | 0.157 | 0.228 | 0.052 | 0.023 |
-| hybrid-graph | 452 | 0.088 | 0.139 | 0.215 | 0.064 | 0.025 |
-| hybrid-graph-weak | 452 | 0.088 | 0.157 | 0.228 | 0.052 | 0.023 |
+| hybrid | 452 | 0.133 | 0.235 | 0.308 | 0.088 | 0.044 |
+| hybrid-graph | 452 | 0.122 | 0.192 | 0.308 | 0.091 | 0.039 |
+| hybrid-graph-weak | 452 | 0.133 | 0.235 | 0.308 | 0.088 | 0.044 |
 
 ### crossref (CIRCULAR — see below)
 
 | arm | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| hybrid | 150 | 0.113 | 0.253 | 0.347 | 0.067 | 0.030 |
-| hybrid-graph | 150 | 0.147 | 0.213 | 0.340 | 0.117 | 0.041 |
-| hybrid-graph-weak | 150 | 0.113 | 0.253 | 0.347 | 0.067 | 0.030 |
+| hybrid | 150 | 0.233 | 0.313 | 0.387 | 0.158 | 0.065 |
+| hybrid-graph | 150 | 0.280 | 0.340 | 0.413 | 0.197 | 0.087 |
+| hybrid-graph-weak | 150 | 0.233 | 0.313 | 0.387 | 0.158 | 0.065 |
 
 ### prooftext
 
 | arm | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| hybrid | 150 | 0.013 | 0.033 | 0.053 | 0.007 | 0.003 |
-| hybrid-graph | 150 | 0.033 | 0.060 | 0.087 | 0.024 | 0.008 |
-| hybrid-graph-weak | 150 | 0.013 | 0.033 | 0.053 | 0.007 | 0.003 |
+| hybrid | 150 | 0.013 | 0.060 | 0.127 | 0.019 | 0.006 |
+| hybrid-graph | 150 | 0.033 | 0.080 | 0.153 | 0.030 | 0.010 |
+| hybrid-graph-weak | 150 | 0.013 | 0.060 | 0.127 | 0.019 | 0.006 |
 
 ### commentary-anchor
 
 | arm | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
-| hybrid | 152 | 0.138 | 0.184 | 0.283 | 0.081 | 0.037 |
-| hybrid-graph | 152 | 0.086 | 0.145 | 0.217 | 0.053 | 0.026 |
-| hybrid-graph-weak | 152 | 0.138 | 0.184 | 0.283 | 0.081 | 0.037 |
+| hybrid | 152 | 0.151 | 0.329 | 0.408 | 0.086 | 0.060 |
+| hybrid-graph | 152 | 0.053 | 0.158 | 0.355 | 0.047 | 0.021 |
+| hybrid-graph-weak | 152 | 0.151 | 0.329 | 0.408 | 0.086 | 0.060 |
 
 **Circularity caveat:** the `crossref` gold category's labels ARE TSK-derived (relevant = chunks covering high-vote TSK targets of the query's source verse), so any gain there from a TSK-derived boost is partially true-by-construction — reported for completeness, NOT evidence. The honest signal for the boost is `prooftext` + `commentary-anchor` (labels from confession proof-texts and commentary anchors, independent of TSK).
 

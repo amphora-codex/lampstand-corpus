@@ -1,0 +1,707 @@
+{
+  "status": "DRAFT — pending theological-advisor review",
+  "format": "expansion-v1",
+  "method": "Non-mechanical residue of the archaic→modern parallel-verse mining: lexical substitutions (charity→love), not inflections. NOT shipped in the expansion table until this file's status is changed to APPROVED by the advisor; entries may be struck or amended and are honored verbatim.",
+  "pairs": [
+    {
+      "archaic": "hast",
+      "modern": "have",
+      "score": 0.7182,
+      "n_verses": 880,
+      "mechanical": false
+    },
+    {
+      "archaic": "thine",
+      "modern": "your",
+      "score": 0.9022,
+      "n_verses": 869,
+      "mechanical": false
+    },
+    {
+      "archaic": "brethren",
+      "modern": "brothers",
+      "score": 0.82,
+      "n_verses": 550,
+      "mechanical": false
+    },
+    {
+      "archaic": "heathen",
+      "modern": "nations",
+      "score": 0.9448,
+      "n_verses": 145,
+      "mechanical": false
+    },
+    {
+      "archaic": "begat",
+      "modern": "father",
+      "score": 0.9078,
+      "n_verses": 141,
+      "mechanical": false
+    },
+    {
+      "archaic": "verily",
+      "modern": "truly",
+      "score": 0.6341,
+      "n_verses": 123,
+      "mechanical": false
+    },
+    {
+      "archaic": "brass",
+      "modern": "bronze",
+      "score": 0.9426,
+      "n_verses": 122,
+      "mechanical": false
+    },
+    {
+      "archaic": "stead",
+      "modern": "place",
+      "score": 0.8824,
+      "n_verses": 102,
+      "mechanical": false
+    },
+    {
+      "archaic": "oblation",
+      "modern": "offering",
+      "score": 0.7822,
+      "n_verses": 101,
+      "mechanical": false
+    },
+    {
+      "archaic": "corn",
+      "modern": "grain",
+      "score": 0.9043,
+      "n_verses": 94,
+      "mechanical": false
+    },
+    {
+      "archaic": "sware",
+      "modern": "swore",
+      "score": 0.7778,
+      "n_verses": 90,
+      "mechanical": false
+    },
+    {
+      "archaic": "hither",
+      "modern": "here",
+      "score": 0.6,
+      "n_verses": 70,
+      "mechanical": false
+    },
+    {
+      "archaic": "suburbs",
+      "modern": "pasturelands",
+      "score": 0.6522,
+      "n_verses": 69,
+      "mechanical": false
+    },
+    {
+      "archaic": "wast",
+      "modern": "were",
+      "score": 0.6471,
+      "n_verses": 68,
+      "mechanical": false
+    },
+    {
+      "archaic": "doings",
+      "modern": "deeds",
+      "score": 0.6613,
+      "n_verses": 62,
+      "mechanical": false
+    },
+    {
+      "archaic": "asses",
+      "modern": "donkeys",
+      "score": 1.0,
+      "n_verses": 60,
+      "mechanical": false
+    },
+    {
+      "archaic": "syrians",
+      "modern": "arameans",
+      "score": 0.8421,
+      "n_verses": 57,
+      "mechanical": false
+    },
+    {
+      "archaic": "sojourner",
+      "modern": "foreigner",
+      "score": 0.6607,
+      "n_verses": 56,
+      "mechanical": false
+    },
+    {
+      "archaic": "fowls",
+      "modern": "birds",
+      "score": 0.8704,
+      "n_verses": 54,
+      "mechanical": false
+    },
+    {
+      "archaic": "savour",
+      "modern": "aroma",
+      "score": 0.7925,
+      "n_verses": 53,
+      "mechanical": false
+    },
+    {
+      "archaic": "sepulchre",
+      "modern": "tomb",
+      "score": 0.902,
+      "n_verses": 51,
+      "mechanical": false
+    },
+    {
+      "archaic": "enquire",
+      "modern": "inquire",
+      "score": 0.6,
+      "n_verses": 50,
+      "mechanical": false
+    },
+    {
+      "archaic": "devils",
+      "modern": "demons",
+      "score": 0.8333,
+      "n_verses": 48,
+      "mechanical": false
+    },
+    {
+      "archaic": "doest",
+      "modern": "what",
+      "score": 0.5532,
+      "n_verses": 47,
+      "mechanical": false
+    },
+    {
+      "archaic": "staves",
+      "modern": "poles",
+      "score": 0.7556,
+      "n_verses": 45,
+      "mechanical": false
+    },
+    {
+      "archaic": "damsel",
+      "modern": "girl",
+      "score": 0.6364,
+      "n_verses": 44,
+      "mechanical": false
+    },
+    {
+      "archaic": "fenced",
+      "modern": "fortified",
+      "score": 0.8947,
+      "n_verses": 38,
+      "mechanical": false
+    },
+    {
+      "archaic": "vail",
+      "modern": "veil",
+      "score": 0.9429,
+      "n_verses": 35,
+      "mechanical": false
+    },
+    {
+      "archaic": "candlestick",
+      "modern": "lampstand",
+      "score": 0.8235,
+      "n_verses": 34,
+      "mechanical": false
+    },
+    {
+      "archaic": "fornication",
+      "modern": "immorality",
+      "score": 0.7812,
+      "n_verses": 32,
+      "mechanical": false
+    },
+    {
+      "archaic": "comest",
+      "modern": "when",
+      "score": 0.5806,
+      "n_verses": 31,
+      "mechanical": false
+    },
+    {
+      "archaic": "kirjath",
+      "modern": "kiriath",
+      "score": 1.0,
+      "n_verses": 31,
+      "mechanical": false
+    },
+    {
+      "archaic": "whithersoever",
+      "modern": "wherever",
+      "score": 0.8387,
+      "n_verses": 31,
+      "mechanical": false
+    },
+    {
+      "archaic": "ahasuerus",
+      "modern": "xerxes",
+      "score": 0.9667,
+      "n_verses": 30,
+      "mechanical": false
+    },
+    {
+      "archaic": "brasen",
+      "modern": "bronze",
+      "score": 0.9643,
+      "n_verses": 28,
+      "mechanical": false
+    },
+    {
+      "archaic": "sojourners",
+      "modern": "foreigners",
+      "score": 0.5909,
+      "n_verses": 22,
+      "mechanical": false
+    },
+    {
+      "archaic": "esaias",
+      "modern": "isaiah",
+      "score": 1.0,
+      "n_verses": 21,
+      "mechanical": false
+    },
+    {
+      "archaic": "ethiopia",
+      "modern": "cush",
+      "score": 0.9524,
+      "n_verses": 21,
+      "mechanical": false
+    },
+    {
+      "archaic": "shoes",
+      "modern": "sandals",
+      "score": 0.8571,
+      "n_verses": 21,
+      "mechanical": false
+    },
+    {
+      "archaic": "twined",
+      "modern": "finely",
+      "score": 1.0,
+      "n_verses": 21,
+      "mechanical": false
+    },
+    {
+      "archaic": "zidon",
+      "modern": "sidon",
+      "score": 1.0,
+      "n_verses": 21,
+      "mechanical": false
+    },
+    {
+      "archaic": "froward",
+      "modern": "perverse",
+      "score": 0.6,
+      "n_verses": 20,
+      "mechanical": false
+    },
+    {
+      "archaic": "kine",
+      "modern": "cows",
+      "score": 0.7,
+      "n_verses": 20,
+      "mechanical": false
+    },
+    {
+      "archaic": "mantle",
+      "modern": "cloak",
+      "score": 0.6,
+      "n_verses": 20,
+      "mechanical": false
+    },
+    {
+      "archaic": "estimation",
+      "modern": "valuation",
+      "score": 0.5789,
+      "n_verses": 19,
+      "mechanical": false
+    },
+    {
+      "archaic": "husbandmen",
+      "modern": "tenants",
+      "score": 0.7368,
+      "n_verses": 19,
+      "mechanical": false
+    },
+    {
+      "archaic": "longsuffering",
+      "modern": "patience",
+      "score": 0.5789,
+      "n_verses": 19,
+      "mechanical": false
+    },
+    {
+      "archaic": "lowland",
+      "modern": "foothills",
+      "score": 1.0,
+      "n_verses": 19,
+      "mechanical": false
+    },
+    {
+      "archaic": "shushan",
+      "modern": "susa",
+      "score": 1.0,
+      "n_verses": 19,
+      "mechanical": false
+    },
+    {
+      "archaic": "shewbread",
+      "modern": "bread",
+      "score": 0.6667,
+      "n_verses": 18,
+      "mechanical": false
+    },
+    {
+      "archaic": "whoring",
+      "modern": "themselves",
+      "score": 0.6667,
+      "n_verses": 18,
+      "mechanical": false
+    },
+    {
+      "archaic": "basons",
+      "modern": "bowls",
+      "score": 0.9412,
+      "n_verses": 17,
+      "mechanical": false
+    },
+    {
+      "archaic": "charger",
+      "modern": "platter",
+      "score": 1.0,
+      "n_verses": 17,
+      "mechanical": false
+    },
+    {
+      "archaic": "inwards",
+      "modern": "entrails",
+      "score": 0.9412,
+      "n_verses": 17,
+      "mechanical": false
+    },
+    {
+      "archaic": "publish",
+      "modern": "proclaim",
+      "score": 0.8824,
+      "n_verses": 17,
+      "mechanical": false
+    },
+    {
+      "archaic": "sarea",
+      "modern": "caesarea",
+      "score": 1.0,
+      "n_verses": 17,
+      "mechanical": false
+    },
+    {
+      "archaic": "sojourneth",
+      "modern": "foreigner",
+      "score": 0.7059,
+      "n_verses": 17,
+      "mechanical": false
+    },
+    {
+      "archaic": "bidden",
+      "modern": "invited",
+      "score": 0.75,
+      "n_verses": 16,
+      "mechanical": false
+    },
+    {
+      "archaic": "candle",
+      "modern": "lamp",
+      "score": 1.0,
+      "n_verses": 16,
+      "mechanical": false
+    },
+    {
+      "archaic": "devoureth",
+      "modern": "fire",
+      "score": 0.5625,
+      "n_verses": 16,
+      "mechanical": false
+    },
+    {
+      "archaic": "nethinim",
+      "modern": "temple",
+      "score": 1.0,
+      "n_verses": 16,
+      "mechanical": false
+    },
+    {
+      "archaic": "nethinims",
+      "modern": "temple",
+      "score": 1.0,
+      "n_verses": 16,
+      "mechanical": false
+    },
+    {
+      "archaic": "thrice",
+      "modern": "times",
+      "score": 1.0,
+      "n_verses": 16,
+      "mechanical": false
+    },
+    {
+      "archaic": "unwittingly",
+      "modern": "unintentionally",
+      "score": 0.75,
+      "n_verses": 16,
+      "mechanical": false
+    },
+    {
+      "archaic": "adan",
+      "modern": "nebuzaradan",
+      "score": 1.0,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "convocation",
+      "modern": "sacred",
+      "score": 1.0,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "firmament",
+      "modern": "expanse",
+      "score": 0.8,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "hallow",
+      "modern": "holy",
+      "score": 0.6,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "ruleth",
+      "modern": "over",
+      "score": 0.6,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "sepulchres",
+      "modern": "tombs",
+      "score": 0.7333,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "sunrising",
+      "modern": "east",
+      "score": 0.8,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "teraphim",
+      "modern": "household",
+      "score": 0.6667,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "whore",
+      "modern": "prostitute",
+      "score": 0.6,
+      "n_verses": 15,
+      "mechanical": false
+    },
+    {
+      "archaic": "armourbearer",
+      "modern": "bearer",
+      "score": 1.0,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "backsliding",
+      "modern": "faithless",
+      "score": 0.5714,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "brimstone",
+      "modern": "sulfur",
+      "score": 1.0,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "chapiters",
+      "modern": "pillars",
+      "score": 0.6429,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "creepeth",
+      "modern": "creature",
+      "score": 0.6429,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "duke",
+      "modern": "chiefs",
+      "score": 0.7143,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "dukes",
+      "modern": "chiefs",
+      "score": 1.0,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "epistle",
+      "modern": "letter",
+      "score": 1.0,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "nego",
+      "modern": "abednego",
+      "score": 1.0,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "psalteries",
+      "modern": "harps",
+      "score": 1.0,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "quicken",
+      "modern": "your",
+      "score": 0.9286,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "sluggard",
+      "modern": "slacker",
+      "score": 1.0,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "taskwork",
+      "modern": "forced",
+      "score": 0.9286,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "token",
+      "modern": "sign",
+      "score": 0.7857,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "turtle",
+      "modern": "young",
+      "score": 0.7857,
+      "n_verses": 14,
+      "mechanical": false
+    },
+    {
+      "archaic": "colour",
+      "modern": "like",
+      "score": 0.6923,
+      "n_verses": 13,
+      "mechanical": false
+    },
+    {
+      "archaic": "fetters",
+      "modern": "with",
+      "score": 0.8462,
+      "n_verses": 13,
+      "mechanical": false
+    },
+    {
+      "archaic": "laver",
+      "modern": "basin",
+      "score": 1.0,
+      "n_verses": 13,
+      "mechanical": false
+    },
+    {
+      "archaic": "psaltery",
+      "modern": "harp",
+      "score": 0.9231,
+      "n_verses": 13,
+      "mechanical": false
+    },
+    {
+      "archaic": "testament",
+      "modern": "covenant",
+      "score": 0.8462,
+      "n_verses": 13,
+      "mechanical": false
+    },
+    {
+      "archaic": "wist",
+      "modern": "know",
+      "score": 0.6154,
+      "n_verses": 13,
+      "mechanical": false
+    },
+    {
+      "archaic": "arches",
+      "modern": "portico",
+      "score": 0.8333,
+      "n_verses": 12,
+      "mechanical": false
+    },
+    {
+      "archaic": "babes",
+      "modern": "children",
+      "score": 0.5833,
+      "n_verses": 12,
+      "mechanical": false
+    },
+    {
+      "archaic": "brutish",
+      "modern": "senseless",
+      "score": 0.75,
+      "n_verses": 12,
+      "mechanical": false
+    },
+    {
+      "archaic": "caul",
+      "modern": "lobe",
+      "score": 0.9167,
+      "n_verses": 12,
+      "mechanical": false
+    },
+    {
+      "archaic": "diverse",
+      "modern": "different",
+      "score": 0.6667,
+      "n_verses": 12,
+      "mechanical": false
+    },
+    {
+      "archaic": "ensign",
+      "modern": "banner",
+      "score": 0.75,
+      "n_verses": 12,
+      "mechanical": false
+    }
+  ]
+}

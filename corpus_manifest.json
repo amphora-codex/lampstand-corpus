@@ -1,5 +1,5 @@
 {
-  "corpus_version": "corpus-v1.0.0-candidate",
+  "corpus_version": "corpus-v2.0.0-candidate",
   "ship_ready": false,
   "note": "CANDIDATE. The pipeline never marks a corpus version ship-ready — the architect's 23-point spot-check gates ship. Pack .sqlite files are gitignored (output/packs/); only this manifest is committed.",
   "format_migration": "Pack diet v1→v2: ondemand_embeddings.sqlite (byte-copy of the built embeddings.sqlite; float32 vectors + one SQL row per BM25 posting keyed by TEXT chunk id) is REPLACED by ondemand_search.sqlite (chunk metadata + display text + one varint-delta posting BLOB per term over stable INTEGER chunk ids; bm25_doc folded into chunk.doc_len; idx_posting_chunk dropped) and ondemand_vectors.sqlite (int8 vectors + per-vector scale, keyed by the same integer ids). bundled_search.sqlite keeps its name but adopts the same v2 encoding with its vectors embedded. Schema contract: docs/pack-diet.md.",
@@ -9,13 +9,13 @@
       "description": "Ships in the app binary. BSB Bible + Westminster Shorter Catechism + a BSB/WSC-scoped dense+BM25 search index.",
       "delivery": "app-binary",
       "license_class": "public-domain / CC0 only",
-      "total_bytes": 18157568,
+      "total_bytes": 50176000,
       "files": [
         {
           "name": "bundled_bibles.sqlite",
           "role": "bibles",
-          "bytes": 6483968,
-          "sha256": "d82ee8691bf0c99a605f7b0bb42c7242ba446623dc150e45d0373f8f648165a6",
+          "bytes": 6524928,
+          "sha256": "5017282913e635c1702fe531b6c4f6c5d47bf209e75df4ec71fabcf97c6a31ff",
           "contents": {
             "translations": [
               "bsb"
@@ -40,13 +40,14 @@
         {
           "name": "bundled_crossrefs.sqlite",
           "role": "crossrefs",
-          "bytes": 3051520,
-          "sha256": "08d5f0a6383ebf8766a4e7ccc562320c30966a0f6157214338b89c03903be0b5",
+          "bytes": 7282688,
+          "sha256": "31594bd050a6b926dc63b9b1438e2f838c205430d8b712936adc132371605932",
           "contents": {
             "format": "crossrefs-pack-v1",
             "n_sources": 29363,
             "n_edges": 344794,
-            "n_expanded_chunks": 13089,
+            "n_expanded_chunks": 117265,
+            "n_prooftext_rows": 5758,
             "expansion_top_n": 8,
             "license": "CC-BY 4.0 (www.openbible.info)",
             "attribution": "Cross-reference data courtesy of www.openbible.info, used under CC-BY."
@@ -55,13 +56,13 @@
         {
           "name": "bundled_search.sqlite",
           "role": "search",
-          "bytes": 8560640,
-          "sha256": "5f0818663b2d10e461a0a6cf5da6304a5ef7fa43eeb74ba1043424549e1151fa",
+          "bytes": 36306944,
+          "sha256": "f5a29810df549dee90d02b4a862d223a5680dd5cde43773f3e0a94aba324985c",
           "contents": {
             "format": "search-pack-v2",
-            "n_chunks": 3382,
-            "vocab_size": 14507,
-            "n_postings": 365626,
+            "n_chunks": 34642,
+            "vocab_size": 14601,
+            "n_postings": 698704,
             "posting_format": "uvarint-gap-tf-v1",
             "text_included": true,
             "vector_format": "int8-symmetric-per-vector-le"
@@ -72,13 +73,13 @@
     "on_demand": {
       "description": "Free, downloaded on first launch. KJV/ASV/WEB, all commentaries, the remaining confessions, lexicons + tagged text, cross-references, and the full search + vectors packs (pack-diet v2).",
       "delivery": "first-launch-download",
-      "total_bytes": 532942848,
+      "total_bytes": 630833152,
       "files": [
         {
           "name": "ondemand_bibles.sqlite",
           "role": "bibles",
-          "bytes": 20291584,
-          "sha256": "8c5a06983d6c787034405a52b57c7899e99db904b0c5de3d48ace906f9717779",
+          "bytes": 20398080,
+          "sha256": "7014a42d262d6eed25ec19a9d204e9b48e01bdb338af6b024c1b056a95e8d455",
           "contents": {
             "translations": [
               "asv",
@@ -101,8 +102,8 @@
         {
           "name": "ondemand_confessions.sqlite",
           "role": "confessions",
-          "bytes": 1163264,
-          "sha256": "5a434b9ef877e91842fa8ee80aaec46d056e0f4f2b68a72ccce6bd9d531535bc",
+          "bytes": 1171456,
+          "sha256": "0c7d499c434a2fcc91fed0a727c62797ca0b37e13d46fe7c971f7a57537b733d",
           "contents": {
             "documents": [
               "belgic",
@@ -137,25 +138,31 @@
         {
           "name": "ondemand_search.sqlite",
           "role": "search",
-          "bytes": 213159936,
-          "sha256": "0c264bc0f6a22bb9f544af0fe165a9b5dcf9de8bcf147d58e6652af6adfe60a3",
+          "bytes": 296697856,
+          "sha256": "57eb9e379dead31785bab640227f1852aa9d40048879c37ace3312a348e6d780",
           "contents": {
             "format": "search-pack-v2",
-            "n_chunks": 175442,
-            "vocab_size": 145281,
-            "n_postings": 10831300,
+            "n_chunks": 317204,
+            "vocab_size": 174383,
+            "n_postings": 14231622,
             "posting_format": "uvarint-gap-tf-v1",
-            "text_included": true
+            "text_included": true,
+            "expansion": {
+              "n_archaic_pairs": 311,
+              "n_synonym_candidates": 100,
+              "n_suffix_classes": 5487,
+              "n_rows": 33208
+            }
           }
         },
         {
           "name": "ondemand_vectors.sqlite",
           "role": "vectors",
-          "bytes": 72060928,
-          "sha256": "cbcece90f725211387f167939e8c0c30afd73e637b13d4b4db020dca1f052595",
+          "bytes": 86298624,
+          "sha256": "bddd6e3dc865d6fd2b390338644d87fe7b37bec116856ad5ccc8e9d98ca042a7",
           "contents": {
             "format": "vectors-pack-v2",
-            "n_vectors": 175442,
+            "n_vectors": 210123,
             "vector_format": "int8-symmetric-per-vector-le",
             "embedding_dim": 384
           }
@@ -189,9 +196,9 @@
     }
   },
   "totals": {
-    "bundled_bytes": 18157568,
-    "ondemand_bytes": 532942848,
-    "all_bytes": 551100416
+    "bundled_bytes": 50176000,
+    "ondemand_bytes": 630833152,
+    "all_bytes": 681009152
   },
   "acknowledgements": [
     {
