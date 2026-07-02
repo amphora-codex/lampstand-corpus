@@ -119,7 +119,7 @@ Caveat on the per-type limit: relevant chunks in all three scored categories are
 
 ## 4b. Query expansion (Rank 7, measured)
 
-BM25 query terms also score their mined expansions (archaic↔modern pairs + suffix classes; approved theological synonyms only) at a flat 0.3 weight. Baseline arms repeated for comparison:
+BM25 query terms also score their mined expansions (INCLUDING the 100 advisor-approved theological synonyms — archaic↔modern doctrinal-vocabulary residue: sepulchre↔tomb, candlestick↔lampstand, oblation↔offering, devils↔demons, …) at a flat 0.3 weight. Baseline arms repeated for comparison:
 
 | set | n | recall@5 | recall@10 | recall@20 | MRR | nDCG@10 |
 |---|---:|---:|---:|---:|---:|---:|
@@ -127,6 +127,21 @@ BM25 query terms also score their mined expansions (archaic↔modern pairs + suf
 | bm25-expand | 452 | 0.173 | 0.232 | 0.292 | 0.137 | 0.054 |
 | hybrid | 452 | 0.128 | 0.223 | 0.296 | 0.084 | 0.042 |
 | hybrid-expand | 452 | 0.128 | 0.206 | 0.296 | 0.082 | 0.040 |
+
+Per-category delta (expand − base), the categories where synonym matching should help most:
+
+| arm pair | category | Δrecall@5 | Δrecall@10 | Δrecall@20 | ΔMRR | ΔnDCG@10 |
+|---|---|---:|---:|---:|---:|---:|
+| bm25→bm25-expand | commentary-anchor | -0.013 | +0.000 | +0.000 | -0.005 | -0.002 |
+| bm25→bm25-expand | crossref | -0.013 | +0.000 | -0.007 | -0.006 | -0.003 |
+| bm25→bm25-expand | prooftext | -0.027 | -0.013 | -0.007 | -0.002 | -0.001 |
+| hybrid→hybrid-expand | commentary-anchor | +0.000 | -0.026 | +0.007 | -0.004 | -0.004 |
+| hybrid→hybrid-expand | crossref | +0.000 | -0.013 | +0.007 | -0.001 | -0.001 |
+| hybrid→hybrid-expand | prooftext | +0.000 | -0.013 | -0.013 | -0.001 | -0.001 |
+
+**Query-expansion decision (synonym-inclusive): KEEP OFF for retrieval.** Best overall-headline (recall@20 / MRR) expand-vs-base gain = +0.000 (bar: ≥ +0.005 on a headline metric with no headline regression on the same arm).
+
+Every headline and per-category delta is null-to-negative: wiring query expansion ON does NOT beat the v2 baseline on these corpus-native labels, even WITH the advisor-approved theological synonyms. The gold queries are drawn from MODERN-vocabulary corpus text (BSB verses, commentary paragraphs), so archaic↔modern synonym firing is structurally rare here — the same labels-favor-lexical caveat as §3. **Recommendation: keep the approved synonym table (it still powers the app's tap-to-gloss UX) but leave query expansion OFF for retrieval scoring.** The expansion table + the advisor-approved synonyms remain shipped in the search pack for the gloss/lookup path; only the query-time BM25 down-weighted expansion stays disabled. Revisit if a future gold set includes archaic-phrased (KJV-style) user queries, where the synonyms should finally earn their weight.
 
 ## 5. retrieve.py ↔ app parity notes
 

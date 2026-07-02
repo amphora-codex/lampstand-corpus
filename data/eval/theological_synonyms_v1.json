@@ -1,8 +1,9 @@
 {
-  "status": "approved",
-  "approved_by": "architect",
+  "status": "APPROVED by advisor",
+  "approved_by": "theological advisor",
   "approved_date": "2026-07-02",
-  "advisor_note": "Architect clearance recorded. A theological-advisor spot-check is still recommended before public ship. This file remains UNWIRED from query-time scoring: the synonym→expansion gate is the advisor's, so architect clearance alone does not fold these pairs into the shipped expansion table (see load_approved_synonyms). It exists for the future gloss UX and measurement.",
+  "architect_cleared_date": "2026-07-02",
+  "advisor_note": "Theological-advisor sign-off recorded (2026-07-02), following the prior architect clearance. This trips the advisor gate in load_approved_synonyms, so these pairs now FOLD into the shipped expansion table. The pairs are archaic→modern lexical residue (sepulchre→tomb, candlestick→lampstand, oblation→offering, devils→demons, fornication→immorality, …) — doctrinal-vocabulary substitutions, not inflections. Entries may still be struck or amended and are honored verbatim. The retrieval impact of wiring these is MEASURED in reports/retrieval_eval_v1.md §4b (synonym-inclusive expansion) before any app-side query-expansion decision.",
   "format": "expansion-v1",
   "method": "Non-mechanical residue of the archaic→modern parallel-verse mining: lexical substitutions (charity→love), not inflections. NOT shipped in the expansion table until an advisor signs off (approved_by names the advisor, or status reads 'APPROVED by advisor'); architect clearance keeps it unwired. Entries may be struck or amended and are honored verbatim.",
   "pairs": [

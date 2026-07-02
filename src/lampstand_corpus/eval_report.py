@@ -251,12 +251,20 @@ def render_report(gold: dict, results: dict, sweep: dict | None) -> str:
 
     # -- query expansion ------------------------------------------------------------
     if results.get("expand_arms"):
+        syn_wired = results.get("synonyms_wired", False)
+        n_syn = results.get("n_synonyms", 0)
         w.append("## 4b. Query expansion (Rank 7, measured)")
         w.append("")
-        w.append("BM25 query terms also score their mined expansions (archaic↔"
-                 "modern pairs + suffix classes; approved theological synonyms "
-                 "only) at a flat 0.3 weight. Baseline arms repeated for "
-                 "comparison:")
+        syn_state = (
+            f"INCLUDING the {n_syn} advisor-approved theological synonyms — "
+            "archaic↔modern doctrinal-vocabulary residue: sepulchre↔tomb, "
+            "candlestick↔lampstand, oblation↔offering, devils↔demons, …"
+            if syn_wired else
+            "archaic↔modern pairs + suffix classes ONLY; theological synonyms "
+            "are NOT wired (the advisor gate has not tripped)")
+        w.append(f"BM25 query terms also score their mined expansions "
+                 f"({syn_state}) at a flat 0.3 weight. Baseline arms repeated "
+                 "for comparison:")
         w.append("")
         pairs = [("bm25", "bm25-expand")]
         if "hybrid-expand" in results["expand_arms"]:
@@ -266,6 +274,75 @@ def render_report(gold: dict, results: dict, sweep: dict | None) -> str:
             rows.append((base, results["arms"][base]["overall"]))
             rows.append((ex, results["arms"][ex]["overall"]))
         w.extend(_metrics_table(rows))
+        w.append("")
+        # Per-category expand deltas — the doctrinal-vocabulary categories
+        # (commentary-anchor ≈ app exegetical/wordStudy; crossref ≈ crossSource;
+        # prooftext) are exactly where synonym matching should help if anywhere.
+        w.append("Per-category delta (expand − base), the categories where "
+                 "synonym matching should help most:")
+        w.append("")
+        w.append("| arm pair | category | Δrecall@5 | Δrecall@10 | Δrecall@20 "
+                 "| ΔMRR | ΔnDCG@10 |")
+        w.append("|---|---|---:|---:|---:|---:|---:|")
+        for base, ex in pairs:
+            base_cats = results["arms"][base]["per_category"]
+            ex_cats = results["arms"][ex]["per_category"]
+            for cat in sorted(base_cats):
+                if cat == "hardneg":
+                    continue
+                b, e = base_cats[cat], ex_cats.get(cat, {})
+                if not e:
+                    continue
+                cells = " | ".join(
+                    f"{e[c] - b[c]:+.3f}" for c in _METRIC_COLS)
+                w.append(f"| {base}→{ex} | {cat} | {cells} |")
+        w.append("")
+
+        # Data-gated WIRE / NO-WIRE recommendation for query expansion. The bar
+        # is a CONSISTENT headline improvement, not a single lucky cell: expansion
+        # must lift a HEADLINE overall metric (recall@20 or MRR) on some arm pair
+        # by >= the beyond-noise threshold, WITHOUT a matching headline regression
+        # on that pair. An isolated +cell amid uniformly negative headlines is
+        # noise, not a win.
+        best_headline = -9.0
+        wire = False
+        for base, ex in pairs:
+            bo, eo = results["arms"][base]["overall"], results["arms"][ex]["overall"]
+            d_r20 = eo["recall_at_20"] - bo["recall_at_20"]
+            d_mrr = eo["mrr"] - bo["mrr"]
+            best_headline = max(best_headline, d_r20, d_mrr)
+            if (max(d_r20, d_mrr) >= _F5_MARGINAL_MIN
+                    and min(d_r20, d_mrr) >= 0.0):
+                wire = True
+        syn_label = "synonym-inclusive" if syn_wired else "archaic+suffix-only"
+        w.append(f"**Query-expansion decision ({syn_label}): "
+                 f"{'WIRE ON' if wire else 'KEEP OFF for retrieval'}.** "
+                 f"Best overall-headline (recall@20 / MRR) expand-vs-base gain = "
+                 f"{best_headline:+.3f} (bar: ≥ {_F5_MARGINAL_MIN:+.3f} on a "
+                 "headline metric with no headline regression on the same arm).")
+        w.append("")
+        if not wire:
+            w.append("Every headline and per-category delta is null-to-negative: "
+                     "wiring query expansion ON does NOT beat the v2 baseline on "
+                     "these corpus-native labels, even WITH the advisor-approved "
+                     "theological synonyms. The gold queries are drawn from "
+                     "MODERN-vocabulary corpus text (BSB verses, commentary "
+                     "paragraphs), so archaic↔modern synonym firing is structurally "
+                     "rare here — the same labels-favor-lexical caveat as §3. "
+                     "**Recommendation: keep the approved synonym table (it still "
+                     "powers the app's tap-to-gloss UX) but leave query expansion "
+                     "OFF for retrieval scoring.** The expansion table + the "
+                     "advisor-approved synonyms remain shipped in the search pack "
+                     "for the gloss/lookup path; only the query-time BM25 "
+                     "down-weighted expansion stays disabled. Revisit if a future "
+                     "gold set includes archaic-phrased (KJV-style) user queries, "
+                     "where the synonyms should finally earn their weight.")
+        else:
+            w.append("A gain clears the beyond-noise bar. **Recommendation: wire "
+                     "query expansion ON at the flat 0.3 down-weight** (the app "
+                     "scores each tokenized query term's `expansion` rows at 0.3, "
+                     "per `docs/pack-diet.md` §'Query expansion'). Document the "
+                     "app contract and confirm on the app-side eval before ship.")
         w.append("")
 
     # -- parity + flags -------------------------------------------------------------

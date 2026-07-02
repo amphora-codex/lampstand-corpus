@@ -1558,6 +1558,14 @@ def _evaluate_arms(gold: dict, harness, dense_reason: str | None) -> dict:
     if expand_arms and harness.dense_available:
         expand_arms.append("hybrid-expand")
     results["expand_arms"] = expand_arms
+    # Record the synonym-wiring state so the report's §4b can say whether the
+    # measured expansion INCLUDES the advisor-approved theological synonyms
+    # (archaic+suffix always; synonyms only once the advisor gate trips).
+    if expand_arms:
+        from .expansion import SYNONYMS_RELPATH, load_approved_synonyms
+        syn = load_approved_synonyms(REPO_ROOT / SYNONYMS_RELPATH)
+        results["synonyms_wired"] = len(syn) > 0
+        results["n_synonyms"] = len(syn)
     for arm in arm_order + int8_arms + graph_arms + expand_arms:
         results["arms"][arm] = harness.evaluate_arm(arm, APP_CONFIG)
         o = results["arms"][arm]["overall"]
