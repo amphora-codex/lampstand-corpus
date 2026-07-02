@@ -77,6 +77,23 @@ SHA (a reused vector is provably the embedding of identical text under the same
 model; CPU float reductions jitter at ~1e-7, recorded and accepted, not silently
 ignored).
 
+**Retrieval eval (F5 measurement foundation).** A deterministic gold set is
+derived from the corpus itself (confession proof-texts, high-vote TSK
+cross-references, commentary verse anchors, plus a DRAFT hard-negative suite
+tracked at `data/eval/hard_negatives_v1.json`), and three retrieval arms —
+BM25-only, dense-only, hybrid RRF exactly as the app's `HybridRetriever`
+fuses — are measured over it (recall@k / MRR / nDCG@10, per category):
+
+```bash
+python -m lampstand_corpus.cli build-eval           # gold set -> output/eval_gold_v1.json
+python -m lampstand_corpus.cli validate-retrieval   # arms + reports/retrieval_eval_v1.md
+python -m lampstand_corpus.cli sweep-retrieval      # fusion-knob sweep (recommends only)
+```
+
+The sweep grid covers the fusion constants the app hard-codes (rrfK, per-type
+BM25 limit, dense depth); it **recommends** constants in the committed report
+and never changes the app. Same built DBs → byte-identical gold set and report.
+
 ---
 
 *LampStand · An Amphora Company.* See the app repo (`lampstand-ios`, private) for the consuming side.
