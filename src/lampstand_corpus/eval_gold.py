@@ -424,17 +424,19 @@ def commentary_queries(
                     notes.append(
                         f"commentary {commentator}:{key}: anchor resolves to no chunk; skipped")
                     continue
-                own = emb_conn.execute(
+                # ALL rows sharing the comment key are "self" — an oversized
+                # paragraph splits into #s siblings that must all be excluded.
+                own_ids = [r[0] for r in emb_conn.execute(
                     "SELECT id FROM chunk WHERE resource_type='commentary' "
-                    "AND source=? AND key=?",
+                    "AND source=? AND key=? ORDER BY id",
                     (commentator, key),
-                ).fetchone()
+                )]
                 out.append(GoldQuery(
                     id=f"ca_{commentator}_{key}",
                     category="commentary-anchor",
                     query=truncate_words(text, QUERY_MAX_CHARS),
                     relevant=sorted(relevant),
-                    exclude=[own[0]] if own else [],
+                    exclude=own_ids,
                     label=f"{commentator}:{key}",
                 ))
                 kept += 1
