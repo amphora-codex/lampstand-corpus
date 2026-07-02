@@ -49,7 +49,7 @@ CREATE TABLE chunk (
     anchor        TEXT NOT NULL,
     book          TEXT, chapter INTEGER, verse_start INTEGER, verse_end INTEGER,
     key           TEXT,
-    text          TEXT,                 -- display text (NULL when meta.text_included = "0")
+    text          TEXT,                 -- display text; NULL when meta.text_included="0", and ALWAYS NULL for pericope parents (indexed=0) — reconstruct from children (see "Dual granularity")
     text_checksum TEXT NOT NULL,        -- sha256 of header+text
     truncated     INTEGER NOT NULL DEFAULT 0,
     doc_len       INTEGER NOT NULL,     -- BM25 token count (0 for parents)
@@ -89,11 +89,35 @@ Scripture rows come in two populations: **children** (single verses,
 `indexed=1`, `parent_id` set — the ONLY rankable Scripture rows) and
 **pericope parents** (`indexed=0`, `parent_id NULL`, `doc_len 0`, present in no
 posting blob and no vectors pack). Retrieve at verse precision; expand a hit to
-its parent's `text` for LLM context via one `chunk` lookup on `parent_id`.
+its parent for LLM context via one `chunk` lookup on `parent_id`.
 Every indexed chunk's EMBEDDED/BM25 text was `header || text` — query-side
 scoring needs no change, but display should render `text` (and may show
 `header` as an eyebrow label). Dense vectors exist for BSB children +
 non-scripture only (KJV/ASV/WEB children are BM25-only).
+
+> **CONTRACT NOTE — parent chunk `text` is NULL (app must reconstruct).**
+> As of the pack-diet size fix, **pericope PARENT rows (`indexed=0`) store
+> `text = NULL`** in `ondemand_search.sqlite` / `bundled_search.sqlite`. A
+> parent's display/context text is exactly the concatenation of its children's
+> verse `text`, and those children are ALSO in the pack, so storing the parent
+> text was pure redundancy (~20 MiB in `ondemand_search`).
+>
+> **The app must reconstruct a parent's text by concatenating its children's
+> `text` in child order.** Child order = ascending `(book, chapter,
+> verse_start)` — equivalently the `idx_chunk_ref` order — over the rows whose
+> `parent_id` equals the parent's `id`. Join with a single indexed query:
+> `SELECT text FROM chunk WHERE parent_id = ? AND indexed = 1
+>  ORDER BY chapter, verse_start`. Insert a single space between verses (the
+> children's `text` carries no leading/trailing whitespace); prepend the
+> parent's own `header` if a labeled context block is wanted. Do NOT expect a
+> parent `text` column value — it is always NULL for `indexed=0` rows.
+>
+> Children remain fully self-sufficient: every `indexed=1` row keeps its full
+> `text`, so search-result rendering (which only ever surfaces child hits)
+> needs no reconstruction and is unaffected. `text_checksum` on a parent is
+> preserved as build-time provenance (it hashes the original `header||text`)
+> and therefore no longer verifies against the now-NULL `text` — do not
+> checksum-validate parent rows.
 
 ### Query expansion (`expansion` table)
 

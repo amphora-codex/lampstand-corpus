@@ -434,12 +434,24 @@ def _build_search_pack(
     dst = _new_db(dst_path)
     try:
         dst.executescript(_SEARCH_SCHEMA_V2)
+
+        def _display_text(c: Chunk) -> str | None:
+            # Pack-diet: context-only pericope PARENTS (indexed=0) store NULL
+            # display text — their text is exactly the concatenation of their
+            # children's verse text, which is ALSO in this pack, so it is
+            # redundant. The app reconstructs a parent's text by concatenating
+            # its children's `text` in child order (docs/pack-diet.md contract).
+            # Children (indexed=1) keep full display text when text is included.
+            if not include_text or not c.indexed:
+                return None
+            return c.text
+
         dst.executemany(
             "INSERT INTO chunk VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [
                 (id_map[c.id], c.id, c.resource_type, c.source, c.anchor,
                  c.book, c.chapter, c.verse_start, c.verse_end, c.key,
-                 c.text if include_text else None, c.text_checksum,
+                 _display_text(c), c.text_checksum,
                  1 if c.truncated else 0, bm25["doc_lengths"].get(c.id, 0),
                  c.header, id_map.get(c.parent) if c.parent else None,
                  1 if c.indexed else 0, c.question, c.lords_day,
@@ -834,9 +846,12 @@ def package_corpus(
     if search_bytes > SEARCH_PACK_TARGET_MAX:
         flags.append(
             f"ondemand_search.sqlite is {search_bytes:,} B (> "
-            f"{SEARCH_PACK_TARGET_MAX // (1024*1024)} MB target WITH display "
-            f"text) — architect decision needed: drop chunk text from the "
-            f"search pack and resolve display text from the per-resource packs.")
+            f"{SEARCH_PACK_TARGET_MAX // (1024*1024)} MiB target). Parent "
+            f"pericope display text is already NULL (children keep text; see "
+            f"docs/pack-diet.md); remaining bulk is commentary/lexicon child "
+            f"text + BM25 postings. Next lever if further shrink is required: "
+            f"drop child display text and resolve it from the per-resource "
+            f"packs (architect decision).")
 
     manifest = _build_manifest(output_dir, files, bundled_bytes, ondemand_bytes)
     return PackagingResult(

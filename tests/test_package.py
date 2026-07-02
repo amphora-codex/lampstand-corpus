@@ -522,6 +522,60 @@ def test_context_parent_rows_have_no_postings_or_vectors(tmp_path):
     vp.close()
 
 
+def test_parent_text_is_null_children_keep_text(tmp_path):
+    """Pack-diet: context-only pericope parents (indexed=0) store NULL display
+    text (redundant with their children); children keep full text and stay
+    self-sufficient for search-result rendering."""
+    out = tmp_path / "output"
+    _build_fixture(out)
+    # Add a pericope parent + re-point two children (scr_a GEN1:1, and a new
+    # GEN1:2 child) at it.
+    conn = sqlite3.connect(out / "embeddings.sqlite")
+    conn.execute(
+        "INSERT INTO chunk (id, resource_type, source, anchor, book, chapter,"
+        " verse_start, verse_end, key, text, text_checksum, truncated,"
+        " header, indexed) VALUES ('scr_p1','scripture','bsb',"
+        "'bsb:pericope GEN 1:1-2','GEN',1,1,2,NULL,"
+        "'in the beginning bsb light and there was more','hp',0,"
+        "'Genesis 1:1-2 — ',0)")
+    conn.execute(
+        "INSERT INTO chunk (id, resource_type, source, anchor, book, chapter,"
+        " verse_start, verse_end, key, text, text_checksum, truncated,"
+        " header, parent_id, indexed) VALUES ('scr_a2','scripture','bsb',"
+        "'bsb:GEN 1:2','GEN',1,2,2,NULL,'and there was more','h7',0,"
+        "'Genesis 1:2 — ','scr_p1',1)")
+    conn.execute("UPDATE chunk SET parent_id='scr_p1' WHERE id='scr_a'")
+    conn.commit()
+    conn.close()
+    package_corpus(out, out / "packs")
+
+    sp = sqlite3.connect(out / "packs" / "ondemand_search.sqlite")
+    # Parent: NULL text, but ids/linkage/metadata intact.
+    ptext, pindexed, pcs = sp.execute(
+        "SELECT text, indexed, text_checksum FROM chunk WHERE string_id='scr_p1'"
+    ).fetchone()
+    assert ptext is None and pindexed == 0
+    assert pcs  # checksum (provenance) is preserved
+
+    # Every indexed child keeps its (non-null) display text.
+    child_rows = sp.execute(
+        "SELECT string_id, text FROM chunk WHERE indexed=1").fetchall()
+    assert child_rows  # sanity
+    for sid, text in child_rows:
+        assert text is not None and text != "", sid
+    # Specifically the children of scr_p1 carry their own verse text.
+    by_sid = {r[0]: r[1] for r in child_rows}
+    assert by_sid["scr_a"] == "in the beginning bsb light"
+    assert by_sid["scr_a2"] == "and there was more"
+
+    # No NON-parent chunk was NULLed (guards against over-broad NULLing).
+    n_null_indexed = sp.execute(
+        "SELECT count(*) FROM chunk WHERE indexed=1 AND text IS NULL"
+    ).fetchone()[0]
+    assert n_null_indexed == 0
+    sp.close()
+
+
 def test_preserve_models_subtree_carries_coreml_entries(tmp_path):
     from lampstand_corpus.package import preserve_models_subtree
 
