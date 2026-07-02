@@ -1739,7 +1739,8 @@ def cmd_package(*, fp32: bool = False) -> None:
     # from the existing manifest so a package run never drops it.
     from .package import preserve_models_subtree
     if preserve_models_subtree(CORPUS_MANIFEST, result.manifest):
-        print("  preserved packs.models subtree from the existing manifest")
+        print("  preserved packs.models / packs.reranker subtrees + their "
+              "model-provenance acknowledgements from the existing manifest")
     CORPUS_MANIFEST.write_text(
         json.dumps(result.manifest, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8")

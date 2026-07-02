@@ -50,7 +50,14 @@ from .pack_codec import assign_int_ids, encode_postings, quantize_int8
 # placeholder the human replaces (and tags) at ship time.
 # v2: the Rank-8/14/7 re-chunk release — every chunk id changed (dual
 # granularity, structural headers, commentary splits, BSB-only dense).
-CORPUS_VERSION_PLACEHOLDER = "corpus-v2.0.0-candidate"
+# v2.1 (FREEZE candidate): additive over v2.0 — full 7-document bundled/on-demand
+# confessions with Westminster+Belgic proof_texts, parent-text-NULL search packs,
+# bundled_crossrefs, advisor-approved synonyms folded into the expansion table
+# (query expansion stays OFF for retrieval — see reports/retrieval_eval_v1.md
+# §4b), and the packs.reranker Core ML asset. Chunk ids are UNCHANGED from v2.0
+# where the underlying text is unchanged (content-addressed). Freeze handoff:
+# docs/pack-handoff-v2.1.md. The architect tags `corpus-v2.1.0` at ship.
+CORPUS_VERSION_PLACEHOLDER = "corpus-v2.1.0-candidate"
 
 # Bundled-pack scope (architect-locked).
 BUNDLED_TRANSLATION = "bsb"
@@ -1068,13 +1075,17 @@ def build_models_pack(
 
 
 def preserve_models_subtree(manifest_path: Path, manifest: dict) -> bool:
-    """Carry an existing manifest's ``packs.models`` into a fresh ``manifest``.
+    """Carry an existing manifest's model/reranker subtrees + acks into ``manifest``.
 
-    ``package`` rebuilds the manifest from the packs it just wrote, but the
-    Core ML query model + vocab entries are added later by ``coreml-export``
-    (``update_manifest_models``) — without this carry-over, every ``package``
-    run would silently drop them until the next model re-export. Returns True
-    when a models subtree was preserved.
+    ``package`` rebuilds the manifest from the packs it just wrote and rebuilds
+    ``acknowledgements`` from the SOURCE resources only, but the Core ML query
+    model + reranker entries are added later by ``coreml-export`` /
+    ``coreml-export-reranker`` (``update_manifest_models`` /
+    ``update_manifest_reranker`` / ``update_manifest_acknowledgement``) — without
+    this carry-over, every ``package`` run would silently drop both the
+    ``packs.models`` / ``packs.reranker`` subtrees AND their model-provenance
+    acknowledgements (e.g. ``id="reranker-model"``) until the next re-export.
+    Returns True when anything was preserved.
     """
     import json
 
@@ -1087,13 +1098,24 @@ def preserve_models_subtree(manifest_path: Path, manifest: dict) -> bool:
     old_packs = old.get("packs", {})
     models = old_packs.get("models")
     reranker = old_packs.get("reranker")
-    if not models and not reranker:
+    # Model-provenance acks are not source resources, so build_acknowledgements
+    # never regenerates them — carry them across by id (e.g. reranker-model).
+    model_ack_ids = ("reranker-model", "embedding-model")
+    old_acks = {a.get("id"): a for a in old.get("acknowledgements", [])
+                if a.get("id") in model_ack_ids}
+    if not models and not reranker and not old_acks:
         return False
     dst = manifest.setdefault("packs", {})
     if models:
         dst["models"] = models
     if reranker:
         dst["reranker"] = reranker
+    if old_acks:
+        acks = manifest.setdefault("acknowledgements", [])
+        present = {a.get("id") for a in acks}
+        for aid, a in old_acks.items():
+            if aid not in present:
+                acks.append(a)
     return True
 
 

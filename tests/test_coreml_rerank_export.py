@@ -134,3 +134,42 @@ def test_update_manifest_reranker_and_ack(tmp_path: Path):
     assert acks["reranker-model"]["name"] == "updated"  # replaced, not duplicated
     assert len([a for a in m["acknowledgements"] if a["id"] == "reranker-model"]) == 1
     assert "bsb" in acks
+
+
+def test_preserve_models_subtree_carries_reranker_and_ack():
+    # A fresh `package`-built manifest (source acks only, no model subtrees) must
+    # inherit packs.models / packs.reranker AND the reranker-model ack from the
+    # existing on-disk manifest — otherwise `package` silently drops them.
+    import json
+    import tempfile
+    from pathlib import Path
+
+    from lampstand_corpus.package import preserve_models_subtree
+
+    with tempfile.TemporaryDirectory() as d:
+        mf = Path(d) / "corpus_manifest.json"
+        mf.write_text(json.dumps({
+            "packs": {
+                "bundled": {"files": []},
+                "models": {"files": [{"name": "BGEQuery.mlpackage"}]},
+                "reranker": {"files": [{"name": "Reranker.mlpackage"}]},
+            },
+            "acknowledgements": [
+                {"id": "bsb", "name": "Berean"},
+                {"id": "reranker-model", "name": "cross-encoder/ms-marco-MiniLM-L-6-v2"},
+                {"id": "embedding-model", "name": "BAAI/bge-small-en-v1.5"},
+            ],
+        }), encoding="utf-8")
+
+        # Simulate a freshly rebuilt manifest: source acks only, no model subtrees.
+        fresh = {
+            "packs": {"bundled": {"files": []}, "on_demand": {"files": []}},
+            "acknowledgements": [{"id": "bsb", "name": "Berean"}],
+        }
+        assert preserve_models_subtree(mf, fresh) is True
+        assert fresh["packs"]["models"]["files"][0]["name"] == "BGEQuery.mlpackage"
+        assert fresh["packs"]["reranker"]["files"][0]["name"] == "Reranker.mlpackage"
+        ack_ids = [a["id"] for a in fresh["acknowledgements"]]
+        assert "reranker-model" in ack_ids and "embedding-model" in ack_ids
+        # No duplicate of the source ack that fresh already had.
+        assert ack_ids.count("bsb") == 1

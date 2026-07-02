@@ -1,5 +1,5 @@
 {
-  "corpus_version": "corpus-v2.0.0-candidate",
+  "corpus_version": "corpus-v2.1.0-candidate",
   "ship_ready": false,
   "note": "CANDIDATE. The pipeline never marks a corpus version ship-ready — the architect's 23-point spot-check gates ship. Pack .sqlite files are gitignored (output/packs/); only this manifest is committed.",
   "format_migration": "Pack diet v1→v2: ondemand_embeddings.sqlite (byte-copy of the built embeddings.sqlite; float32 vectors + one SQL row per BM25 posting keyed by TEXT chunk id) is REPLACED by ondemand_search.sqlite (chunk metadata + display text + one varint-delta posting BLOB per term over stable INTEGER chunk ids; bm25_doc folded into chunk.doc_len; idx_posting_chunk dropped) and ondemand_vectors.sqlite (int8 vectors + per-vector scale, keyed by the same integer ids). bundled_search.sqlite keeps its name but adopts the same v2 encoding with its vectors embedded. Schema contract: docs/pack-diet.md.",
@@ -9,7 +9,7 @@
       "description": "Ships in the app binary. BSB Bible + Westminster Shorter Catechism + a BSB/WSC-scoped dense+BM25 search index.",
       "delivery": "app-binary",
       "license_class": "public-domain / CC0 only",
-      "total_bytes": 45416448,
+      "total_bytes": 45432832,
       "files": [
         {
           "name": "bundled_bibles.sqlite",
@@ -56,8 +56,8 @@
         {
           "name": "bundled_search.sqlite",
           "role": "search",
-          "bytes": 31399936,
-          "sha256": "7368fde7bde0f5eb80a3503b622109c30f33432703482821ac8e677750bc3b7b",
+          "bytes": 31416320,
+          "sha256": "7a2d650274c2454473e5593bd8dbea82647ce9e6b756217041fba624a8895223",
           "contents": {
             "format": "search-pack-v2",
             "n_chunks": 34642,
@@ -77,14 +77,14 @@
       "app_reader": "To honor the default grouping: fetch every packs.on_demand.files[] whose tier == \"default\". Treat download_group == \"retrieval-index\" (ondemand_search + ondemand_vectors) as one unit; the dense arm requires ondemand_vectors, BM25 requires only ondemand_search. tier == \"optional\" (none today) is the user-opt-in slot.",
       "tiers": {
         "default": {
-          "bytes": 610537472,
+          "bytes": 610553856,
           "groups": [
             "retrieval-index",
             "content"
           ]
         }
       },
-      "total_bytes": 610537472,
+      "total_bytes": 610553856,
       "files": [
         {
           "name": "ondemand_bibles.sqlite",
@@ -159,8 +159,8 @@
         {
           "name": "ondemand_search.sqlite",
           "role": "search",
-          "bytes": 276205568,
-          "sha256": "68f4e85845e446e4ced6e57b3f7711ba0799da469f3bf4dc464466ebad5af9ab",
+          "bytes": 276221952,
+          "sha256": "f7166daa35e2f084c6ae1e1123f0e76109299913354cb33727199d4b86689486",
           "tier": "default",
           "download_group": "retrieval-index",
           "contents": {
@@ -174,7 +174,7 @@
               "n_archaic_pairs": 311,
               "n_synonym_candidates": 100,
               "n_suffix_classes": 5487,
-              "n_rows": 33208
+              "n_rows": 33408
             }
           }
         },
@@ -248,9 +248,9 @@
     }
   },
   "totals": {
-    "bundled_bytes": 45416448,
-    "ondemand_bytes": 610537472,
-    "all_bytes": 655953920
+    "bundled_bytes": 45432832,
+    "ondemand_bytes": 610553856,
+    "all_bytes": 655986688
   },
   "acknowledgements": [
     {
