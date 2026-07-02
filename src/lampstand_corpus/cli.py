@@ -65,6 +65,21 @@ bge_parity_fixture.json + bge_tokenizer_fixture.json under output/models/
 (gitignored) with a report in reports/. Requires the ``[coreml]`` extra
 (``pip install -e ".[coreml]"``) and a built bundled_search.sqlite (run ``package``).
 
+Usage (retrieval eval — F5 measurement foundation):
+    python -m lampstand_corpus.cli build-eval          # gold set -> output/eval_gold_v1.json
+    python -m lampstand_corpus.cli validate-retrieval  # BM25/dense/hybrid arms + report
+    python -m lampstand_corpus.cli sweep-retrieval     # fusion-constant sweep + report
+
+``build-eval`` derives a deterministic query→relevant-chunk gold set from the
+built DBs (confession proof-texts, high-vote TSK cross-refs, commentary anchors,
+plus the DRAFT hard-negative suite tracked at data/eval/hard_negatives_v1.json).
+``validate-retrieval`` runs three app-parity retrieval arms (BM25-only, dense-
+only, hybrid RRF exactly as HybridRetriever fuses) over the gold set and writes
+reports/retrieval_eval_v1.md (committed). ``sweep-retrieval`` grid-sweeps the
+fusion knobs the app hard-codes (rrfK, per-type BM25 limit, dense depth) and
+appends the best-config deltas to the report — it RECOMMENDS constants, it never
+changes the app.
+
 Usage (P7 packaging):
     python -m lampstand_corpus.cli package  # split built DBs -> output/packs/ + manifest
 
@@ -1221,6 +1236,155 @@ def _check_coreml_reproducibility(res) -> str:
         _shutil.rmtree(tmp, ignore_errors=True)
 
 
+# --- Retrieval eval (F5 measurement foundation) --------------------------------
+def cmd_build_eval() -> None:
+    """Build the deterministic retrieval gold set from the built DBs."""
+    from .eval_gold import build_gold
+
+    required = ["embeddings.sqlite", "confessions.sqlite", "crossrefs.sqlite",
+                "commentaries.sqlite", "bibles.sqlite"]
+    missing = [f for f in required if not (OUTPUT_DIR / f).exists()]
+    if missing:
+        print("Missing built DBs: " + ", ".join(missing)
+              + " — run the build-* commands first.", file=sys.stderr)
+        sys.exit(2)
+    print("Building retrieval gold set -> output/ (deterministic, seeded)...")
+    payload = build_gold(OUTPUT_DIR, REPO_ROOT)
+    for cat, n in payload["counts"].items():
+        print(f"  {cat}: {n} queries")
+    print(f"  crossref vote threshold (data-driven): "
+          f">= {payload['thresholds']['crossref_votes_min']}")
+    for note in payload["notes"]:
+        print(f"  note: {note}")
+    print(f"  wrote {OUTPUT_DIR / 'eval_gold_v1.json'} "
+          f"({sum(payload['counts'].values())} queries)")
+
+
+def _query_encoder():
+    """(callable, None) when the BGE query encoder loads, else (None, reason)."""
+    from .embeddings import QUERY_INSTRUCTION
+
+    try:
+        from .encode import MODEL_CACHE, encode_texts, load_model
+        os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
+        model = load_model(device="cpu")
+    except Exception as e:  # degrade loudly to BM25-only arms
+        return None, f"{type(e).__name__}: {e}"
+
+    def encode(texts: list[str]):
+        return encode_texts(model, [QUERY_INSTRUCTION + t for t in texts])
+
+    return encode, None
+
+
+def _build_eval_harness():
+    """Load the gold set (building it if absent) and cache per-query rankings."""
+    from .eval_gold import GOLD_FILENAME, load_gold
+    from .eval_retrieval import Harness
+
+    if not (OUTPUT_DIR / GOLD_FILENAME).exists():
+        print(f"No output/{GOLD_FILENAME} — building the gold set first.")
+        cmd_build_eval()
+    gold = load_gold(OUTPUT_DIR)
+
+    encoder, reason = _query_encoder()
+    if encoder is None:
+        print(f"  !! DENSE ARMS UNAVAILABLE — query encoder failed to load "
+              f"({reason}); degrading to BM25-only.", file=sys.stderr)
+    print(f"Caching per-query rankings over {len(gold['queries'])} gold queries "
+          f"(BM25{' + dense' if encoder else ' only'})...")
+    harness = Harness.build(
+        OUTPUT_DIR / "embeddings.sqlite", gold["queries"], encode_queries=encoder)
+    return gold, harness, reason
+
+
+def _write_eval_report(gold: dict, results: dict) -> None:
+    from .eval_report import REPORT_FILENAME, render_report
+    from .eval_retrieval import SWEEP_FILENAME
+
+    sweep_path = OUTPUT_DIR / SWEEP_FILENAME
+    sweep = (json.loads(sweep_path.read_text(encoding="utf-8"))
+             if sweep_path.exists() else None)
+    text = render_report(gold, results, sweep)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    rp = REPORTS_DIR / REPORT_FILENAME
+    rp.write_text(text, encoding="utf-8")
+    print(f"  wrote {rp}")
+
+
+def _evaluate_arms(gold: dict, harness, dense_reason: str | None) -> dict:
+    from .eval_retrieval import APP_CONFIG, APP_DENSE_RAW_FETCH, FusionConfig
+
+    arm_order = ["bm25"]
+    if harness.dense_available:
+        arm_order += ["dense", "dense@80", "hybrid"]
+    results: dict = {
+        "app_config": APP_CONFIG.as_dict(),
+        "app_config_label": APP_CONFIG.label(),
+        "dense_available": harness.dense_available,
+        "arm_order": arm_order,
+        "arms": {},
+    }
+    if dense_reason:
+        results["dense_unavailable_reason"] = dense_reason
+    deep_dense = FusionConfig(dense_depth=80,
+                              dense_raw_fetch=max(320, APP_DENSE_RAW_FETCH))
+    for arm in arm_order:
+        base_arm = "dense" if arm == "dense@80" else arm
+        cfg = deep_dense if arm == "dense@80" else APP_CONFIG
+        results["arms"][arm] = harness.evaluate_arm(base_arm, cfg)
+        o = results["arms"][arm]["overall"]
+        print(f"  {arm:9s} recall@20={o['recall_at_20']:.3f} "
+              f"MRR={o['mrr']:.3f} nDCG@10={o['ndcg_at_10']:.3f}")
+    return results
+
+
+def cmd_validate_retrieval() -> None:
+    """Run the three arms at the app's constants; write results + report."""
+    from .eval_retrieval import RESULTS_FILENAME
+
+    gold, harness, dense_reason = _build_eval_harness()
+    print("Evaluating arms at the app's shipped constants...")
+    results = _evaluate_arms(gold, harness, dense_reason)
+    harness.index.close()
+
+    (OUTPUT_DIR / RESULTS_FILENAME).write_text(
+        json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"  wrote {OUTPUT_DIR / RESULTS_FILENAME}")
+    _write_eval_report(gold, results)
+
+
+def cmd_sweep_retrieval() -> None:
+    """Sweep the fusion knobs (cached rankings; recommends, never changes)."""
+    from .eval_retrieval import RESULTS_FILENAME, SWEEP_FILENAME, run_sweep, sweep_grid
+
+    gold, harness, dense_reason = _build_eval_harness()
+    if not harness.dense_available:
+        print("Sweep needs the dense arm (it tunes the FUSION); aborting. "
+              f"Encoder failure: {dense_reason}", file=sys.stderr)
+        sys.exit(2)
+
+    # Keep the committed results JSON in lockstep (cheap once cached).
+    print("Evaluating arms at the app's shipped constants...")
+    results = _evaluate_arms(gold, harness, dense_reason)
+    (OUTPUT_DIR / RESULTS_FILENAME).write_text(
+        json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    print(f"Sweeping {len(sweep_grid())} fusion configs (hybrid arm, cached "
+          "rankings)...")
+    sweep = run_sweep(harness)
+    harness.index.close()
+    for metric in ("recall_at_20", "mrr", "ndcg_at_10"):
+        b = sweep["best"][metric]
+        print(f"  best {metric}: {b['label']} "
+              f"({b['metrics'][metric]:.3f}, {b['delta_vs_app'][metric]:+.3f} vs app)")
+    (OUTPUT_DIR / SWEEP_FILENAME).write_text(
+        json.dumps(sweep, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"  wrote {OUTPUT_DIR / SWEEP_FILENAME}")
+    _write_eval_report(gold, results)
+    print("Sweep RECOMMENDS constants; it changes nothing in the app.")
+
+
 # --- P7 packaging ------------------------------------------------------------
 PACKS_DIR = OUTPUT_DIR / "packs"
 CORPUS_MANIFEST = REPO_ROOT / "corpus_manifest.json"
@@ -1324,6 +1488,12 @@ def main(argv: list[str] | None = None) -> int:
         cmd_validate_embeddings()
     elif cmd == "coreml-export":
         cmd_coreml_export()
+    elif cmd == "build-eval":
+        cmd_build_eval()
+    elif cmd == "validate-retrieval":
+        cmd_validate_retrieval()
+    elif cmd == "sweep-retrieval":
+        cmd_sweep_retrieval()
     elif cmd == "package":
         cmd_package()
     else:
