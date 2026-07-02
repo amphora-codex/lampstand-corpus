@@ -404,6 +404,21 @@ def test_packaging_is_deterministic(tmp_path):
         assert _sha(f) == _sha(out / "packs_b" / f.name), f.name
 
 
+def test_preserve_models_subtree_carries_coreml_entries(tmp_path):
+    from lampstand_corpus.package import preserve_models_subtree
+
+    manifest_path = tmp_path / "corpus_manifest.json"
+    # No existing manifest -> nothing to preserve.
+    fresh = {"packs": {"bundled": {}}}
+    assert preserve_models_subtree(manifest_path, fresh) is False
+    assert "models" not in fresh["packs"]
+    # Existing manifest with a models subtree -> carried into the new one.
+    manifest_path.write_text(json.dumps(
+        {"packs": {"models": {"files": [{"name": "BGEQuery.mlpackage"}]}}}))
+    assert preserve_models_subtree(manifest_path, fresh) is True
+    assert fresh["packs"]["models"]["files"][0]["name"] == "BGEQuery.mlpackage"
+
+
 def test_manifest_shape_and_acknowledgements(tmp_path):
     out = tmp_path / "output"
     _build_fixture(out)

@@ -903,6 +903,30 @@ def build_models_pack(
     ])
 
 
+def preserve_models_subtree(manifest_path: Path, manifest: dict) -> bool:
+    """Carry an existing manifest's ``packs.models`` into a fresh ``manifest``.
+
+    ``package`` rebuilds the manifest from the packs it just wrote, but the
+    Core ML query model + vocab entries are added later by ``coreml-export``
+    (``update_manifest_models``) — without this carry-over, every ``package``
+    run would silently drop them until the next model re-export. Returns True
+    when a models subtree was preserved.
+    """
+    import json
+
+    if not manifest_path.exists():
+        return False
+    try:
+        old = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    models = old.get("packs", {}).get("models")
+    if not models:
+        return False
+    manifest.setdefault("packs", {})["models"] = models
+    return True
+
+
 def update_manifest_models(manifest_path: Path, models_pack: OrderedDict) -> None:
     """Insert/replace the ``packs.models`` subtree in an existing manifest, on disk.
 

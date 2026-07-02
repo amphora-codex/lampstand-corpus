@@ -1440,7 +1440,12 @@ def cmd_package(*, fp32: bool = False) -> None:
     else:
         print("\nNo size flags (bundled pack is within target).")
 
-    # Manifest is a committed artifact of this step.
+    # Manifest is a committed artifact of this step. The packs.models subtree
+    # (Core ML query model + vocab, added by coreml-export) is carried over
+    # from the existing manifest so a package run never drops it.
+    from .package import preserve_models_subtree
+    if preserve_models_subtree(CORPUS_MANIFEST, result.manifest):
+        print("  preserved packs.models subtree from the existing manifest")
     CORPUS_MANIFEST.write_text(
         json.dumps(result.manifest, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8")
