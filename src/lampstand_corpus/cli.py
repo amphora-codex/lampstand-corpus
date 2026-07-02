@@ -69,6 +69,7 @@ Usage (retrieval eval — F5 measurement foundation):
     python -m lampstand_corpus.cli build-eval          # gold set -> output/eval_gold_v1.json
     python -m lampstand_corpus.cli validate-retrieval  # BM25/dense/hybrid arms + report
     python -m lampstand_corpus.cli sweep-retrieval     # fusion-constant sweep + report
+    python -m lampstand_corpus.cli rerank-eval         # cross-encoder rerank gate + report
 
 ``build-eval`` derives a deterministic query→relevant-chunk gold set from the
 built DBs (confession proof-texts, high-vote TSK cross-refs, commentary anchors,
@@ -1423,6 +1424,71 @@ def cmd_sweep_retrieval() -> None:
     print("Sweep RECOMMENDS constants; it changes nothing in the app.")
 
 
+def cmd_rerank_eval(*, all_models: bool = False) -> None:
+    """Measure a cross-encoder reranker over the hybrid top-K (EVAL-GATED).
+
+    Reranks each gold query's un-reranked v2 HYBRID top-``RERANK_K`` candidates
+    with a permissively-licensed cross-encoder, recomputes metrics per category
+    vs the un-reranked baseline, and writes ``reports/reranker_eval_v1.md`` with
+    a SHIP/HOLD verdict. The cross-encoder (sentence-transformers/torch) is a
+    DEV/EVAL-only dependency — install with ``pip install -e ".[rerank]"``.
+    If no model can be loaded (offline / not cached), the gate cannot run and the
+    command stops WITHOUT writing a verdict, as required.
+    """
+    from .encode import MODEL_CACHE
+    from .eval_rerank import (
+        DEFAULT_RERANK_MODEL,
+        RERANK_MODELS,
+        run_rerank_eval,
+    )
+    from .eval_rerank_report import REPORT_FILENAME, render_report
+
+    gold, harness, dense_reason = _build_eval_harness()
+    if not harness.dense_available:
+        print("Rerank eval needs the HYBRID arm (it reranks the fused top-K); "
+              f"the query encoder failed to load: {dense_reason}. Aborting.",
+              file=sys.stderr)
+        harness.index.close()
+        sys.exit(2)
+
+    model_keys = list(RERANK_MODELS) if all_models else [DEFAULT_RERANK_MODEL]
+    os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE))
+    print(f"Reranking hybrid top-30 with cross-encoder(s): "
+          f"{', '.join(model_keys)} (header + raw variants)...")
+    try:
+        results = run_rerank_eval(
+            harness, gold["queries"], OUTPUT_DIR / "embeddings.sqlite",
+            MODEL_CACHE, model_keys=model_keys)
+    except Exception as e:  # degrade loudly — the gate could not run
+        harness.index.close()
+        print(f"  !! RERANK GATE COULD NOT RUN — cross-encoder unavailable "
+              f"({type(e).__name__}: {e}).\n"
+              "     Install the eval extra (`pip install -e \".[rerank]\"`) and "
+              "ensure the model downloads (needs network on first run). No "
+              "verdict written.", file=sys.stderr)
+        sys.exit(2)
+    harness.index.close()
+
+    (OUTPUT_DIR / "eval_rerank_v1.json").write_text(
+        json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    for arm in results["deltas"]:
+        o = arm["overall"]
+        print(f"  {arm['model_key']:24s} {arm['variant']:6s} "
+              f"ΔMRR={o['mrr']:+.3f} Δrecall@10={o['recall_at_10']:+.3f} "
+              f"Δrecall@20={o['recall_at_20']:+.3f} "
+              f"hardneg={arm['hardneg_win_rate']:.3f}")
+    text = render_report(gold, results)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    rp = REPORTS_DIR / REPORT_FILENAME
+    rp.write_text(text, encoding="utf-8")
+    print(f"  wrote {rp}")
+    # Echo the verdict word so the operator sees SHIP/HOLD without opening the file.
+    for line in text.splitlines():
+        if line.startswith("**Verdict:"):
+            print(f"  {line.strip('*')}")
+            break
+
+
 # --- P7 packaging ------------------------------------------------------------
 PACKS_DIR = OUTPUT_DIR / "packs"
 CORPUS_MANIFEST = REPO_ROOT / "corpus_manifest.json"
@@ -1572,6 +1638,10 @@ def main(argv: list[str] | None = None) -> int:
         cmd_validate_retrieval()
     elif cmd == "sweep-retrieval":
         cmd_sweep_retrieval()
+    elif cmd == "rerank-eval":
+        # `rerank-eval all` measures every permissive cross-encoder candidate;
+        # default measures the primary (ms-marco-MiniLM-L-6-v2, Apache-2.0).
+        cmd_rerank_eval(all_models=("all" in argv[1:]))
     elif cmd == "package":
         # `package fp32` keeps exact float32 vector bytes (no quantization).
         cmd_package(fp32=("fp32" in argv[1:]))

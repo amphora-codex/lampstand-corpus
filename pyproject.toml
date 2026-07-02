@@ -42,6 +42,15 @@ embeddings = [
 coreml = [
     "coremltools>=8.0",            # torch->Core ML mlprogram conversion (fp16)
 ]
+# Cross-encoder rerank MEASUREMENT only (Rank 4 quality gate). Reuses the
+# [embeddings] sentence-transformers/torch stack for the CrossEncoder; adds no
+# new runtime dep. This group is DEV/EVAL-ONLY — the cross-encoder is NEVER
+# shipped in the core package (the app would ship a CoreML export instead, and
+# only if the gate passes). Install with:  pip install -e ".[rerank]"
+rerank = [
+    "sentence-transformers>=3.0",  # CrossEncoder for the rerank quality gate
+    "torch>=2.2",                  # CPU inference; no CUDA required
+]
 
 [project.scripts]
 # Filled in as the CLI takes shape (fetch / normalize / build / validate).
