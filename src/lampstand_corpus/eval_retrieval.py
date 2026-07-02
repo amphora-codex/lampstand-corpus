@@ -328,6 +328,15 @@ class QueryCache:
     # Dense ranking against the int8-quantized vectors (pack-diet quality
     # probe); empty unless the harness was built with int8_variant=True.
     dense_q: list[tuple[int, float, int]] = field(default_factory=list)
+    # Self-hit exclusions (chunk idx) — kept so post-fusion steps (the TSK
+    # graph boost) can never reintroduce an excluded chunk.
+    exclude_idx: list[int] = field(default_factory=list)
+
+
+# TSK graph boost (Rank 13 measurement): how many top-ranked Scripture hits
+# contribute their cross-referenced pericopes as extra candidates. 5 sources ×
+# ≤8 pack neighbors keeps the injection within one retriever's fusion budget.
+GRAPH_SOURCE_TOP = 5
 
 
 class Harness:
@@ -338,12 +347,29 @@ class Harness:
         self.index = index
         self.dense_available = dense_available
         self.int8_available = int8_available
+        self.graph_available = False
+        # chunk idx -> TSK-adjacent chunk idx list (weight order), mirroring
+        # the bundled chunk_crossref table exactly (same builder).
+        self.expansion: dict[int, list[int]] = {}
         self.caches: list[QueryCache] = []
+
+    def load_expansion(self, crossrefs_db: Path, emb_db: Path) -> None:
+        """Build the per-pericope TSK expansion (the pack's own code path)."""
+        from .crossref_pack import build_expansion, load_scripture_chunk_refs
+
+        chunks = load_scripture_chunk_refs(emb_db)
+        expansion = build_expansion(chunks, crossrefs_db)
+        idx_of = self.index.id_to_idx
+        self.expansion = {
+            idx_of[sid]: [idx_of[n] for n, _w in nbrs if n in idx_of]
+            for sid, nbrs in expansion.items() if sid in idx_of
+        }
+        self.graph_available = True
 
     @classmethod
     def build(
         cls, emb_db: Path, gold_queries: list[dict], *, encode_queries=None,
-        int8_variant: bool = False,
+        int8_variant: bool = False, crossrefs_db: Path | None = None,
     ) -> Harness:
         """Cache BM25 + dense rankings for every gold query.
 
@@ -353,10 +379,14 @@ class Harness:
         scores against the int8 quantize→dequantize round-trip of the corpus
         matrix — mathematically identical to scoring the int8 vectors pack —
         so the pack diet's quality delta is measured by this same harness.
+        ``crossrefs_db`` (the built crossrefs.sqlite) enables the experimental
+        TSK graph-boost arms.
         """
         index = EvalIndex(emb_db)
         h = cls(index, dense_available=encode_queries is not None,
                 int8_available=encode_queries is not None and int8_variant)
+        if crossrefs_db is not None and crossrefs_db.exists():
+            h.load_expansion(crossrefs_db, emb_db)
 
         sims_by_row: np.ndarray | None = None
         sims_q_by_row: np.ndarray | None = None
@@ -381,6 +411,7 @@ class Harness:
                 relevant=set(q["relevant"]),
                 hard_negative=q.get("hard_negative"),
                 bm25_types=index.bm25_type_lists(q["query"], exclude_idx),
+                exclude_idx=exclude_idx,
             )
             if sims_by_row is not None:
                 cache.dense = index.dense_deduped(sims_by_row[row], exclude_idx)
@@ -393,11 +424,18 @@ class Harness:
     def ranked_ids(
         self, cache: QueryCache, arm: str, cfg: FusionConfig
     ) -> list[str]:
-        """Ranked chunk ids for one arm: ``bm25`` / ``dense`` / ``hybrid``, plus
-        the ``-int8`` variants of the dense-bearing arms, which rank against the
-        quantized vectors through the identical fusion path."""
+        """Ranked chunk ids for one arm.
+
+        Arms: ``bm25`` / ``dense`` / ``hybrid``; the ``-int8`` variants of the
+        dense-bearing arms (rank against the quantized vectors, identical
+        fusion path); and the experimental TSK arms ``hybrid-graph`` (graph
+        candidates fused as an equal third retriever — the same weight the app
+        gives dense) / ``hybrid-graph-weak`` (graph list down-weighted to ⅓ of
+        a retriever slot via λ=0.25).
+        """
         idx = self.index
-        base = arm.removesuffix("-int8")
+        graph = arm in ("hybrid-graph", "hybrid-graph-weak")
+        base = "hybrid" if graph else arm.removesuffix("-int8")
         dense_cache = cache.dense_q if arm.endswith("-int8") else cache.dense
         bm25_ids: list[int] = []
         dense_ids: list[int] = []
@@ -408,7 +446,43 @@ class Harness:
         fused = rrf_fuse(
             bm25_ids, dense_ids, idx.anchors,
             rrf_k=cfg.rrf_k, dense_lambda=cfg.dense_lambda)
+        if graph:
+            fused = self._graph_boost(
+                fused, cache,
+                rrf_k=cfg.rrf_k,
+                graph_lambda=0.25 if arm == "hybrid-graph-weak" else 0.5)
         return [idx.ids[i] for i in fused]
+
+    def _graph_boost(
+        self, base: list[int], cache: QueryCache, *, rrf_k: float,
+        graph_lambda: float,
+    ) -> list[int]:
+        """Post-fusion TSK boost: RRF-fuse the base ranking with the top
+        Scripture hits' cross-referenced pericopes.
+
+        Graph candidates come from the first :data:`GRAPH_SOURCE_TOP` Scripture
+        hits within the top 20, in (source rank, pack weight) order; candidates
+        already ranked (by verse-range identity), excluded for this query, or
+        duplicated are skipped, so the graph list only introduces NEW pericopes.
+        """
+        dedup_key = self.index.dedup_key
+        sources = [i for i in base[:20] if dedup_key[i] is not None]
+        sources = sources[:GRAPH_SOURCE_TOP]
+        seen_ranges = {dedup_key[i] for i in base if dedup_key[i] is not None}
+        blocked = set(base) | set(cache.exclude_idx)
+        graph_ids: list[int] = []
+        for s in sources:
+            for nb in self.expansion.get(s, ()):
+                key = dedup_key[nb]
+                if nb in blocked or key in seen_ranges:
+                    continue
+                blocked.add(nb)
+                seen_ranges.add(key)
+                graph_ids.append(nb)
+        if not graph_ids:
+            return base
+        return rrf_fuse(base, graph_ids, self.index.anchors,
+                        rrf_k=rrf_k, dense_lambda=graph_lambda)
 
     def evaluate_arm(self, arm: str, cfg: FusionConfig) -> dict:
         """Metrics for one arm/config: overall, per category, hardneg pairwise."""

@@ -187,6 +187,38 @@ def test_rrf_fuse_keeps_full_bm25_depth_asymmetry():
     assert set(fused) == set(range(35))
 
 
+# --- TSK graph boost -----------------------------------------------------------------
+def test_graph_boost_injects_new_pericopes_only(index):
+    """Neighbors sharing a ranked verse range or excluded for the query are
+    skipped; genuinely new candidates are RRF-fused in."""
+    h = er.Harness(index, dense_available=False)
+    i_bsb = index.id_to_idx["s_bsb1"]
+    i_kjv = index.id_to_idx["s_kjv1"]      # same verse range as s_bsb1
+    i_com = index.id_to_idx["c_com1"]
+    i_wsc = index.id_to_idx["f_wsc33"]
+    h.expansion = {i_bsb: [i_kjv, i_wsc, i_com]}
+    h.graph_available = True
+    cache = er.QueryCache(
+        qid="q", category="crossref", relevant=set(), hard_negative=None,
+        bm25_types={}, exclude_idx=[i_wsc])
+
+    boosted = h._graph_boost([i_bsb], cache, rrf_k=60.0, graph_lambda=0.5)
+    # s_kjv1 (same range) and f_wsc33 (excluded) are skipped; c_com1 joins.
+    assert set(boosted) == {i_bsb, i_com}
+    # Equal-weight tie (both rank 1 in their lists) breaks by anchor asc:
+    # "bsb:ROM…" < "henry:GEN…".
+    assert boosted == [i_bsb, i_com]
+
+
+def test_graph_boost_is_identity_without_candidates(index):
+    h = er.Harness(index, dense_available=False)
+    cache = er.QueryCache(
+        qid="q", category="crossref", relevant=set(), hard_negative=None,
+        bm25_types={})
+    base = [index.id_to_idx["s_bsb1"], index.id_to_idx["c_com1"]]
+    assert h._graph_boost(base, cache, rrf_k=60.0, graph_lambda=0.5) == base
+
+
 # --- harness arms -------------------------------------------------------------------
 def test_harness_bm25_arm_runs_without_encoder(index, tmp_path):
     gold = [{

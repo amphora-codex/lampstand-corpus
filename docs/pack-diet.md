@@ -22,6 +22,10 @@ Nothing else moved: `bundled_bibles/confessions`, `ondemand_bibles/confessions/
 commentaries/lexicons/crossrefs` are unchanged. The BUILD artifact
 `output/embeddings.sqlite` also keeps its v1 schema — only the packs changed.
 
+A sibling bundled pack, `bundled_crossrefs.sqlite` (TSK edge table + the
+per-pericope expansion over the SAME integer chunk ids), has its own contract:
+`docs/crossrefs-pack.md`.
+
 ## Integer chunk ids
 
 - Assigned **1-based, by ascending string chunk id**, over the WHOLE corpus

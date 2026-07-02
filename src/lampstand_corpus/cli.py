@@ -1295,7 +1295,10 @@ def _build_eval_harness():
           f"(BM25{' + dense fp32 + dense int8' if encoder else ' only'})...")
     harness = Harness.build(
         OUTPUT_DIR / "embeddings.sqlite", gold["queries"], encode_queries=encoder,
-        int8_variant=True)
+        int8_variant=True, crossrefs_db=OUTPUT_DIR / "crossrefs.sqlite")
+    if harness.graph_available:
+        print(f"  TSK expansion loaded for {len(harness.expansion):,} Scripture "
+              "chunks (graph-boost arms enabled)")
     return gold, harness, reason
 
 
@@ -1338,10 +1341,16 @@ def _evaluate_arms(gold: dict, harness, dense_reason: str | None) -> dict:
     int8_arms = (["dense-int8", "hybrid-int8"]
                  if getattr(harness, "int8_available", False) else [])
     results["int8_arms"] = int8_arms
-    for arm in arm_order + int8_arms:
+    # Experimental TSK graph-boost arms (Rank 13) — also outside arm_order;
+    # consumed by reports/crossref_pack_v1.md.
+    graph_arms = (["hybrid-graph", "hybrid-graph-weak"]
+                  if (harness.dense_available
+                      and getattr(harness, "graph_available", False)) else [])
+    results["graph_arms"] = graph_arms
+    for arm in arm_order + int8_arms + graph_arms:
         results["arms"][arm] = harness.evaluate_arm(arm, APP_CONFIG)
         o = results["arms"][arm]["overall"]
-        print(f"  {arm:12s} recall@20={o['recall_at_20']:.3f} "
+        print(f"  {arm:17s} recall@20={o['recall_at_20']:.3f} "
               f"MRR={o['mrr']:.3f} nDCG@10={o['ndcg_at_10']:.3f}")
     return results
 
@@ -1466,6 +1475,18 @@ def cmd_package(*, fp32: bool = False) -> None:
     rp = REPORTS_DIR / PACK_DIET_REPORT_FILENAME
     rp.write_text(report, encoding="utf-8")
     print(f"Wrote {rp}")
+
+    # TSK crossref-pack report (committed): size + graph-boost measurement.
+    from .pack_report import CROSSREF_REPORT_FILENAME, render_crossref_pack_report
+    cross_file = next(
+        (f for f in result.files if f.name == "bundled_crossrefs.sqlite"), None)
+    if cross_file is not None:
+        report = render_crossref_pack_report(
+            corpus_version=CORPUS_VERSION_PLACEHOLDER,
+            pack_file=cross_file, eval_results=eval_results)
+        rp = REPORTS_DIR / CROSSREF_REPORT_FILENAME
+        rp.write_text(report, encoding="utf-8")
+        print(f"Wrote {rp}")
     print("Candidate only — the architect's 23-point spot-check gates ship.")
 
 
