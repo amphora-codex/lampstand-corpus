@@ -484,10 +484,23 @@ def run_sweep(harness: Harness) -> dict:
             "metrics": harness.overall_metrics("hybrid", cfg).as_dict(),
         })
 
+    # BM25-ONLY sensitivity to the per-type limit — the honesty check for any
+    # hybrid "win": if BM25 alone at the same per-type limit beats the swept
+    # hybrid, the gain came from the tighter limit, not from dense fusion.
+    bm25_rows = [
+        {
+            "bm25_per_type": pt,
+            "metrics": harness.overall_metrics(
+                "bm25", FusionConfig(bm25_per_type=pt)).as_dict(),
+        }
+        for pt in SWEEP_PER_TYPE
+    ]
+
     return {
         "baseline": {"config": APP_CONFIG.as_dict(), "label": APP_CONFIG.label(),
                      "metrics": baseline},
         "grid": rows,
         "best": best,
         "lambda_exploration": lam_rows,
+        "bm25_sensitivity": bm25_rows,
     }

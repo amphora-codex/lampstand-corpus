@@ -1313,11 +1313,14 @@ def _write_eval_report(gold: dict, results: dict) -> None:
 
 
 def _evaluate_arms(gold: dict, harness, dense_reason: str | None) -> dict:
-    from .eval_retrieval import APP_CONFIG, APP_DENSE_RAW_FETCH, FusionConfig
+    from .eval_retrieval import APP_CONFIG
 
+    # Note: a deeper dense-only arm (e.g. depth 80) is deliberately NOT run —
+    # single-list RRF is rank-preserving, so no metric computed within the top
+    # 20 can differ from the depth-20 dense arm by construction.
     arm_order = ["bm25"]
     if harness.dense_available:
-        arm_order += ["dense", "dense@80", "hybrid"]
+        arm_order += ["dense", "hybrid"]
     results: dict = {
         "app_config": APP_CONFIG.as_dict(),
         "app_config_label": APP_CONFIG.label(),
@@ -1327,12 +1330,8 @@ def _evaluate_arms(gold: dict, harness, dense_reason: str | None) -> dict:
     }
     if dense_reason:
         results["dense_unavailable_reason"] = dense_reason
-    deep_dense = FusionConfig(dense_depth=80,
-                              dense_raw_fetch=max(320, APP_DENSE_RAW_FETCH))
     for arm in arm_order:
-        base_arm = "dense" if arm == "dense@80" else arm
-        cfg = deep_dense if arm == "dense@80" else APP_CONFIG
-        results["arms"][arm] = harness.evaluate_arm(base_arm, cfg)
+        results["arms"][arm] = harness.evaluate_arm(arm, APP_CONFIG)
         o = results["arms"][arm]["overall"]
         print(f"  {arm:9s} recall@20={o['recall_at_20']:.3f} "
               f"MRR={o['mrr']:.3f} nDCG@10={o['ndcg_at_10']:.3f}")

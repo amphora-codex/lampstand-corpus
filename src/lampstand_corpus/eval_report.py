@@ -114,10 +114,18 @@ def render_report(gold: dict, results: dict, sweep: dict | None) -> str:
     w.append("")
     w.append(f"Fusion config: `{results['app_config_label']}` "
              "(HybridRetriever.swift). BM25 arm = the app's per-type-balanced "
-             "lexical ranking; dense arm = the app's deduped dense contribution; "
-             "hybrid = RRF fusion of both, exactly as `hybridContext` fuses. "
-             "`dense@80` is a supplementary deeper dense-only arm (depth 80, raw "
-             "320) for the F5 question — not an app mode.")
+             "lexical ranking; dense arm = the app's deduped dense contribution "
+             "(depth 20 — a deeper dense-only arm cannot change any top-20 "
+             "metric, since single-list RRF is rank-preserving); hybrid = RRF "
+             "fusion of both, exactly as `hybridContext` fuses.")
+    w.append("")
+    w.append("Labels are CONSERVATIVE (zero-annotation): only the derived "
+             "chunks count as relevant. A doctrinally-correct sibling hit — "
+             "e.g. WSC 77 'ninth commandment' retrieved for a Heidelberg "
+             "ninth-commandment question whose labels are its proof-text "
+             "VERSES — scores as a miss. Absolute numbers are therefore floors, "
+             "not user-experienced quality; ARM-VS-ARM deltas on identical "
+             "labels are the meaningful signal.")
     w.append("")
     if not results.get("dense_available", False):
         w.append("> **DENSE ARMS UNAVAILABLE** — the query encoder failed to "
@@ -147,6 +155,21 @@ def render_report(gold: dict, results: dict, sweep: dict | None) -> str:
              f"category for JUSTIFIED; ≥ {_F5_MARGINAL_MIN:.1%} for MARGINAL.")
     w.append("")
     w.extend(lines)
+    if "hybrid" in results["arms"]:
+        hn_parts = ", ".join(
+            f"{arm} {results['arms'][arm]['hardneg_pairwise']['wins']}"
+            f"/{results['arms'][arm]['hardneg_pairwise']['count']}"
+            for arm in results["arm_order"])
+        w.append(f"- hardneg pairwise wins (DRAFT suite): {hn_parts}")
+    w.append("")
+    w.append("Context for the verdict: these corpus-native labels favor lexical "
+             "overlap (crossref and commentary-anchor queries share verse "
+             "wording with their targets), while dense retrieval's known "
+             "strength — short paraphrased USER queries (the app's ~46-case "
+             "eval, recall@20≈0.826) — is structurally under-represented here. "
+             "This verdict gates the corpus-side evidence only; the app-side "
+             "eval remains the user-experience gate, and the two should be "
+             "read together before any decision about the ~1.9 GB dense pack.")
     w.append("")
 
     # -- sweep ------------------------------------------------------------------------
@@ -187,6 +210,33 @@ def render_report(gold: dict, results: dict, sweep: dict | None) -> str:
             cells = " | ".join(_fmt(row["metrics"][c]) for c in _METRIC_COLS)
             w.append(f"| {row['lambda']:g} | {cells} |")
         w.append("")
+        if sweep.get("bm25_sensitivity"):
+            w.append("### Honesty check — BM25-only across the per-type limit")
+            w.append("")
+            w.append("Any hybrid \"win\" must be read against BM25 ALONE at the "
+                     "same per-type limit; a gain that survives here is fusion's, "
+                     "one that doesn't came from the tighter limit:")
+            w.append("")
+            w.extend(_metrics_table([
+                (f"bm25-only perType={row['bm25_per_type']}", row["metrics"])
+                for row in sweep["bm25_sensitivity"]
+            ]))
+            w.append("")
+            best_h = max(r["metrics"]["recall_at_20"] for r in sweep["grid"])
+            best_b = max(r["metrics"]["recall_at_20"]
+                         for r in sweep["bm25_sensitivity"])
+            rel = "BEATS" if best_h > best_b else "does NOT beat"
+            w.append(f"Best swept hybrid recall@20 = {_fmt(best_h)}; best "
+                     f"BM25-only recall@20 = {_fmt(best_b)} — the swept hybrid "
+                     f"{rel} BM25-only on these labels.")
+            w.append("")
+            w.append("Caveat on the per-type limit: relevant chunks in all three "
+                     "scored categories are SCRIPTURE, so a tighter per-type "
+                     "limit mechanically favors these labels by squeezing "
+                     "commentary/lexicon out of the top-20 window. A user query "
+                     "like \"propitiation\" WANTS commentary and lexicon rows; "
+                     "do not lower bm25PerType on this evidence alone.")
+            w.append("")
 
     # -- parity + flags -------------------------------------------------------------
     w.append("## 5. retrieve.py ↔ app parity notes")
