@@ -286,6 +286,42 @@ def _bsb_chunks_for_range(
     return out
 
 
+# --- reverse proof-text index (Rank 14) ---------------------------------------------
+def build_prooftext_rows(confessions_db: Path) -> list[tuple[int, str, str]]:
+    """(verse_key, document, section_key) rows: verse → citing sections.
+
+    Every proof-text ref of every confession/catechism section is expanded to
+    per-verse rows (ranges enumerated) on the same arithmetic verse key as the
+    TSK edge table, so the app's reading panel answers "this verse is cited by
+    WCF 11.1 / HC 60 / Dort h1.a1" with one indexed lookup. Deterministic,
+    deduped, sorted.
+    """
+    import json as _json
+
+    conn = sqlite3.connect(confessions_db)
+    try:
+        rows = conn.execute(
+            "SELECT document, key, proof_texts FROM section "
+            "WHERE proof_texts IS NOT NULL ORDER BY document, ord"
+        ).fetchall()
+    finally:
+        conn.close()
+    out: set[tuple[int, str, str]] = set()
+    for document, key, proofs_json in rows:
+        for ref in _json.loads(proofs_json):
+            book, ch = ref.get("book"), ref.get("chapter")
+            vs = ref.get("verse_start")
+            ve = ref.get("verse_end", vs)
+            if book not in books.ORDER_INDEX or not vs:
+                continue
+            for v in range(vs, (ve or vs) + 1):
+                try:
+                    out.add((verse_key(book, ch, v), document, key))
+                except ValueError:
+                    continue  # off-key-range ref stays flagged upstream
+    return sorted(out)
+
+
 # --- pack writer ------------------------------------------------------------------------
 _CROSSREFS_SCHEMA = """
 CREATE TABLE meta (
@@ -302,6 +338,12 @@ CREATE TABLE chunk_crossref (
     n_neighbors INTEGER NOT NULL,
     neighbors   BLOB NOT NULL        -- see meta.neighbor_format (weight desc)
 );
+CREATE TABLE prooftext (
+    verse_key INTEGER NOT NULL,      -- same arithmetic key as crossref.src_verse
+    document  TEXT NOT NULL,         -- confession document id (wcf/heidelberg/…)
+    key       TEXT NOT NULL,         -- section key ("11.1", "60", "h1.a1")
+    PRIMARY KEY (verse_key, document, key)
+) WITHOUT ROWID;
 """
 
 
@@ -310,8 +352,10 @@ def build_bundled_crossrefs(
     emb_db: Path,
     id_map: dict[str, int],
     dst_path: Path,
+    confessions_db: Path | None = None,
 ) -> dict:
-    """Write ``bundled_crossrefs.sqlite`` (edge table + expansion). Returns stats."""
+    """Write ``bundled_crossrefs.sqlite`` (edges + expansion + reverse
+    proof-text index). Returns stats."""
     conn = sqlite3.connect(crossrefs_db)
     try:
         src_meta = conn.execute(
@@ -329,6 +373,9 @@ def build_bundled_crossrefs(
         for sid, nbrs in sorted(expansion.items(), key=lambda kv: id_map[kv[0]])
     ]
 
+    prooftext_rows = (
+        build_prooftext_rows(confessions_db) if confessions_db else [])
+
     if dst_path.exists():
         dst_path.unlink()
     dst_path.parent.mkdir(parents=True, exist_ok=True)
@@ -337,6 +384,7 @@ def build_bundled_crossrefs(
         dst.executescript(_CROSSREFS_SCHEMA)
         dst.executemany("INSERT INTO crossref VALUES (?,?,?)", edge_rows)
         dst.executemany("INSERT INTO chunk_crossref VALUES (?,?,?)", expansion_rows)
+        dst.executemany("INSERT INTO prooftext VALUES (?,?,?)", prooftext_rows)
         dst.executemany(
             "INSERT INTO meta VALUES (?,?)",
             [
@@ -353,6 +401,7 @@ def build_bundled_crossrefs(
                 ("n_sources", str(stats["n_sources"])),
                 ("n_edges", str(stats["n_edges"])),
                 ("n_expanded_chunks", str(len(expansion_rows))),
+                ("n_prooftext_rows", str(len(prooftext_rows))),
                 ("license", license_),
                 ("attribution", attribution),
             ],
@@ -365,6 +414,7 @@ def build_bundled_crossrefs(
         "n_sources": stats["n_sources"],
         "n_edges": stats["n_edges"],
         "n_expanded_chunks": len(expansion_rows),
+        "n_prooftext_rows": len(prooftext_rows),
         "expansion_top_n": EXPANSION_TOP_N,
         "license": license_,
         "attribution": attribution,

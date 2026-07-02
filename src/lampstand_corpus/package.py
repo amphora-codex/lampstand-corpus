@@ -777,7 +777,8 @@ def package_corpus(
     from .crossref_pack import build_bundled_crossrefs
     c = build_bundled_crossrefs(
         output_dir / "crossrefs.sqlite", output_dir / "embeddings.sqlite",
-        id_map, packs_dir / "bundled_crossrefs.sqlite")
+        id_map, packs_dir / "bundled_crossrefs.sqlite",
+        confessions_db=output_dir / "confessions.sqlite")
     register("bundled", "bundled_crossrefs.sqlite", "crossrefs", c)
 
     # --- On-demand packs ---

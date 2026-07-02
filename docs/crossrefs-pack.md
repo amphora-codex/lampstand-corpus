@@ -34,7 +34,19 @@ CREATE TABLE chunk_crossref (
     n_neighbors INTEGER NOT NULL,
     neighbors   BLOB NOT NULL        -- aggregated-weight desc
 );
+CREATE TABLE prooftext (             -- Rank 14 reverse proof-text index
+    verse_key INTEGER NOT NULL,      -- same arithmetic key as crossref.src_verse
+    document  TEXT NOT NULL,         -- confession document id (wcf/heidelberg/…)
+    key       TEXT NOT NULL,         -- section key ("11.1", "60", "h1.a1")
+    PRIMARY KEY (verse_key, document, key)
+) WITHOUT ROWID;
 ```
+
+The `prooftext` table answers "this verse is cited by WCF 11.1 / HC 60 / Dort
+h1.a1" with one primary-key prefix lookup; proof ranges are pre-expanded to
+per-verse rows. Coverage note: WCF/LBCF/Heidelberg/Dort carry proof apparatus;
+the WSC/WLC/Belgic source editions have none (architect decision pending on a
+supplemental source).
 
 Key `meta` rows: `format=crossrefs-pack-v1`, `verse_key`, `target_format`,
 `neighbor_format`, `id_assignment`, `expansion_top_n` (8),

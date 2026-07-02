@@ -77,20 +77,26 @@ def _make_confessions(path: Path) -> None:
         "CREATE TABLE document(id TEXT PRIMARY KEY, name TEXT, shortcode TEXT,"
         " version TEXT, license TEXT, source_url TEXT, retrieved TEXT, checksum TEXT);"
         "CREATE TABLE section(document TEXT, key TEXT, ord INTEGER, title TEXT,"
-        " text TEXT, PRIMARY KEY(document, key));"
+        " text TEXT, proof_texts TEXT, PRIMARY KEY(document, key));"
     )
     conn.execute("INSERT INTO meta VALUES('schema_version','1')")
     for did, name in (("wsc", "Westminster Shorter Catechism"),
-                      ("wcf", "Westminster Confession of Faith")):
+                      ("wcf", "Westminster Confession of Faith"),
+                      ("heidelberg", "Heidelberg Catechism")):
         conn.execute(
             "INSERT INTO document VALUES(?,?,?,?,?,?,?,?)",
             (did, name, did.upper(), "v1", "Public domain", "http://x",
              "2026-06-10", "ck"),
         )
         conn.execute(
-            "INSERT INTO section VALUES(?,?,?,?,?)",
+            "INSERT INTO section VALUES(?,?,?,?,?,NULL)",
             (did, "1", 0, "Title", f"Body of {did}."),
         )
+    # A proof-texted section for the reverse index (HC 60 cites GEN 1:1-2).
+    conn.execute(
+        "INSERT INTO section VALUES('heidelberg','60',1,NULL,'Only by faith.',"
+        "'[{\"book\":\"GEN\",\"chapter\":1,\"verse_start\":1,"
+        "\"verse_end\":2}]')")
     conn.commit()
     conn.close()
 
@@ -466,6 +472,14 @@ def test_bundled_crossrefs_pack_edges_and_expansion(tmp_path):
     assert cp.execute(
         "SELECT count(*) FROM chunk_crossref WHERE chunk_id=?",
         (int_id["scr_j"],)).fetchone()[0] == 0
+
+    # Reverse proof-text index (Rank 14): HC 60 cites GEN 1:1 in the fixture.
+    rows = cp.execute(
+        "SELECT document, key FROM prooftext WHERE verse_key=?",
+        (verse_key("GEN", 1, 1),)).fetchall()
+    assert ("heidelberg", "60") in rows
+    assert int(dict(cp.execute("SELECT key, value FROM meta"))
+               ["n_prooftext_rows"]) >= 1
     sp.close()
     cp.close()
 
