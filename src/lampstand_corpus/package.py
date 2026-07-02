@@ -48,7 +48,9 @@ from .pack_codec import assign_int_ids, encode_postings, quantize_int8
 # Corpus version placeholder. The pipeline NEVER finalizes a version — tagging
 # happens only after the architect's 23-point spot-check passes. This string is a
 # placeholder the human replaces (and tags) at ship time.
-CORPUS_VERSION_PLACEHOLDER = "corpus-v1.0.0-candidate"
+# v2: the Rank-8/14/7 re-chunk release — every chunk id changed (dual
+# granularity, structural headers, commentary splits, BSB-only dense).
+CORPUS_VERSION_PLACEHOLDER = "corpus-v2.0.0-candidate"
 
 # Bundled-pack scope (architect-locked).
 BUNDLED_TRANSLATION = "bsb"
