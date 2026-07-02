@@ -1,0 +1,548 @@
+{
+  "status": "DRAFT — pending theological-advisor review",
+  "version": "v1",
+  "method": "WSC/WLC same-document question pairs ranked by answer content-token Jaccard (stopworded), floor 0.1, greedy one-use-per-question; deterministic (no RNG).",
+  "review_note": "Each triple asserts that question A's answer chunk should outrank question B's for query A. An advisor may strike or amend pairs; edits to this file are honored verbatim by build-eval.",
+  "triples": [
+    {
+      "id": "hn_wlc_134_140",
+      "document": "wlc",
+      "query": "Which is the sixth commandment?",
+      "relevant_anchor": "WLC 134",
+      "hard_negative_anchor": "WLC 140",
+      "hard_negative_question": "Which is the eighth commandment?",
+      "answer_jaccard": 0.4286
+    },
+    {
+      "id": "hn_wsc_67_73",
+      "document": "wsc",
+      "query": "Which is the Sixth Commandment?",
+      "relevant_anchor": "WSC 67",
+      "hard_negative_anchor": "WSC 73",
+      "hard_negative_question": "Which is the Eighth Commandment?",
+      "answer_jaccard": 0.4286
+    },
+    {
+      "id": "hn_wsc_77_78",
+      "document": "wsc",
+      "query": "What is required in the Ninth Commandment?",
+      "relevant_anchor": "WSC 77",
+      "hard_negative_anchor": "WSC 78",
+      "hard_negative_question": "What is forbidden in the Ninth Commandment?",
+      "answer_jaccard": 0.3684
+    },
+    {
+      "id": "hn_wsc_64_65",
+      "document": "wsc",
+      "query": "What is required in the Fifth Commandment?",
+      "relevant_anchor": "WSC 64",
+      "hard_negative_anchor": "WSC 65",
+      "hard_negative_question": "What is the forbidden in the Fifth Commandment?",
+      "answer_jaccard": 0.3478
+    },
+    {
+      "id": "hn_wlc_115_120",
+      "document": "wlc",
+      "query": "Which is the fourth commandment?",
+      "relevant_anchor": "WLC 115",
+      "hard_negative_anchor": "WLC 120",
+      "hard_negative_question": "What are the reasons annexed to the fourth commandment, the more to enforce it?",
+      "answer_jaccard": 0.3443
+    },
+    {
+      "id": "hn_wsc_13_15",
+      "document": "wsc",
+      "query": "Did our first parents continue in the estate wherein they were created?",
+      "relevant_anchor": "WSC 13",
+      "hard_negative_anchor": "WSC 15",
+      "hard_negative_question": "What was the sin whereby our first parents fell from the estate wherein they were created?",
+      "answer_jaccard": 0.3333
+    },
+    {
+      "id": "hn_wsc_32_36",
+      "document": "wsc",
+      "query": "What benefits do they that are effectually called partake of in this life?",
+      "relevant_anchor": "WSC 32",
+      "hard_negative_anchor": "WSC 36",
+      "hard_negative_question": "What are the benefits which in this life do accompany or flow from justification, adoption, and sanctification?",
+      "answer_jaccard": 0.32
+    },
+    {
+      "id": "hn_wlc_65_69",
+      "document": "wlc",
+      "query": "What special benefits do the members of the invisible church enjoy by Christ?",
+      "relevant_anchor": "WLC 65",
+      "hard_negative_anchor": "WLC 69",
+      "hard_negative_question": "What is the communion in grace which the members of the invisible church have with Christ?",
+      "answer_jaccard": 0.3
+    },
+    {
+      "id": "hn_wsc_47_51",
+      "document": "wsc",
+      "query": "What is forbidden in the First Commandment?",
+      "relevant_anchor": "WSC 47",
+      "hard_negative_anchor": "WSC 51",
+      "hard_negative_question": "What is forbidden in the Second Commandment?",
+      "answer_jaccard": 0.3
+    },
+    {
+      "id": "hn_wlc_123_133",
+      "document": "wlc",
+      "query": "Which is the fifth commandment?",
+      "relevant_anchor": "WLC 123",
+      "hard_negative_anchor": "WLC 133",
+      "hard_negative_question": "What is the reason annexed to the fifth commandment, the more to enforce it?",
+      "answer_jaccard": 0.2857
+    },
+    {
+      "id": "hn_wsc_29_30",
+      "document": "wsc",
+      "query": "How are we made partakers of the redemption purchased by Christ?",
+      "relevant_anchor": "WSC 29",
+      "hard_negative_anchor": "WSC 30",
+      "hard_negative_question": "How doth the Spirit apply to us the redemption purchased by Christ?",
+      "answer_jaccard": 0.2857
+    },
+    {
+      "id": "hn_wsc_74_75",
+      "document": "wsc",
+      "query": "What is required in the Eighth Commandment?",
+      "relevant_anchor": "WSC 74",
+      "hard_negative_anchor": "WSC 75",
+      "hard_negative_question": "What is forbidden in the Eighth Commandment?",
+      "answer_jaccard": 0.2778
+    },
+    {
+      "id": "hn_wlc_5_91",
+      "document": "wlc",
+      "query": "What do the Scriptures principally teach?",
+      "relevant_anchor": "WLC 5",
+      "hard_negative_anchor": "WLC 91",
+      "hard_negative_question": "What is the duty which God requires of man?",
+      "answer_jaccard": 0.2727
+    },
+    {
+      "id": "hn_wlc_107_110",
+      "document": "wlc",
+      "query": "Which is the second commandment?",
+      "relevant_anchor": "WLC 107",
+      "hard_negative_anchor": "WLC 110",
+      "hard_negative_question": "What are the reasons annexed to the second commandment, the more to enforce it?",
+      "answer_jaccard": 0.2639
+    },
+    {
+      "id": "hn_wlc_10_11",
+      "document": "wlc",
+      "query": "What are the personal properties of the three persons in the Godhead?",
+      "relevant_anchor": "WLC 10",
+      "hard_negative_anchor": "WLC 11",
+      "hard_negative_question": "How does it appear that the Son and the Holy Ghost are God equal with the Father?",
+      "answer_jaccard": 0.2632
+    },
+    {
+      "id": "hn_wlc_111_114",
+      "document": "wlc",
+      "query": "Which is the third commandment?",
+      "relevant_anchor": "WLC 111",
+      "hard_negative_anchor": "WLC 114",
+      "hard_negative_question": "What reasons are annexed to the third commandment?",
+      "answer_jaccard": 0.2564
+    },
+    {
+      "id": "hn_wlc_137_143",
+      "document": "wlc",
+      "query": "Which is the seventh commandment?",
+      "relevant_anchor": "WLC 137",
+      "hard_negative_anchor": "WLC 143",
+      "hard_negative_question": "Which is the ninth commandment?",
+      "answer_jaccard": 0.25
+    },
+    {
+      "id": "hn_wsc_39_40",
+      "document": "wsc",
+      "query": "What is the duty which God requireth of man?",
+      "relevant_anchor": "WSC 39",
+      "hard_negative_anchor": "WSC 40",
+      "hard_negative_question": "What did God at first reveal to man for the rule of his obedience?",
+      "answer_jaccard": 0.25
+    },
+    {
+      "id": "hn_wsc_70_76",
+      "document": "wsc",
+      "query": "Which is the Seventh Commandment?",
+      "relevant_anchor": "WSC 70",
+      "hard_negative_anchor": "WSC 76",
+      "hard_negative_question": "What is the Ninth Commandment?",
+      "answer_jaccard": 0.25
+    },
+    {
+      "id": "hn_wlc_82_86",
+      "document": "wlc",
+      "query": "What is the communion in glory which the members of the invisible church have with Christ?",
+      "relevant_anchor": "WLC 82",
+      "hard_negative_anchor": "WLC 86",
+      "hard_negative_question": "What is the communion in glory with Christ, which the members of the invisible church enjoy immediately after death?",
+      "answer_jaccard": 0.2407
+    },
+    {
+      "id": "hn_wsc_50_58",
+      "document": "wsc",
+      "query": "What is required in the Second Commandment?",
+      "relevant_anchor": "WSC 50",
+      "hard_negative_anchor": "WSC 58",
+      "hard_negative_question": "What is required in the Fourth Commandment?",
+      "answer_jaccard": 0.24
+    },
+    {
+      "id": "hn_wsc_68_69",
+      "document": "wsc",
+      "query": "What is required in the Sixth Commandment?",
+      "relevant_anchor": "WSC 68",
+      "hard_negative_anchor": "WSC 69",
+      "hard_negative_question": "What is forbidden in the Sixth Commandment?",
+      "answer_jaccard": 0.2353
+    },
+    {
+      "id": "hn_wlc_131_132",
+      "document": "wlc",
+      "query": "What are the duties of equals?",
+      "relevant_anchor": "WLC 131",
+      "hard_negative_anchor": "WLC 132",
+      "hard_negative_question": "What are the sins of equals?",
+      "answer_jaccard": 0.2333
+    },
+    {
+      "id": "hn_wlc_35_164",
+      "document": "wlc",
+      "query": "How is the covenant of grace administered under the New Testament?",
+      "relevant_anchor": "WLC 35",
+      "hard_negative_anchor": "WLC 164",
+      "hard_negative_question": "How many sacraments has Christ instituted in his church under the New Testament?",
+      "answer_jaccard": 0.2188
+    },
+    {
+      "id": "hn_wlc_147_148",
+      "document": "wlc",
+      "query": "What are the duties required in the tenth commandment?",
+      "relevant_anchor": "WLC 147",
+      "hard_negative_anchor": "WLC 148",
+      "hard_negative_question": "What are the sins forbidden in the tenth commandment?",
+      "answer_jaccard": 0.2188
+    },
+    {
+      "id": "hn_wlc_70_73",
+      "document": "wlc",
+      "query": "What is justification?",
+      "relevant_anchor": "WLC 70",
+      "hard_negative_anchor": "WLC 73",
+      "hard_negative_question": "How does faith justify a sinner in the sight of God?",
+      "answer_jaccard": 0.2174
+    },
+    {
+      "id": "hn_wsc_19_27",
+      "document": "wsc",
+      "query": "What is the misery of that estate whereinto man fell?",
+      "relevant_anchor": "WSC 19",
+      "hard_negative_anchor": "WSC 27",
+      "hard_negative_question": "Wherein did Christ's humiliation consist?",
+      "answer_jaccard": 0.2121
+    },
+    {
+      "id": "hn_wlc_102_122",
+      "document": "wlc",
+      "query": "What is the sum of the four commandments which contain our duty to God?",
+      "relevant_anchor": "WLC 102",
+      "hard_negative_anchor": "WLC 122",
+      "hard_negative_question": "What is the sum of the six commandments which contain our duty to man?",
+      "answer_jaccard": 0.2105
+    },
+    {
+      "id": "hn_wsc_89_91",
+      "document": "wsc",
+      "query": "How is the Word made effectual to salvation?",
+      "relevant_anchor": "WSC 89",
+      "hard_negative_anchor": "WSC 91",
+      "hard_negative_question": "How do the sacraments become effectual means of salvation?",
+      "answer_jaccard": 0.2069
+    },
+    {
+      "id": "hn_wlc_57_58",
+      "document": "wlc",
+      "query": "What benefits has Christ procured by his mediation?",
+      "relevant_anchor": "WLC 57",
+      "hard_negative_anchor": "WLC 58",
+      "hard_negative_question": "How do we come to be made partakers of the benefits which Christ has procured?",
+      "answer_jaccard": 0.2
+    },
+    {
+      "id": "hn_wsc_53_56",
+      "document": "wsc",
+      "query": "Which is the Third Commandment?",
+      "relevant_anchor": "WSC 53",
+      "hard_negative_anchor": "WSC 56",
+      "hard_negative_question": "What is the reason annexed to the Third Commandment?",
+      "answer_jaccard": 0.2
+    },
+    {
+      "id": "hn_wsc_45_48",
+      "document": "wsc",
+      "query": "Which is the First Commandment?",
+      "relevant_anchor": "WSC 45",
+      "hard_negative_anchor": "WSC 48",
+      "hard_negative_question": "What are we specially taught by these words, \"before me\" in the First Commandment?",
+      "answer_jaccard": 0.1905
+    },
+    {
+      "id": "hn_wlc_8_61",
+      "document": "wlc",
+      "query": "Are there more Gods than one?",
+      "relevant_anchor": "WLC 8",
+      "hard_negative_anchor": "WLC 61",
+      "hard_negative_question": "Are all they saved who hear the gospel, and live in the church?",
+      "answer_jaccard": 0.1875
+    },
+    {
+      "id": "hn_wlc_72_76",
+      "document": "wlc",
+      "query": "What is justifying faith?",
+      "relevant_anchor": "WLC 72",
+      "hard_negative_anchor": "WLC 76",
+      "hard_negative_question": "What is repentance unto life?",
+      "answer_jaccard": 0.1875
+    },
+    {
+      "id": "hn_wsc_37_38",
+      "document": "wsc",
+      "query": "What benefits do believers receive from Christ at death?",
+      "relevant_anchor": "WSC 37",
+      "hard_negative_anchor": "WSC 38",
+      "hard_negative_question": "What benefits do believers receive from Christ at the resurrection?",
+      "answer_jaccard": 0.1875
+    },
+    {
+      "id": "hn_wlc_89_90",
+      "document": "wlc",
+      "query": "What shall be done to the wicked at the day of judgment?",
+      "relevant_anchor": "WLC 89",
+      "hard_negative_anchor": "WLC 90",
+      "hard_negative_question": "What shall be done to the righteous at the day of judgment",
+      "answer_jaccard": 0.1868
+    },
+    {
+      "id": "hn_wlc_112_190",
+      "document": "wlc",
+      "query": "What is required in the third commandment?",
+      "relevant_anchor": "WLC 112",
+      "hard_negative_anchor": "WLC 190",
+      "hard_negative_question": "What do we pray for in the first petition?",
+      "answer_jaccard": 0.1857
+    },
+    {
+      "id": "hn_wsc_85_88",
+      "document": "wsc",
+      "query": "What doth God require of us, that we may escape his wrath and curse due to us for sin?",
+      "relevant_anchor": "WSC 85",
+      "hard_negative_anchor": "WSC 88",
+      "hard_negative_question": "What are the outward means whereby Christ communicateth to us the benefits of redemption?",
+      "answer_jaccard": 0.1852
+    },
+    {
+      "id": "hn_wsc_33_34",
+      "document": "wsc",
+      "query": "What is justification?",
+      "relevant_anchor": "WSC 33",
+      "hard_negative_anchor": "WSC 34",
+      "hard_negative_question": "What is adoption?",
+      "answer_jaccard": 0.1818
+    },
+    {
+      "id": "hn_wsc_43_44",
+      "document": "wsc",
+      "query": "What is the preface to the Ten Commandments?",
+      "relevant_anchor": "WSC 43",
+      "hard_negative_anchor": "WSC 44",
+      "hard_negative_question": "What doth the preface to the Ten Commandments teach us?",
+      "answer_jaccard": 0.1818
+    },
+    {
+      "id": "hn_wlc_33_34",
+      "document": "wlc",
+      "query": "Was the covenant of grace always administered after one and the same manner?",
+      "relevant_anchor": "WLC 33",
+      "hard_negative_anchor": "WLC 34",
+      "hard_negative_question": "How was the covenant of grace administered under the Old Testament?",
+      "answer_jaccard": 0.1778
+    },
+    {
+      "id": "hn_wlc_39_40",
+      "document": "wlc",
+      "query": "Why was it requisite that the Mediator should be man?",
+      "relevant_anchor": "WLC 39",
+      "hard_negative_anchor": "WLC 40",
+      "hard_negative_question": "Why was it requisite that the Mediator should be God and man in one person?",
+      "answer_jaccard": 0.175
+    },
+    {
+      "id": "hn_wlc_12_14",
+      "document": "wlc",
+      "query": "What are the decrees of God?",
+      "relevant_anchor": "WLC 12",
+      "hard_negative_anchor": "WLC 14",
+      "hard_negative_question": "How does God execute his decrees?",
+      "answer_jaccard": 0.1724
+    },
+    {
+      "id": "hn_wlc_168_170",
+      "document": "wlc",
+      "query": "What is the Lord's Supper?",
+      "relevant_anchor": "WLC 168",
+      "hard_negative_anchor": "WLC 170",
+      "hard_negative_question": "How do they that worthily communicate in the Lord's Supper feed upon the body and blood of Christ therein?",
+      "answer_jaccard": 0.1714
+    },
+    {
+      "id": "hn_wlc_100_150",
+      "document": "wlc",
+      "query": "What special things are we to consider in the ten commandments?",
+      "relevant_anchor": "WLC 100",
+      "hard_negative_anchor": "WLC 150",
+      "hard_negative_question": "Are all transgressions of the law of God equally heinous in themselves, and in the sight of God?",
+      "answer_jaccard": 0.1667
+    },
+    {
+      "id": "hn_wsc_10_35",
+      "document": "wsc",
+      "query": "How did God create man?",
+      "relevant_anchor": "WSC 10",
+      "hard_negative_anchor": "WSC 35",
+      "hard_negative_question": "What is sanctification?",
+      "answer_jaccard": 0.1667
+    },
+    {
+      "id": "hn_wlc_20_92",
+      "document": "wlc",
+      "query": "What was the providence of God toward man in the estate in which he was created?",
+      "relevant_anchor": "WLC 20",
+      "hard_negative_anchor": "WLC 92",
+      "hard_negative_question": "What did God at first reveal unto man as the rule of his obedience?",
+      "answer_jaccard": 0.1636
+    },
+    {
+      "id": "hn_wlc_2_4",
+      "document": "wlc",
+      "query": "How does it appear that there is a God?",
+      "relevant_anchor": "WLC 2",
+      "hard_negative_anchor": "WLC 4",
+      "hard_negative_question": "How does it appear that the Scriptures are the Word of God?",
+      "answer_jaccard": 0.1628
+    },
+    {
+      "id": "hn_wlc_94_96",
+      "document": "wlc",
+      "query": "Is there any use of the moral law to man since the fall?",
+      "relevant_anchor": "WLC 94",
+      "hard_negative_anchor": "WLC 96",
+      "hard_negative_question": "What particular use is there of the moral law to unregenerate men?",
+      "answer_jaccard": 0.1622
+    },
+    {
+      "id": "hn_wsc_17_20",
+      "document": "wsc",
+      "query": "Into what estate did the fall bring mankind?",
+      "relevant_anchor": "WSC 17",
+      "hard_negative_anchor": "WSC 20",
+      "hard_negative_question": "Did God leave all mankind to perish in the estate of sin and misery?",
+      "answer_jaccard": 0.16
+    },
+    {
+      "id": "hn_wsc_61_72",
+      "document": "wsc",
+      "query": "What is forbidden in the Fourth Commandment?",
+      "relevant_anchor": "WSC 61",
+      "hard_negative_anchor": "WSC 72",
+      "hard_negative_question": "What is forbidden in the Seventh Commandment?",
+      "answer_jaccard": 0.16
+    },
+    {
+      "id": "hn_wsc_49_57",
+      "document": "wsc",
+      "query": "Which is the Second Commandment?",
+      "relevant_anchor": "WSC 49",
+      "hard_negative_anchor": "WSC 57",
+      "hard_negative_question": "Which is the Fourth Commandment?",
+      "answer_jaccard": 0.1587
+    },
+    {
+      "id": "hn_wlc_9_37",
+      "document": "wlc",
+      "query": "How many persons are there in the Godhead?",
+      "relevant_anchor": "WLC 9",
+      "hard_negative_anchor": "WLC 37",
+      "hard_negative_question": "How did Christ, being the Son of God, become man?",
+      "answer_jaccard": 0.1579
+    },
+    {
+      "id": "hn_wlc_127_128",
+      "document": "wlc",
+      "query": "What is the honor that inferiors owe to their superiors.?",
+      "relevant_anchor": "WLC 127",
+      "hard_negative_anchor": "WLC 128",
+      "hard_negative_question": "What are the sins of inferiors against their superiors?",
+      "answer_jaccard": 0.1579
+    },
+    {
+      "id": "hn_wlc_84_183",
+      "document": "wlc",
+      "query": "Shall all men die?",
+      "relevant_anchor": "WLC 84",
+      "hard_negative_anchor": "WLC 183",
+      "hard_negative_question": "For whom are we to pray?",
+      "answer_jaccard": 0.1562
+    },
+    {
+      "id": "hn_wlc_125_126",
+      "document": "wlc",
+      "query": "Why are superiors styled father and mother?",
+      "relevant_anchor": "WLC 125",
+      "hard_negative_anchor": "WLC 126",
+      "hard_negative_question": "What is the general scope of the fifth commandment?",
+      "answer_jaccard": 0.1562
+    },
+    {
+      "id": "hn_wlc_153_154",
+      "document": "wlc",
+      "query": "What does God require of us, that we may escape his wrath and curse due to us by reason of the transgression of the law?",
+      "relevant_anchor": "WLC 153",
+      "hard_negative_anchor": "WLC 154",
+      "hard_negative_question": "What are the outward means whereby Christ communicates to us the benefits of his mediation?",
+      "answer_jaccard": 0.1562
+    },
+    {
+      "id": "hn_wlc_135_136",
+      "document": "wlc",
+      "query": "What are the duties required in the sixth commandment?",
+      "relevant_anchor": "WLC 135",
+      "hard_negative_anchor": "WLC 136",
+      "hard_negative_question": "What are the sins forbidden in the sixth commandment?",
+      "answer_jaccard": 0.1553
+    },
+    {
+      "id": "hn_wsc_8_11",
+      "document": "wsc",
+      "query": "How doth God execute his decrees?",
+      "relevant_anchor": "WSC 8",
+      "hard_negative_anchor": "WSC 11",
+      "hard_negative_question": "What are God's works of providence?",
+      "answer_jaccard": 0.1538
+    },
+    {
+      "id": "hn_wsc_80_81",
+      "document": "wsc",
+      "query": "What is required in the Tenth Commandment?",
+      "relevant_anchor": "WSC 80",
+      "hard_negative_anchor": "WSC 81",
+      "hard_negative_question": "What is forbidden in the Tenth Commandment?",
+      "answer_jaccard": 0.1538
+    }
+  ]
+}
