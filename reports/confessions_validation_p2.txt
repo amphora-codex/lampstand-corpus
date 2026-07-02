@@ -102,7 +102,7 @@ fix. The pipeline never marks a corpus ship-ready.
   wcf prose cross-checked vs Wikisource Burges-1646: 14 sampled sections, 0 divergence(s) (incl. forced ch.23.1 & ch.24.1)
 
 ## PROOF-TEXT CROSS-CHECK vs bibles.sqlite (refs must resolve in our own Bibles)
-  proof-text refs cross-checked against bibles.sqlite under the canonical-spine versification map: 5231 refs across translations ['asv', 'bsb', 'kjv', 'web']
+  proof-text refs cross-checked against bibles.sqlite under the canonical-spine versification map: 5311 refs across translations ['asv', 'bsb', 'kjv', 'web']
     asv: 1 proof ref(s) do not resolve in this translation
     bsb: 1 proof ref(s) do not resolve in this translation
     kjv: 1 proof ref(s) do not resolve in this translation
