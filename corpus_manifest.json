@@ -1,5 +1,5 @@
 {
-  "corpus_version": "corpus-v2.1.1-candidate",
+  "corpus_version": "corpus-v2.1.2-candidate",
   "ship_ready": false,
   "note": "CANDIDATE. The pipeline never marks a corpus version ship-ready — the architect's 23-point spot-check gates ship. Pack .sqlite files are gitignored (output/packs/); only this manifest is committed.",
   "format_migration": "Pack diet v1→v2: ondemand_embeddings.sqlite (byte-copy of the built embeddings.sqlite; float32 vectors + one SQL row per BM25 posting keyed by TEXT chunk id) is REPLACED by ondemand_search.sqlite (chunk metadata + display text + one varint-delta posting BLOB per term over stable INTEGER chunk ids; bm25_doc folded into chunk.doc_len; idx_posting_chunk dropped) and ondemand_vectors.sqlite (int8 vectors + per-vector scale, keyed by the same integer ids). bundled_search.sqlite keeps its name but adopts the same v2 encoding with its vectors embedded. Schema contract: docs/pack-diet.md.",
@@ -42,7 +42,7 @@
           "name": "bundled_crossrefs.sqlite",
           "role": "crossrefs",
           "bytes": 7389184,
-          "sha256": "116027ccce15a1156e5d4cccb122f7d37aec012d4fffa06840f2f626fa370754",
+          "sha256": "93f5a8f9523d195c799c24a10a96e50b9e9f30a0ba3271137bcf774a84ec40aa",
           "contents": {
             "format": "crossrefs-pack-v1",
             "n_sources": 29363,
@@ -58,7 +58,7 @@
           "name": "bundled_search.sqlite",
           "role": "search",
           "bytes": 31449088,
-          "sha256": "76c7fd1dc9c06b1ac9117031661689a901dcd0fde4ca33d7c1ee9e3f227ae167",
+          "sha256": "e5bb428e01cfbfc617331163782072a6886c5a16debc13da0afd001b110df1b1",
           "contents": {
             "format": "search-pack-v2",
             "n_chunks": 34642,
@@ -79,14 +79,14 @@
       "app_reader": "To honor the default grouping: fetch every packs.on_demand.files[] whose tier == \"default\". Treat download_group == \"retrieval-index\" (ondemand_search + ondemand_vectors) as one unit; the dense arm requires ondemand_vectors, BM25 requires only ondemand_search. tier == \"optional\" (none today) is the user-opt-in slot.",
       "tiers": {
         "default": {
-          "bytes": 610586624,
+          "bytes": 607494144,
           "groups": [
             "retrieval-index",
             "content"
           ]
         }
       },
-      "total_bytes": 610586624,
+      "total_bytes": 607494144,
       "files": [
         {
           "name": "ondemand_bibles.sqlite",
@@ -109,8 +109,8 @@
         {
           "name": "ondemand_commentaries.sqlite",
           "role": "commentaries",
-          "bytes": 132046848,
-          "sha256": "03c0f27486919ecb9f86825f3a9eb902d5773a7f2aa9d01867bbf8e9b0a3adf7",
+          "bytes": 131387392,
+          "sha256": "1b798b07011a96fa951cd1e1f80424837cc82d6c674d29b8a6b1a29f9fb41bb3",
           "tier": "default",
           "download_group": "content",
           "contents": {
@@ -162,15 +162,15 @@
         {
           "name": "ondemand_search.sqlite",
           "role": "search",
-          "bytes": 276254720,
-          "sha256": "4f12b989795e9c8cea433709724d6ee8b2aabb1990c592c81aad07eeec91a9aa",
+          "bytes": 275148800,
+          "sha256": "1318da3d8d5224056c0758102baf7571bea2487272db03a65e59f35c05e5ce9d",
           "tier": "default",
           "download_group": "retrieval-index",
           "contents": {
             "format": "search-pack-v2",
-            "n_chunks": 317204,
+            "n_chunks": 313966,
             "vocab_size": 174383,
-            "n_postings": 14231622,
+            "n_postings": 14202860,
             "posting_format": "uvarint-gap-tf-v1",
             "text_included": true,
             "n_gloss_rows": 411,
@@ -192,13 +192,13 @@
         {
           "name": "ondemand_vectors.sqlite",
           "role": "vectors",
-          "bytes": 86298624,
-          "sha256": "bddd6e3dc865d6fd2b390338644d87fe7b37bec116856ad5ccc8e9d98ca042a7",
+          "bytes": 84971520,
+          "sha256": "a6fb0bb558b1b4aea70e12fb771be7c2ee1ed391abf4295554a5e650dcc1afae",
           "tier": "default",
           "download_group": "retrieval-index",
           "contents": {
             "format": "vectors-pack-v2",
-            "n_vectors": 210123,
+            "n_vectors": 206885,
             "vector_format": "int8-symmetric-per-vector-le",
             "embedding_dim": 384
           }
@@ -260,8 +260,8 @@
   },
   "totals": {
     "bundled_bytes": 45666304,
-    "ondemand_bytes": 610586624,
-    "all_bytes": 656252928
+    "ondemand_bytes": 607494144,
+    "all_bytes": 653160448
   },
   "acknowledgements": [
     {

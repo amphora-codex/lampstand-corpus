@@ -19,16 +19,16 @@ ERROR / FLAG SUMMARY
 
 CHUNKS EMBEDDED
 ----------------------------------------------------------------
-  total chunks: 317204
+  total chunks: 313966
   by resource type:
-    commentary   145581
+    commentary   142343
     confession   895
     lexicon      32561
     scripture    138167
   by source:
-    commentary/calvin          45100
+    commentary/calvin          43045
     commentary/henry           40391
-    commentary/jfb             44817
+    commentary/jfb             43634
     commentary/spurgeon        15273
     confession/belgic          37
     confession/dort            94
@@ -89,17 +89,17 @@ BM25 KEYWORD INDEX
 ----------------------------------------------------------------
   tokenizer:     NFKC + casefold + [a-z0-9']+ ; no stemming
   vocabulary:    174383 terms
-  postings:      14231622
-  avg doc len:   72.15 tokens
+  postings:      14202860
+  avg doc len:   72.81 tokens
 
 RETRIEVAL SMOKE TEST (dense top-k; eyeball only)
 ----------------------------------------------------------------
   [PASS] "justification by faith"
           expect: Romans 3-5 / Galatians (and Reformed confessions on justification)
-    1. (0.851) commentary/jfb jfb:ROM.4.16#p1#33718 — 16, 17. Therefore, &c.—A general summary: "Thus justification is by fa
-    2. (0.841) commentary/jfb jfb:GAL.2.16#p4#36870 — justified by the faith of Christ —that is, by Christ, the object of fa
+    1. (0.851) commentary/jfb jfb:ROM.4.16#p1#32673 — 16, 17. Therefore, &c.—A general summary: "Thus justification is by fa
+    2. (0.841) commentary/jfb jfb:GAL.2.16#p4#35782 — justified by the faith of Christ —that is, by Christ, the object of fa
     3. (0.825) commentary/henry henry:ROM.3.19-31#p2#27888 — From all this Paul infers that it is in vain to look for justification
-    4. (0.824) commentary/calvin calvin:ROM.3.27#p5#24095 — 28. Therefore we conclude that a man is justified by faith without the
+    4. (0.824) commentary/calvin calvin:ROM.3.27#p5#22578 — 28. Therefore we conclude that a man is justified by faith without the
     5. (0.823) confession/wlc WLC 72 — Q72. What is justifying faith? A72. Justifying faith is a saving grace
 
   [PASS] "the LORD is my shepherd"
@@ -113,23 +113,29 @@ RETRIEVAL SMOKE TEST (dense top-k; eyeball only)
   [PASS] "in the beginning God created the heavens and the earth"
           expect: Genesis 1
     1. (0.938) scripture/bsb bsb:GEN 1:1 — In the beginning God created the heavens and the earth.
-    2. (0.855) commentary/calvin calvin:GEN.1.0#p2#1 — 1. In the beginning God created the heaven and the earth.
+    2. (0.855) commentary/calvin calvin:GEN.1.0#p2#0 — 1. In the beginning God created the heaven and the earth.
     3. (0.833) commentary/henry henry:GEN.1.1-2#p1#2 — 1 In the beginning God created the heaven and the earth. 2 And the ear
-    4. (0.827) commentary/calvin calvin:JHN.1.1#p6#17118 — in the beginning God created the heaven and the earth, ( Genesis 1:1 )
+    4. (0.827) commentary/calvin calvin:JHN.1.1#p6#15948 — in the beginning God created the heaven and the earth, ( Genesis 1:1 )
     5. (0.826) scripture/bsb bsb:GEN 2:4 — This is the account of the heavens and the earth when they were create
 
 INCREMENTAL RE-ENCODE
 ----------------------------------------------------------------
-  (full encode — no prior-vector reuse recorded this run)
+  mode: incremental (reused unchanged vectors)
+  total chunks:  206885
+  reused:        120206  (vectors copied verbatim from prior DB)
+  re-encoded:    86679  (changed / new chunks)
+  dropped:       89917  (prior chunk ids no longer present)
+  prior model revision: 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+  reuse key: content-addressed chunk id (resource_type+source+anchor+text_checksum); an id match guarantees byte-identical text under the pinned model.
 
 DETERMINISM
 ----------------------------------------------------------------
   method:   cosine-tolerance
   identical: False
-  max abs diff: 1.490e-07
+  max abs diff: 1.788e-07
   min cosine:   0.99999994
   note: 400-chunk CPU re-encode differed in bytes; FLAGGED for architect (CLAUDE.md rule 6)
-  encode wall-time: 8631.9s (CPU, deterministic)
+  encode wall-time: 2157.9s (CPU, deterministic)
 
 FLAGGED FOR HUMAN REVIEW
 ----------------------------------------------------------------
@@ -137,5 +143,5 @@ FLAGGED FOR HUMAN REVIEW
   2. 101 Strong's entries skipped from embedding — 'Not Used' placeholder numbers (Strong assigned but never populated; the new CC0 Greek edition ships them explicitly where the prior CC-BY-SA edition omitted them). No English text to embed; kept in lexicons.sqlite so the coverage span is explicit.
   3. 1 Scripture pericope windows were empty (made entirely of omitted critical-text verses) and skipped; verify these are the expected omitted-variant gaps, not a chunking error.
   4. 10 chunks exceeded the character cap and were truncated before encoding (the encoder also truncates at 512 tokens). Confirm no long commentary block lost material it needed for retrieval.
-  5. Embeddings were NOT bit-for-bit reproducible across two CPU runs (min cosine 0.99999994, max abs diff 1.490e-07). Recorded as within-tolerance and flagged for the architect per CLAUDE.md rule 6 — do not accept silently.
+  5. Embeddings were NOT bit-for-bit reproducible across two CPU runs (min cosine 0.99999994, max abs diff 1.788e-07). Recorded as within-tolerance and flagged for the architect per CLAUDE.md rule 6 — do not accept silently.
 

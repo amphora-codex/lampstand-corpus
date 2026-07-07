@@ -2,7 +2,7 @@
 
 **CANDIDATE MEASUREMENT — corpus half only.** The app lane builds the UI panel + the hybridContext graph boost against `docs/crossrefs-pack.md`.
 
-Corpus reference: `corpus-v2.1.1-candidate`.
+Corpus reference: `corpus-v2.1.2-candidate`.
 
 ## 1. Pack size + home
 

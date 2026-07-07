@@ -57,7 +57,16 @@ from .pack_codec import assign_int_ids, encode_postings, quantize_int8
 # §4b), and the packs.reranker Core ML asset. Chunk ids are UNCHANGED from v2.0
 # where the underlying text is unchanged (content-addressed). Freeze handoff:
 # docs/pack-handoff-v2.1.md. The architect tags `corpus-v2.1.0` at ship.
-CORPUS_VERSION_PLACEHOLDER = "corpus-v2.1.1-candidate"
+# v2.1.2 (candidate): the CODE delta over v2.1.1 is the structural-header filter —
+# ~3,238 pure passage-label / chapter-heading commentary chunks (Calvin's "Romans
+# 15:25-29", JFB's "CHAPTER 23", no exposition) are dropped at build time; see
+# build_commentaries.is_structural_header. NOTE: the candidate packs were rebuilt
+# from an on-disk commentaries.sqlite that predated recent parser work, so the
+# repackage also reconciled that accumulated commentary-parsing drift (the
+# incremental re-embed reused ~58%, not ~99%); the packs reflect CURRENT parsing +
+# the header filter. Still a candidate — ship_ready stays false until the
+# architect's spot-check gates ship.
+CORPUS_VERSION_PLACEHOLDER = "corpus-v2.1.2-candidate"
 
 # Bundled-pack scope (architect-locked).
 BUNDLED_TRANSLATION = "bsb"
