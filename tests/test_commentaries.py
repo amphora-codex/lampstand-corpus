@@ -22,6 +22,7 @@ from lampstand_corpus.commentaries import (
     _parse_scripcom,
     parse_commentary,
 )
+from lampstand_corpus.build_commentaries import is_structural_header
 from lampstand_corpus.schema import Provenance, ResourceType
 from lampstand_corpus.validate_commentaries import (
     CALVIN_EXPECTED_BOOKS,
@@ -53,6 +54,41 @@ def _parse(cid: str, volume: str, body: str):
     )
     src = _src(cid, volume)
     return parse_commentary(src, {volume: _PROV}, {volume: content})
+
+
+# --- structural-header filter ------------------------------------------------
+# The filter must drop pure passage-label / chapter headers (no exposition) while
+# NEVER touching a terse but real gloss or footnote. The KEEP cases are drawn from
+# real corpus chunks that a naive length filter would have wrongly deleted.
+@pytest.mark.parametrize("text", [
+    "Romans 15:25-29",          # Calvin passage-range label
+    "Psalm 131:1",              # Calvin single-verse label (singular "Psalm")
+    "2 Peter 3:5-8",            # numbered-book label
+    "Ephesians 2:14-16",
+    "Matthew 17:24-27",
+    "CHAPTER 23",               # JFB chapter heading
+    "PSALM 134",                # JFB psalm heading
+    "INTRODUCTION",
+    "Acts 1:1-2.",              # trailing period tolerated
+    "   ",                      # whitespace-only
+])
+def test_structural_header_drops(text):
+    assert is_structural_header(text)
+
+
+@pytest.mark.parametrize("text", [
+    "service —worship.",                        # JFB one-word gloss
+    "chosen —( Isa 41:8 ).",                     # JFB gloss with cross-ref
+    '14. — Greek, "But," or "And."',             # JFB textual note
+    "Harmony, vol. 1, p. 437 .",                 # Calvin footnote page ref
+    "First Galilean Circuit ( Mt 4:23-25 ).",    # pericope title WITH content
+    "Nu 5:5-10 . Restitution Enjoined.",         # abbreviated ref + a real title
+    "We have in these verses,",                  # Henry lead fragment
+    "Bithynia —to the northeast.",               # JFB geographic gloss
+    "Psalm 131 is a lovely psalm of humility.",  # a real sentence starting with a ref
+])
+def test_structural_header_keeps_real_content(text):
+    assert not is_structural_header(text)
 
 
 # --- scripCom mapping --------------------------------------------------------

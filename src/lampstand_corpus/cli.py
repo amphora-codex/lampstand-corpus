@@ -458,8 +458,11 @@ def cmd_build_commentaries() -> None:
     parsed = normalize_commentaries()
     out = OUTPUT_DIR / "commentaries.sqlite"
     print(f"Building {out} ...")
-    write_commentaries(parsed, out)
+    dropped = write_commentaries(parsed, out)
     print(f"  wrote {out} ({out.stat().st_size:,} bytes)")
+    if dropped:
+        print(f"  dropped {dropped:,} structural-header chunks "
+              "(passage labels / chapter headings, no exposition)")
     _emit_commentary_report(parsed)
 
 
