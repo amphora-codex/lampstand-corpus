@@ -1,7 +1,7 @@
 {
   "corpus_version": "corpus-v2.1.2",
   "ship_ready": true,
-  "note": "CANDIDATE. The pipeline never marks a corpus version ship-ready — the architect's 23-point spot-check gates ship. Pack .sqlite files are gitignored (output/packs/); only this manifest is committed.",
+  "note": "Ship status lives in ship_ready: the pipeline always writes false — the architect's 23-point spot-check gates the flip to true. Pack .sqlite files are gitignored (output/packs/); only this manifest is committed.",
   "format_migration": "Pack diet v1→v2: ondemand_embeddings.sqlite (byte-copy of the built embeddings.sqlite; float32 vectors + one SQL row per BM25 posting keyed by TEXT chunk id) is REPLACED by ondemand_search.sqlite (chunk metadata + display text + one varint-delta posting BLOB per term over stable INTEGER chunk ids; bm25_doc folded into chunk.doc_len; idx_posting_chunk dropped) and ondemand_vectors.sqlite (int8 vectors + per-vector scale, keyed by the same integer ids). bundled_search.sqlite keeps its name but adopts the same v2 encoding with its vectors embedded. Schema contract: docs/pack-diet.md.",
   "embedding_dim": 384,
   "packs": {

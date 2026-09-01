@@ -995,9 +995,10 @@ def _build_manifest(
         ("corpus_version", CORPUS_VERSION_PLACEHOLDER),
         ("ship_ready", False),
         ("note",
-         "CANDIDATE. The pipeline never marks a corpus version ship-ready — "
-         "the architect's 23-point spot-check gates ship. Pack .sqlite files are "
-         "gitignored (output/packs/); only this manifest is committed."),
+         "Ship status lives in ship_ready: the pipeline always writes false — "
+         "the architect's 23-point spot-check gates the flip to true. Pack "
+         ".sqlite files are gitignored (output/packs/); only this manifest is "
+         "committed."),
         ("format_migration",
          "Pack diet v1→v2: ondemand_embeddings.sqlite (byte-copy of the built "
          "embeddings.sqlite; float32 vectors + one SQL row per BM25 posting "
